@@ -3,7 +3,7 @@
 
 #include "BuiltIns.h"
 #include "Gamepad.h"
-#include "Ports.h"
+#include "Globals.h"
 
 #define FEED this->GetWatchdog().Feed()
 
@@ -12,6 +12,7 @@ class Robot: public IterativeRobot //we need a better name for the robot class
 public:
 	Gamepad Controller;
 	RobotDrive Drive;
+	ColorImage Image;
 	
 	Robot(void);
 	~Robot(void);
