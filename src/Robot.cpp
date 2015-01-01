@@ -1,49 +1,38 @@
 #include "Robot.h"
 
-using namespace std; //do we need this?
-
-Robot::Robot(void)
+Robot::Robot(void) : Controller(1)
 {
-	printf("Creating robot object\n");
 	SmartDashboard::PutBoolean("Active", true);
-	
+	SmartDashboard::PutString("State", "Unknown");
 }
 
 Robot::~Robot(void)
 {
-	printf("Destroying robot object\n");
 	SmartDashboard::PutBoolean("Active", false);
-	
-}
-	
-void Robot::StartCompetition(void)
-{
-
-}
-	
-void Robot::RobotInit(void)
-{
-
 }
 
 void Robot::DisabledInit(void)
 {
-
+	SmartDashboard::PutString("State", "Disabled");
+	
 }
 
 void Robot::AutonomousInit(void)
 {
-
+	SmartDashboard::PutString("State", "Autonomous");
+	
 }
 
 void Robot::TeleopInit(void)
 {
-
+	SmartDashboard::PutString("State", "Teleop");
+	
 }
 
 void Robot::TestInit(void)
 {
-
+	SmartDashboard::PutString("State", "Test");
+	
 }
 
 void Robot::DisabledPeriodic(void)
@@ -65,3 +54,5 @@ void Robot::TestPeriodic(void)
 {
 
 }
+
+START_ROBOT_CLASS(Robot);

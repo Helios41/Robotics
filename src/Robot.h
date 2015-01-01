@@ -1,19 +1,22 @@
-#include <stdio.h>
-#include <string> 
-#include "BuiltIns.h"
+#ifndef ROBOT_H_
+#define ROBOT_H_
 
-//do we need to include "string"
+#include "BuiltIns.h"
+#include "Gamepad.h"
+
 //we need a better name for the robot class
+//why is everything public? change?
+
+//change to SimpleRobot?
 
 class Robot: public IterativeRobot
 {
 public:
+	Gamepad Controller;
+	
 	Robot(void);
 	~Robot(void);
 	
-	void StartCompetition(void);
-	
-	void RobotInit(void);
 	void DisabledInit(void);
 	void AutonomousInit(void);
 	void TeleopInit(void);
@@ -24,3 +27,5 @@ public:
 	void TeleopPeriodic(void);
 	void TestPeriodic(void);
 };
+
+#endif
