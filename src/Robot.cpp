@@ -1,14 +1,15 @@
 #include "Robot.h"
 
-Robot::Robot(void) : Controller(1)
+Robot::Robot(void): 
+	Controller(CONTROLLER_PORT), 
+	Drive(LEFT_WHEEL_PORT, RIGHT_WHEEL_PORT)
 {
-	SmartDashboard::PutBoolean("Active", true);
 	SmartDashboard::PutString("State", "Unknown");
 }
 
 Robot::~Robot(void)
 {
-	SmartDashboard::PutBoolean("Active", false);
+
 }
 
 void Robot::DisabledInit(void)
@@ -47,7 +48,19 @@ void Robot::AutonomousPeriodic(void)
 
 void Robot::TeleopPeriodic(void);
 {
-
+	float leftSpeed = 0.0f;
+	float rightSpeed = 0.0f;
+	
+	if(this->Controller.GetLBTrigger())
+		leftSpeed = 5.0f;
+		
+	if(this->Controller.GetRBTrigger())
+		rightSpeed = 5.0f;
+	
+	this->Drive.TankDrive(leftSpeed, rightSpeed);
+	
+	if(!this->Controller.GetXButton())
+		this->GetWatchdog().Feed();
 }
 
 void Robot::TestPeriodic(void)

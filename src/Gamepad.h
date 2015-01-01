@@ -9,7 +9,6 @@ private:
 	Joystick Controller;
 	
 public:
-	Gamepad() : Controller(1) {};
 	Gamepad(int port) : Controller(port) {};
 	~Gamepad() {};
 	

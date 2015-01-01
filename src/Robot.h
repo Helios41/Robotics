@@ -5,14 +5,17 @@
 #include "Gamepad.h"
 
 //we need a better name for the robot class
-//why is everything public? change?
 
-//change to SimpleRobot?
+#define CONTROLLER_PORT 1
+
+#define LEFT_WHEEL_PORT 1
+#define RIGHT_WHEEL_PORT 2
 
 class Robot: public IterativeRobot
 {
 public:
 	Gamepad Controller;
+	RobotDrive Drive;
 	
 	Robot(void);
 	~Robot(void);
