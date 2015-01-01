@@ -1,13 +1,19 @@
 #include "Robot.h"
 
+using namespace std; //do we need this?
+
 Robot::Robot(void)
 {
-
+	printf("Creating robot object\n");
+	SmartDashboard::PutBoolean("Active", true);
+	
 }
 
 Robot::~Robot(void)
 {
-
+	printf("Destroying robot object\n");
+	SmartDashboard::PutBoolean("Active", false);
+	
 }
 	
 void Robot::StartCompetition(void)

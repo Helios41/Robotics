@@ -1,5 +1,8 @@
+#include <stdio.h>
+#include <string> 
 #include "BuiltIns.h"
 
+//do we need to include "string"
 //we need a better name for the robot class
 
 class Robot: public IterativeRobot
