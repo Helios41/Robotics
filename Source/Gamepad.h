@@ -5,9 +5,15 @@
 
 /* 
 	TODO:
-	-Map D-Pad
+	-Test DPad mappings
 	-Fix not being able to check for both triggers
 */
+
+#define DPAD_UP 1
+#define DPAD_DOWN 2
+#define DPAD_LEFT 3
+#define DPAD_RIGHT 4
+#define DPAD_NONE 0
 
 class Gamepad
 {
@@ -29,11 +35,13 @@ public:
 	bool GetLTrigger();
 	bool GetRTrigger();
 	
-	float GetLeftAnalogX();
-	float GetLeftAnalogY();
+	float GetLAnalogX();
+	float GetLAnalogY();
 	
-	float GetRightAnalogX();
-	float GetRightAnalogY();
+	float GetRAnalogX();
+	float GetRAnalogY();
+	
+	int GetDPad();
 };
 
 #endif

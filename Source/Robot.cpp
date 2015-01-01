@@ -44,9 +44,9 @@ void Robot::DisabledPeriodic(void)
 
 void Robot::AutonomousPeriodic(void)
 {
-	AxisCamera &camera = AxisCamera::GetInstance(CAMERA_IP);
-	camera.GetImage(&this->Image);
-	this->Image.Write("/Image.bmp");
+	//AxisCamera &camera = AxisCamera::GetInstance(CAMERA_IP);
+	//camera.GetImage(&this->Image);
+	//this->Image.Write("/Image.bmp");
 	
 	FEED;
 }
@@ -56,11 +56,11 @@ void Robot::TeleopPeriodic(void);
 	float leftSpeed = 0.0f;
 	float rightSpeed = 0.0f;
 	
-	if(this->Controller.GetLBumper())
-		leftSpeed = 5.0f;
+	if(this->Controller.GetLAnalogY() > 0.0f)
+		leftSpeed = this->Controller.GetLAnalogY();
 		
-	if(this->Controller.GetRBumper())
-		rightSpeed = 5.0f;
+	if(this->Controller.GetRAnalogY() > 0.0f)
+		rightSpeed = this->Controller.GetRAnalogY();
 	
 	this->Drive.TankDrive(leftSpeed, rightSpeed);
 	

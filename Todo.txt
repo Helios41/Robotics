@@ -1,5 +1,5 @@
 Todo:
    -OmniController for both Joystick & Gamepad
    -Vision processing
-   -
+   -Think of a better name for the robot class
    -

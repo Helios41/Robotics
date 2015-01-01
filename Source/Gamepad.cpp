@@ -54,22 +54,42 @@ bool Gamepad::GetRTrigger()
 	return false;
 }
 
-float GetLeftAnalogX()
+float Gamepad::GetLAnalogX()
 {
 	return this->Controller.GetRawAxis(1);
 }
 
-float GetLeftAnalogY()
+float Gamepad::GetLAnalogY()
 {
 	return this->Controller.GetRawAxis(2);
 }
 
-float GetRightAnalogX()
+float Gamepad::GetRAnalogX()
 {
 	return this->Controller.GetRawAxis(4);
 }
 
-float GetRightAnalogY()
+float Gamepad::GetRAnalogY()
 {
 	return this->Controller.GetRawAxis(5);
+}
+
+int Gamepad::GetDPad()
+{
+	float x = this->Controller.GetRawAxis(6);
+	float y = this->Controller.GetRawAxis(7);
+	
+	if(x > 0.0f)
+		return DPAD_RIGHT;
+		
+	if(x < 0.0f)
+		return DPAD_LEFT;
+		
+	if(y < 0.0f)
+		return DPAD_DOWN;
+		
+	if(y > 0.0f)
+		return DPAD_UP;
+		
+	return DPAD_NONE;
 }
