@@ -56,10 +56,10 @@ void Robot::TeleopPeriodic(void);
 	float leftSpeed = 0.0f;
 	float rightSpeed = 0.0f;
 	
-	if(this->Controller.GetLBTrigger())
+	if(this->Controller.GetLBumper())
 		leftSpeed = 5.0f;
 		
-	if(this->Controller.GetRBTrigger())
+	if(this->Controller.GetRBumper())
 		rightSpeed = 5.0f;
 	
 	this->Drive.TankDrive(leftSpeed, rightSpeed);

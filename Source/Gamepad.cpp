@@ -20,19 +20,19 @@ bool Gamepad::GetBButton()
 	return this->Controller.GetRawButton(2);
 }
 	
-bool Gamepad::GetLBTrigger()
+bool Gamepad::GetLBumper()
 {
 	return this->Controller.GetRawButton(5);
 }
 
-bool Gamepad::GetRBTrigger()
+bool Gamepad::GetRBumper()
 {
 	return this->Controller.GetRawButton(6);
 }
 
-bool Gamepad::GetLTTrigger()
+bool Gamepad::GetLTrigger()
 {
-	float v = this->Controller.GetThrottle();
+	float v = this->Controller.GetRawAxis(3);
 
 	if((v > 0.0f) && (v < 1.0f))
 	{
@@ -42,9 +42,9 @@ bool Gamepad::GetLTTrigger()
 	return false;
 }
 
-bool Gamepad::GetRTTrigger()
+bool Gamepad::GetRTrigger()
 {
-	float v = this->Controller.GetThrottle();
+	float v = this->Controller.GetRawAxis(3);
 
 	if((v < 0.0f) && (v > -1.0f))
 	{
@@ -52,4 +52,24 @@ bool Gamepad::GetRTTrigger()
 	}
 	
 	return false;
+}
+
+float GetLeftAnalogX()
+{
+	return this->Controller.GetRawAxis(1);
+}
+
+float GetLeftAnalogY()
+{
+	return this->Controller.GetRawAxis(2);
+}
+
+float GetRightAnalogX()
+{
+	return this->Controller.GetRawAxis(4);
+}
+
+float GetRightAnalogY()
+{
+	return this->Controller.GetRawAxis(5);
 }

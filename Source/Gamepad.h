@@ -3,6 +3,12 @@
 
 #include "BuiltIns.h"
 
+/* 
+	TODO:
+	-Map D-Pad
+	-Fix not being able to check for both triggers
+*/
+
 class Gamepad
 {
 private:
@@ -17,10 +23,17 @@ public:
 	bool GetAButton();
 	bool GetBButton();
 	
-	bool GetLBTrigger();
-	bool GetRBTrigger();
-	bool GetLTTrigger();
-	bool GetRTTrigger();
+	bool GetLBumper();
+	bool GetRBumper();
+	
+	bool GetLTrigger();
+	bool GetRTrigger();
+	
+	float GetLeftAnalogX();
+	float GetLeftAnalogY();
+	
+	float GetRightAnalogX();
+	float GetRightAnalogY();
 };
 
 #endif
