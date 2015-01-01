@@ -43,7 +43,7 @@ void Robot::DisabledPeriodic(void)
 
 void Robot::AutonomousPeriodic(void)
 {
-
+	FEED;
 }
 
 void Robot::TeleopPeriodic(void);
@@ -60,12 +60,12 @@ void Robot::TeleopPeriodic(void);
 	this->Drive.TankDrive(leftSpeed, rightSpeed);
 	
 	if(!this->Controller.GetXButton())
-		this->GetWatchdog().Feed();
+		FEED;
 }
 
 void Robot::TestPeriodic(void)
 {
-
+	FEED;
 }
 
 START_ROBOT_CLASS(Robot);

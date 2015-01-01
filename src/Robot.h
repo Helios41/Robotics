@@ -3,15 +3,11 @@
 
 #include "BuiltIns.h"
 #include "Gamepad.h"
+#include "Ports.h"
 
-//we need a better name for the robot class
+#define FEED this->GetWatchdog().Feed()
 
-#define CONTROLLER_PORT 1
-
-#define LEFT_WHEEL_PORT 1
-#define RIGHT_WHEEL_PORT 2
-
-class Robot: public IterativeRobot
+class Robot: public IterativeRobot //we need a better name for the robot class
 {
 public:
 	Gamepad Controller;
