@@ -2,4 +2,6 @@ Todo:
    -OmniController for both Joystick & Gamepad
    -Vision processing
    -Think of a better name for the robot class
+   -Test DPad mappings
+   -Fix not being able to check for both triggers
    -

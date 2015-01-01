@@ -70,7 +70,7 @@ void Robot::TeleopPeriodic(void);
 
 void Robot::TestPeriodic(void)
 {
-	FEED;
+	
 }
 
 START_ROBOT_CLASS(Robot);

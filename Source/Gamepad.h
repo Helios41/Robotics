@@ -3,12 +3,6 @@
 
 #include "BuiltIns.h"
 
-/* 
-	TODO:
-	-Test DPad mappings
-	-Fix not being able to check for both triggers
-*/
-
 #define DPAD_UP 1
 #define DPAD_DOWN 2
 #define DPAD_LEFT 3
