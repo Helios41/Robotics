@@ -7,12 +7,12 @@
 
 #define FEED this->GetWatchdog().Feed()
 
-class Robot: public IterativeRobot //we need a better name for the robot class
+class Robot: public IterativeRobot
 {
 public:
 	Gamepad Controller;
 	RobotDrive Drive;
-	ColorImage Image;
+	ColorImage Image; //do we need this? 
 	
 	Robot(void);
 	~Robot(void);
