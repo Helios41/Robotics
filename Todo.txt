@@ -4,4 +4,8 @@ Todo:
    -Test DPad mappings
    -Fix not being able to check for both triggers
    -Finish network code
+   -Gear switch API
+   -DPad changes gear
+   -
+   -
    -
