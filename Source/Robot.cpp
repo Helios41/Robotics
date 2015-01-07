@@ -2,8 +2,7 @@
 
 Robot::Robot(void): 
 	Controller(CONTROLLER_PORT), 
-	Drive(LEFT_WHEEL_PORT, RIGHT_WHEEL_PORT),
-	Image(IMAQ_IMAGE_RGB)
+	Drive(LEFT_FRONT_WHEEL_PORT, RIGHT_FRONT_WHEEL_PORT)
 {
 	SmartDashboard::PutString("State", "Unknown");
 }
@@ -44,9 +43,6 @@ void Robot::DisabledPeriodic(void)
 
 void Robot::AutonomousPeriodic(void)
 {
-	//AxisCamera &camera = AxisCamera::GetInstance(CAMERA_IP);
-	//camera.GetImage(&this->Image);
-	//this->Image.Write("/Image.bmp");
 	
 	FEED;
 }

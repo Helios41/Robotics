@@ -12,7 +12,6 @@ class Robot: public IterativeRobot
 public:
 	Gamepad Controller;
 	RobotDrive Drive;
-	ColorImage Image; //do we need this? 
 	
 	Robot(void);
 	~Robot(void);

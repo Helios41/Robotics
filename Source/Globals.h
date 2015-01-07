@@ -3,9 +3,9 @@
 
 #define CONTROLLER_PORT 1
 
-#define LEFT_WHEEL_PORT 1
-#define RIGHT_WHEEL_PORT 2
-
-#define CAMERA_IP "0.0.0.0"
+#define LEFT_FRONT_WHEEL_PORT 1
+#define RIGHT_FRONT_WHEEL_PORT 2
+#define LEFT_BACK_WHEEL_PORT 3
+#define RIGHT_BACK_WHEEL_PORT 4
 
 #endif
