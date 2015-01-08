@@ -28,6 +28,9 @@ public:
 	
 	bool GetLTrigger();
 	bool GetRTrigger();
+
+        bool GetLButton();
+        bool GetRButton();
 	
 	float GetLAnalogX();
 	float GetLAnalogY();

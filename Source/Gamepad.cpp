@@ -93,3 +93,13 @@ int Gamepad::GetDPad()
 		
 	return DPAD_NONE;
 }
+
+bool Gamepad::GetLButton()
+{
+	return this->Controller.GetRawButton(9);
+}
+
+bool Gamepad::GetRButton()
+{
+	return this->Controller.GetRawButton(10);
+}
