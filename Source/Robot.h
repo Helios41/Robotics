@@ -3,6 +3,7 @@
 
 #include "BuiltIns.h"
 #include "Gamepad.h"
+#include "MechanumDrive.h"
 #include "Globals.h"
 
 #define FEED this->GetWatchdog().Feed()
@@ -11,7 +12,7 @@ class Robot: public IterativeRobot
 {
 public:
 	Gamepad Controller;
-	RobotDrive Drive;
+	MechanumDrive Drive;
 	
 	Robot(void);
 	~Robot(void);

@@ -2,7 +2,7 @@
 
 Robot::Robot(void): 
 	Controller(CONTROLLER_PORT), 
-	Drive(LEFT_FRONT_WHEEL_PORT, RIGHT_FRONT_WHEEL_PORT)
+	Drive(LEFT_FRONT_WHEEL_PORT, RIGHT_FRONT_WHEEL_PORT, LEFT_BACK_WHEEL_PORT, RIGHT_BACK_WHEEL_PORT)
 {
 	SmartDashboard::PutString("State", "Unknown");
 }
