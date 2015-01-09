@@ -51,7 +51,7 @@ body {
 	text-align: center;
 }
 
-.homelink:hover {
+.home:hover  .homelink{
 	opacity: 1;
 	cursor: hand;
 	visibility: visible;
