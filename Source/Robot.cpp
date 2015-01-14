@@ -1,9 +1,11 @@
 #include "Robot.h"
 
 Robot::Robot(void): 
-	Controller(CONTROLLER_PORT), 
-	Drive(LEFT_FRONT_WHEEL_PORT, RIGHT_FRONT_WHEEL_PORT, LEFT_BACK_WHEEL_PORT, RIGHT_BACK_WHEEL_PORT)
+	Controller(CONTROLLER_PORT),
+	Drive(LEFT_FRONT_WHEEL_PORT, RIGHT_FRONT_WHEEL_PORT) 
+	//Drive(LEFT_FRONT_WHEEL_PORT, RIGHT_FRONT_WHEEL_PORT, LEFT_BACK_WHEEL_PORT, RIGHT_BACK_WHEEL_PORT)
 {
+	this->Drive.SetExpiration(0.1);
 	SmartDashboard::PutString("State", "Unknown");
 }
 
@@ -20,14 +22,14 @@ void Robot::DisabledInit(void)
 
 void Robot::AutonomousInit(void)
 {
+	this->Drive.SetSafetyEnabled(false);
 	SmartDashboard::PutString("State", "Autonomous");
-	
 }
 
 void Robot::TeleopInit(void)
 {
+	this->Drive.SetSafetyEnabled(true);
 	SmartDashboard::PutString("State", "Teleop");
-	
 }
 
 void Robot::TestInit(void)
@@ -38,7 +40,7 @@ void Robot::TestInit(void)
 
 void Robot::DisabledPeriodic(void)
 {
-
+	FEED;
 }
 
 void Robot::AutonomousPeriodic(void)

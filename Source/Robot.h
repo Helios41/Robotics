@@ -12,8 +12,9 @@ class Robot: public IterativeRobot
 {
 public:
 	Gamepad Controller;
-	MechanumDrive Drive;
-	
+	//MechanumDrive Drive;
+	RobotDrive Drive;	
+
 	Robot(void);
 	~Robot(void);
 	
