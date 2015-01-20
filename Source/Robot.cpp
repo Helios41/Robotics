@@ -1,9 +1,9 @@
 #include "Robot.h"
 
 Robot::Robot(void): 
-	Controller(CONTROLLER_PORT),
-	Drive(LEFT_FRONT_WHEEL_PORT, RIGHT_FRONT_WHEEL_PORT) 
-	//Drive(LEFT_FRONT_WHEEL_PORT, RIGHT_FRONT_WHEEL_PORT, LEFT_BACK_WHEEL_PORT, RIGHT_BACK_WHEEL_PORT)
+	Controller(Globals::Controller),
+	Drive(Globals::LeftFrontWheel, Globals::RightFrontWheel) 
+	//Drive(Globals::LeftFrontWheel, Globals::RightFrontWheel, Globals::LeftBackWheel, Globals::RightBackWheel)
 {
 	this->Drive.SetExpiration(0.1);
 	SmartDashboard::PutString("State", "Unknown");

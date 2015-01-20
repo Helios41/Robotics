@@ -1,11 +1,14 @@
-#ifndef PORTS_H_
-#define PORTS_H_
+#ifndef GLOBALS_H_
+#define GLOBALS_H_
 
-#define CONTROLLER_PORT 1
-
-#define RIGHT_FRONT_WHEEL_PORT 0
-#define LEFT_FRONT_WHEEL_PORT 2
-#define RIGHT_BACK_WHEEL_PORT 1
-#define LEFT_BACK_WHEEL_PORT 3
+class Globals
+{
+	static const int Controller = 1;
+	
+	static const int RightFrontWheel = 0;
+	static const int LeftFrontWheel = 2;
+	static const int RightBackWheel = 1;
+	static const int LeftBackWheel = 3;
+};
 
 #endif
