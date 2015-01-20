@@ -14,61 +14,65 @@ Robot::~Robot(void)
 
 }
 
-void Robot::DisabledInit(void)
+void Robot::Disabled(void)
 {
 	SmartDashboard::PutString("State", "Disabled");
 	
+	while(IsDisabled())
+	{
+		
+	}
 }
 
-void Robot::AutonomousInit(void)
+void Robot::Autonomous(void)
 {
 	this->Drive.SetSafetyEnabled(false);
 	SmartDashboard::PutString("State", "Autonomous");
-}
-
-void Robot::TeleopInit(void)
-{
-	this->Drive.SetSafetyEnabled(true);
-	SmartDashboard::PutString("State", "Teleop");
-}
-
-void Robot::TestInit(void)
-{
-	SmartDashboard::PutString("State", "Test");
 	
-}
-
-void Robot::DisabledPeriodic(void)
-{
-	FEED;
-}
-
-void Robot::AutonomousPeriodic(void)
-{
-	
-	FEED;
-}
-
-void Robot::TeleopPeriodic(void);
-{
 	float leftSpeed = 0.0f;
 	float rightSpeed = 0.0f;
 	
-	if(this->Controller.GetLAnalogY() > 0.0f)
-		leftSpeed = this->Controller.GetLAnalogY();
+	while(IsAutonomous() && IsEnabled())
+	{
+		if((leftSpeed < 1.0f) && (rightSpeed < 1.0f))
+		{
+			leftSpeed += 0.01f;
+			rightSpeed += 0.01f;
+		}
+		else
+		{
+			leftSpeed = -0.3f;
+			rightSpeed = -0.3f;
+		}
 		
-	if(this->Controller.GetRAnalogY() > 0.0f)
-		rightSpeed = this->Controller.GetRAnalogY();
-	
-	this->Drive.TankDrive(leftSpeed, rightSpeed);
-	
-	if(!this->Controller.GetXButton())
-		FEED;
+		this->Drive.TankDrive(leftSpeed, rightSpeed);
+		Wait(0.005);
+	}
 }
 
-void Robot::TestPeriodic(void)
+void Robot::OperatorControl(void)
 {
-	FEED;	
+	this->Drive.SetSafetyEnabled(true);
+	SmartDashboard::PutString("State", "Teleop");
+	
+	while(IsOperatorControl() && IsEnabled())
+	{
+		float leftSpeed = this->Controller.GetLAnalogY();
+		float rightSpeed = this->Controller.GetRAnalogY();
+	
+		this->Drive.TankDrive(leftSpeed, rightSpeed);
+		Wait(0.005);
+	}
+}
+
+void Robot::Test(void)
+{
+	SmartDashboard::PutString("State", "Test");
+	
+	while(IsTest() && IsEnabled())
+	{
+		
+	}
 }
 
 START_ROBOT_CLASS(Robot);
