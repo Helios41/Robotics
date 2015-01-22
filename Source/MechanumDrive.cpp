@@ -7,7 +7,7 @@ float Vector2::Length()
 }
 
 MechanumDrive::MechanumDrive(int frontLeft, int frontRight, int backLeft, int backRight) :
-   Drive(frontLeft, frontRight, backLeft, backRight);
+   Drive(frontLeft, backLeft, frontRight, backRight);
 {
 
 }
@@ -25,5 +25,5 @@ void MechanumDrive::SetDirection(float XAxis, float YAxis)
 
 void MechanumDrive::UpdateDrive()
 {
-	
+	this->Drive.MecanumDrive_Cartesian(this->Direction.X, this->Direction.Y, 0.0f);
 }
