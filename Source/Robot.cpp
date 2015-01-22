@@ -57,8 +57,26 @@ void Robot::OperatorControl(void)
 	
 	while(IsOperatorControl() && IsEnabled())
 	{
+		
+#if 0
 		float leftSpeed = this->Controller.GetLAnalogY();
 		float rightSpeed = this->Controller.GetRAnalogY();
+#endif
+
+		float controllerY = this->Controller.GetLAnalogY();
+		float controllerX = this->Controller.GetLAnalogX();
+	
+		float leftSpeed = controllerY;
+		float rightSpeed = controllerY;
+	
+		if(controllerX > 0.0)
+		{
+			rightSpeed *= 0.5;
+		}
+		else if(controllerX < 0.0)
+		{
+			leftSpeed *= 0.5;
+		}
 	
 		this->Drive.TankDrive(leftSpeed, rightSpeed);
 		Wait(0.005);
