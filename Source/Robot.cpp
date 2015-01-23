@@ -1,4 +1,5 @@
 #include "Robot.h"
+#include "math.h"
 
 Robot::Robot(void): 
 	Controller(Globals::Controller),
@@ -56,10 +57,7 @@ void Robot::OperatorControl(void)
 	SmartDashboard::PutString("State", "Teleop");
 	
 	while(IsOperatorControl() && IsEnabled())
-	{
-		//float leftSpeed = this->Controller.GetLAnalogY();
-		//float rightSpeed = this->Controller.GetRAnalogY();
-		
+	{	
 		float controllerY = this->Controller.GetLAnalogY();
 		float controllerX = this->Controller.GetLAnalogX();
 	
@@ -79,11 +77,11 @@ void Robot::OperatorControl(void)
 	
 		if(controllerX > 0.0)
 		{
-			rightSpeed *= 0.5;
+			rightSpeed *= 1.0 / controllerX;
 		}
 		else if(controllerX < 0.0)
 		{
-			leftSpeed *= 0.5;
+			leftSpeed *= 1.0 / fabs(controllerX);
 		}
 	
 		this->Drive.TankDrive(leftSpeed, rightSpeed);
