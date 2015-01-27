@@ -6,12 +6,17 @@
 #include "MechanumDrive.h"
 #include "Globals.h"
 
+#define KIT_DRIVE
+
 class Robot: public SimpleRobot
 {
 public:
 	Gamepad Controller;
-	//MechanumDrive Drive;
-	RobotDrive Drive;	
+#ifdef KIT_DRIVE
+	RobotDrive Drive;
+#elif defined(MECHANUM_DRIVE)
+	MechanumDrive Drive;
+#endif
 
 	Robot(void);
 	~Robot(void);

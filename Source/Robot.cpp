@@ -60,10 +60,9 @@ void Robot::OperatorControl(void)
 	{	
 		float controllerY = this->Controller.GetLAnalogY();
 		float controllerX = this->Controller.GetLAnalogX();
-	
-		float leftSpeed = controllerY;
-		float rightSpeed = controllerY;
-		/*float rotate = 0.0f;
+		
+#ifdef MECHANUM_DRIVE
+		float rotate = 0.0f;
 	
 		if(this->Controller.GetLBumper())
 		{
@@ -73,7 +72,14 @@ void Robot::OperatorControl(void)
 		if(this->Controller.GetRBumper())
 		{
 			rotate = 0.5f;
-		}*/
+		}
+	
+		this->Drive.Drive(controllerX, controllerY, rotate);
+#endif
+
+#ifdef KIT_DRIVE	
+		float leftSpeed = controllerY;
+		float rightSpeed = controllerY;
 	
 		if(controllerX > 0.0)
 		{
@@ -85,7 +91,8 @@ void Robot::OperatorControl(void)
 		}
 	
 		this->Drive.TankDrive(leftSpeed, rightSpeed);
-		//this->Drive.Drive(x, y, rotate);
+#endif
+		
 		Wait(0.005);
 	}
 }

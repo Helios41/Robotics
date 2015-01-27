@@ -20,3 +20,23 @@ void MechanumDrive::Drive(float XAxis, float YAxis, float rotate)
 {
 	this->Drive.MecanumDrive_Cartesian(XAxis, YAxis, rotate);
 }
+
+void MechanumDrive:DriveForward(float speed)
+{	
+	this->Drive(0.0f, speed);
+}
+
+void MechanumDrive:DriveBackward(float speed)
+{
+	this->Drive(0.0f, speed - (speed * 2));
+}
+
+void MechanumDrive:DriveLeft(float speed)
+{
+	this->Drive(speed - (speed * 2), 0.0f);
+}
+
+void MechanumDrive:DriveRight(float speed)
+{
+	this->Drive(speed, 0.0f);
+}
