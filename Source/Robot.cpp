@@ -15,8 +15,6 @@ Robot::Robot(void):
 
 	this->Drive.SetExpiration(0.1);
 	SmartDashboard::PutString("State", "Unknown");
-	this->Compressor.Start();
-	//TODO: add a safety switch to the compressor
 }
 
 Robot::~Robot(void)
