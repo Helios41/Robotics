@@ -74,7 +74,7 @@ void Robot::OperatorControl(void)
 		}
 		else
 		{
-			this->Solenoid.Off();
+			this->Solenoid.Reverse();
 		}
 
 #ifdef MECHANUM_DRIVE

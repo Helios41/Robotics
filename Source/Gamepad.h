@@ -3,6 +3,15 @@
 
 #include "BuiltIns.h"
 
+enum DPadValue
+{
+	DPadUp,
+	DPadDown,
+	DPadLeft,
+	DPadRight,
+	DPadNone
+};
+
 #define DPAD_UP 1
 #define DPAD_DOWN 2
 #define DPAD_LEFT 3
@@ -15,6 +24,27 @@ private:
 	Joystick Controller;
 	
 public:
+	static const int YButton = 4;
+	static const int XButton = 3;
+	static const int AButton = 1;
+	static const int BButton = 2;
+
+	static const int LBButton = 5;
+	static const int RBButton = 6;
+	
+	static const int TAxis = 3;
+	
+	static const int LXAxis = 1;
+	static const int LYAxis = 2;
+	static const int LButton = 9;
+	
+	static const int RXAxis = 4;
+	static const int RYAxis = 5;
+	static const int RButton = 10;
+	
+	static const int DXAxis = 6;
+	static const int DYAxis = 7;
+	
 	Gamepad(int port);
 	~Gamepad();
 	
@@ -38,7 +68,7 @@ public:
 	float GetRAnalogX();
 	float GetRAnalogY();
 	
-	int GetDPad();
+	DPadValue GetDPad();
 };
 
 #endif
