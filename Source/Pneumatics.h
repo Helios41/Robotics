@@ -3,20 +3,6 @@
 
 #include "WPILib.h"
 
-class PneumaticCompressor
-{
-	private:
-		Compressor compressor;
-
-	public:
-		PneumaticCompressor(int pressureSwitch, int compressorRelay);
-		~PneumaticCompressor(void);
-
-		void Start(void);
-		void Stop(void);
-		int GetPreasure(void);
-};
-
 class PneumaticSolenoid
 {
 	private:

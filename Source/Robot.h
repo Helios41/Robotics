@@ -5,12 +5,14 @@
 #include "Gamepad.h"
 #include "MechanumDrive.h"
 #include "Globals.h"
+#include "Pneumatics.h"
 
 #define KIT_DRIVE
 
 class Robot: public SimpleRobot
 {
 public:
+	PneumaticSolenoid Solenoid;
 	Gamepad Controller;
 #ifdef KIT_DRIVE
 	RobotDrive Drive;

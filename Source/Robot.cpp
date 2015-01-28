@@ -3,11 +3,20 @@
 
 Robot::Robot(void): 
 	Controller(Globals::Controller),
-	Drive(Globals::LeftFrontWheel, Globals::RightFrontWheel) 
-	//Drive(Globals::LeftFrontWheel, Globals::RightFrontWheel, Globals::LeftBackWheel, Globals::RightBackWheel)
+	Solenoid(Globals::SolenoidForward, Globals::SolenoidReverse)
 {
+#ifdef KIT_DRIVE
+	this->Drive(Globals::LeftFrontWheel, Globals::RightFrontWheel);
+#endif
+
+#ifdef MECHANUM_DRIVE
+	this->Drive(Globals::LeftFrontWheel, Globals::RightFrontWheel, Globals::LeftBackWheel, Globals::RightBackWheel);
+#endif
+
 	this->Drive.SetExpiration(0.1);
 	SmartDashboard::PutString("State", "Unknown");
+	this->Compressor.Start();
+	//TODO: add a safety switch to the compressor
 }
 
 Robot::~Robot(void)
@@ -60,7 +69,16 @@ void Robot::OperatorControl(void)
 	{	
 		float controllerY = this->Controller.GetLAnalogY();
 		float controllerX = this->Controller.GetLAnalogX();
-		
+	
+		if(this->Controller.GetXButton())
+		{
+			this->Solenoid.Forward();
+		}
+		else
+		{
+			this->Solenoid.Off();
+		}
+
 #ifdef MECHANUM_DRIVE
 		float rotate = 0.0f;
 	

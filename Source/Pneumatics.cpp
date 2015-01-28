@@ -1,31 +1,5 @@
 #include "Pneumatics.h"
 
-PneumaticCompressor::PneumaticCompressor(int preasureSwitch, int compressorRelay) :
-	compressor(preasureSwitch, compressorRelay)
-{
-
-}
-
-PneumaticCompressor::~PneumaticCompressor(void)
-{
-
-}
-
-void PneumaticCompressor::Start(void)
-{
-	this->compressor.Start();
-}
-
-void PneumaticCompressor::Stop(void)
-{
-	this->compressor.Stop();
-}
-
-int PneumaticCompressor::GetPreasure(void)
-{
-	return this->compressor.GetPreasureSwitchValue();	
-}
-
 PneumaticSolenoid::PneumaticSolenoid(int forwardPort, int reversePort) : 
 	solenoid(forwardPort, reversePort)
 {
