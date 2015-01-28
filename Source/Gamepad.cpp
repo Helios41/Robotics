@@ -1,5 +1,16 @@
 #include "Gamepad.h"
 
+Gamepad::Gamepad(int port):
+	Controller(port)
+{
+
+}
+
+Gamepad::~Gamepad()
+{
+
+}
+
 bool Gamepad::GetYButton();
 {
 	return this->Controller.GetRawButton(4);

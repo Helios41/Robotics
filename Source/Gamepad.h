@@ -15,8 +15,8 @@ private:
 	Joystick Controller;
 	
 public:
-	Gamepad(int port) : Controller(port) {};
-	~Gamepad() {};
+	Gamepad(int port);
+	~Gamepad();
 	
 	bool GetYButton();
 	bool GetXButton();
