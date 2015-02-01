@@ -3,17 +3,14 @@
 
 Robot::Robot(void): 
 	Controller(Globals::Controller),
-	Solenoid(Globals::SolenoidForward, Globals::SolenoidReverse)
+	Solenoid(Globals::SolenoidForward, Globals::SolenoidReverse),
+   Drive(Globals::LeftFrontWheel, Globals::RightFrontWheel, Globals::LeftBackWheel, Globals::RightBackWheel),
+   Elevator(Globals::Elevator),
+   TopSwitch(Globals::TopSwitch),
+   BottomSwitch(Globals::BottomSwitch),
+   LeftIntake(Globals::LeftIntake),
+   RightIntake(Globals::RightIntake)
 {
-#ifdef KIT_DRIVE
-	this->Drive(Globals::LeftFrontWheel, Globals::RightFrontWheel);
-#endif
-
-#ifdef MECHANUM_DRIVE
-	this->Drive(Globals::LeftFrontWheel, Globals::RightFrontWheel, Globals::LeftBackWheel, Globals::RightBackWheel);
-#endif
-
-	this->Drive.SetExpiration(0.1);
 	SmartDashboard::PutString("State", "Unknown");
 }
 
@@ -34,7 +31,6 @@ void Robot::Disabled(void)
 
 void Robot::Autonomous(void)
 {
-	this->Drive.SetSafetyEnabled(false);
 	SmartDashboard::PutString("State", "Autonomous");
 	
 	float leftSpeed = 0.0f;
@@ -52,63 +48,61 @@ void Robot::Autonomous(void)
 			leftSpeed = -0.3f;
 			rightSpeed = -0.3f;
 		}
-		
-		this->Drive.TankDrive(leftSpeed, rightSpeed);
+
+      this->Drive.DriveForward(leftSpeed);
 		Wait(0.005);
 	}
 }
 
 void Robot::OperatorControl(void)
 {
-	this->Drive.SetSafetyEnabled(true);
 	SmartDashboard::PutString("State", "Teleop");
 	
 	while(IsOperatorControl() && IsEnabled())
 	{	
 		float controllerY = this->Controller.GetLAnalogY();
 		float controllerX = this->Controller.GetLAnalogX();
-	
+      float rotate = 0.0f;
+   
 		if(this->Controller.GetXButton())
 		{
 			this->Solenoid.Forward();
 		}
-		else
+		else if(this->Controller.GetYButton())
 		{
 			this->Solenoid.Reverse();
 		}
-
-#ifdef MECHANUM_DRIVE
-		float rotate = 0.0f;
+      else
+      {
+         this->Solenoid.Off();
+      }
 	
+      //intake motors
+   
+      if((this->Controller.GetDPad() == DPadValue::DPadUp) && TopSwitch.IsOff())
+      {
+         this->Elevator.Set(1.0f);
+      }
+      else if((this->Controller.GetDPad() == DPadValue::DPadDown) && BottomSwitch.IsOff())
+      {
+         this->Elevator.Set(-1.0f);
+      }
+      else
+      {
+         this->Elevator.Set(0.0f);
+      }
+   
 		if(this->Controller.GetLBumper())
 		{
 			rotate = -0.5f;
 		}
-		
+      
 		if(this->Controller.GetRBumper())
 		{
 			rotate = 0.5f;
 		}
 	
 		this->Drive.Drive(controllerX, controllerY, rotate);
-#endif
-
-#ifdef KIT_DRIVE	
-		float leftSpeed = controllerY;
-		float rightSpeed = controllerY;
-	
-		if(controllerX > 0.0)
-		{
-			rightSpeed *= 1.0 / controllerX;
-		}
-		else if(controllerX < 0.0)
-		{
-			leftSpeed *= 1.0 / fabs(controllerX);
-		}
-	
-		this->Drive.TankDrive(leftSpeed, rightSpeed);
-#endif
-		
 		Wait(0.005);
 	}
 }

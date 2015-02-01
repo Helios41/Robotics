@@ -5,21 +5,21 @@
 #include "Gamepad.h"
 #include "MechanumDrive.h"
 #include "Globals.h"
-#include "Pneumatics.h"
+#include "PneumaticSolenoid.h"
+#include "Switch.h"
 
-#define KIT_DRIVE
-
-class Robot: public SimpleRobot
+class Robot: public SampleRobot
 {
 public:
 	PneumaticSolenoid Solenoid;
 	Gamepad Controller;
-#ifdef KIT_DRIVE
-	RobotDrive Drive;
-#elif defined(MECHANUM_DRIVE)
 	MechanumDrive Drive;
-#endif
-
+   Victor Elevator;
+   Switch TopSwitch;
+   Switch BottomSwitch;
+   Victor LeftIntake;
+   Victor RightIntake;
+   
 	Robot(void);
 	~Robot(void);
 	

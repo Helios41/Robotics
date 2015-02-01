@@ -1,7 +1,7 @@
 #ifndef GAMEPAD_H_
 #define GAMEPAD_H_
 
-#include "BuiltIns.h"
+#include "WPILib.h"
 
 enum DPadValue
 {
@@ -11,12 +11,6 @@ enum DPadValue
 	DPadRight,
 	DPadNone
 };
-
-#define DPAD_UP 1
-#define DPAD_DOWN 2
-#define DPAD_LEFT 3
-#define DPAD_RIGHT 4
-#define DPAD_NONE 0
 
 class Gamepad
 {

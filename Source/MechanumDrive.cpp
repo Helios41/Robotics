@@ -1,9 +1,10 @@
 #include "MechanumDrive.h"
 
 MechanumDrive::MechanumDrive(int frontLeft, int frontRight, int backLeft, int backRight) :
-   Drive(frontLeft, backLeft, frontRight, backRight);
+   DriveTrain(frontLeft, backLeft, frontRight, backRight);
 {
-
+   this->DriveTrain.SetExpiration(0.1);
+   this->DriveTrain.SetSafetyEnabled(false);
 }
 
 MechanumDrive::~MechanumDrive()
@@ -13,12 +14,12 @@ MechanumDrive::~MechanumDrive()
 
 void MechanumDrive::Drive(float XAxis, float YAxis)
 {
-	this->Drive.MecanumDrive_Cartesian(XAxis, YAxis, 0.0f);
+	this->DriveTrain.MecanumDrive_Cartesian(XAxis, YAxis, 0.0f);
 }
 
 void MechanumDrive::Drive(float XAxis, float YAxis, float rotate)
 {
-	this->Drive.MecanumDrive_Cartesian(XAxis, YAxis, rotate);
+	this->DriveTrain.MecanumDrive_Cartesian(XAxis, YAxis, rotate);
 }
 
 void MechanumDrive:DriveForward(float speed)
