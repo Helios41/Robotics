@@ -77,7 +77,21 @@ void Robot::OperatorControl(void)
          this->Solenoid.Off();
       }
 	
-      //intake motors
+      if(this->Controller.GetAButton())
+      {
+         this->LeftIntake.Set(1.0f);
+         this->RightIntake.Set(-1.0f);
+      }
+      else if(this->Controller.GetBButton())
+      {
+         this->LeftIntake.Set(-1.0f);
+         this->RightIntake.Set(1.0f);
+      }
+      else
+      {
+         this->LeftIntake.Set(0.0f);
+         this->RightIntake.Set(0.0f);
+      }
    
       if((this->Controller.GetDPad() == DPadValue::DPadUp) && TopSwitch.IsOff())
       {
