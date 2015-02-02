@@ -40,29 +40,29 @@ public:
 	static const int DYAxis = 7;
 	
 	Gamepad(int port);
-	~Gamepad();
+	~Gamepad(void);
 	
-	bool GetYButton();
-	bool GetXButton();
-	bool GetAButton();
-	bool GetBButton();
+	bool GetYButton(void);
+	bool GetXButton(void);
+	bool GetAButton(void);
+	bool GetBButton(void);
 	
-	bool GetLBumper();
-	bool GetRBumper();
+	bool GetLBumper(void);
+	bool GetRBumper(void);
 	
-	bool GetLTrigger();
-	bool GetRTrigger();
+	bool GetLTrigger(void);
+	bool GetRTrigger(void);
 
-    bool GetLButton();
-    bool GetRButton();
+    bool GetLButton(void);
+    bool GetRButton(void);
 	
-	float GetLAnalogX();
-	float GetLAnalogY();
+	float GetLAnalogX(void);
+	float GetLAnalogY(void);
 	
-	float GetRAnalogX();
-	float GetRAnalogY();
+	float GetRAnalogX(void);
+	float GetRAnalogY(void);
 	
-	DPadValue GetDPad();
+	DPadValue GetDPad(void);
 };
 
 #endif

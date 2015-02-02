@@ -6,42 +6,42 @@ Gamepad::Gamepad(int port):
 
 }
 
-Gamepad::~Gamepad()
+Gamepad::~Gamepad(void)
 {
 
 }
 
-bool Gamepad::GetYButton();
+bool Gamepad::GetYButton(void);
 {
 	return this->Controller.GetRawButton(Gamepad::YButton);
 }
 
-bool Gamepad::GetXButton()
+bool Gamepad::GetXButton(void)
 {
 	return this->Controller.GetRawButton(Gamepad::XButton);
 }
 
-bool Gamepad::GetAButton()
+bool Gamepad::GetAButton(void)
 {
 	return this->Controller.GetRawButton(Gamepad::AButton);
 }
 
-bool Gamepad::GetBButton()
+bool Gamepad::GetBButton(void)
 {
 	return this->Controller.GetRawButton(Gamepad::BButton);
 }
 	
-bool Gamepad::GetLBumper()
+bool Gamepad::GetLBumper(void)
 {
 	return this->Controller.GetRawButton(Gamepad::LBButton);
 }
 
-bool Gamepad::GetRBumper()
+bool Gamepad::GetRBumper(void)
 {
 	return this->Controller.GetRawButton(Gamepad::LBButton);
 }
 
-bool Gamepad::GetLTrigger()
+bool Gamepad::GetLTrigger(void)
 {
 	float v = this->Controller.GetRawAxis(Gamepad::TAxis);
 
@@ -53,7 +53,7 @@ bool Gamepad::GetLTrigger()
 	return false;
 }
 
-bool Gamepad::GetRTrigger()
+bool Gamepad::GetRTrigger(void)
 {
 	float v = this->Controller.GetRawAxis(Gamepad::TAxis);
 
@@ -65,27 +65,27 @@ bool Gamepad::GetRTrigger()
 	return false;
 }
 
-float Gamepad::GetLAnalogX()
+float Gamepad::GetLAnalogX(void)
 {
 	return this->Controller.GetRawAxis(Gamepad::LXAxis);
 }
 
-float Gamepad::GetLAnalogY()
+float Gamepad::GetLAnalogY(void)
 {
 	return this->Controller.GetRawAxis(Gamepad::LYAxis);
 }
 
-float Gamepad::GetRAnalogX()
+float Gamepad::GetRAnalogX(void)
 {
 	return this->Controller.GetRawAxis(Gamepad::RXAxis);
 }
 
-float Gamepad::GetRAnalogY()
+float Gamepad::GetRAnalogY(void)
 {
 	return this->Controller.GetRawAxis(Gamepad::RYAxis);
 }
 
-DPadValue Gamepad::GetDPad()
+DPadValue Gamepad::GetDPad(void)
 {
 	float x = this->Controller.GetRawAxis(Gamepad::DXAxis);
 	float y = this->Controller.GetRawAxis(Gamepad::DYAxis);
@@ -105,12 +105,12 @@ DPadValue Gamepad::GetDPad()
 	return DPadValue::DPadNone;
 }
 
-bool Gamepad::GetLButton()
+bool Gamepad::GetLButton(void)
 {
 	return this->Controller.GetRawButton(Gamepad::LButton);
 }
 
-bool Gamepad::GetRButton()
+bool Gamepad::GetRButton(void)
 {
 	return this->Controller.GetRawButton(Gamepad::RButton);
 }
