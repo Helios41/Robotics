@@ -20,7 +20,8 @@ class CDBGlobals
       static const std::string Updated = "updated";
       static const std::string WidgetPrefix = "widget_";
       
-      static const std::string Log = "log";
+      static const std::string RobotSuffix = "_robot";
+      static const std::string ClientSuffix = "_client";
 };
 
 class CustomDashboard
@@ -29,14 +30,16 @@ class CustomDashboard
       NetworkTable *Table;
       
       void PushUpdate(std::string channel);
+      void PushChannel(std::string channel, std::string data);
       void PopUpdate(std::string channel);
+      void PopChannel(std::string channel);
       
    public:
       CustomDashboard(void);
       ~CustomDashboard(void);
       
-      void Log(std::string text);
       void Send(std::string widget, std::string data);
+      std::string Recive(std::string widget);
 };
 
 #endif

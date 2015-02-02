@@ -18,6 +18,12 @@ void CustomDashboard::PushUpdate(std::string channel)
    this->Table->PutString(CDBGlobals::Updated, newUploaded);
 }
 
+void CustomDashboard::PushChannel(std::string channel, std::string data)
+{
+   this->Table->PutString(channel, data);
+   this->PushUpdate(channel);
+}
+
 void CustomDashboard::PopUpdate(std::string channel)
 {
    std::string oldUpdated = this->Table->GetString(CDBGlobals::Updated);
@@ -45,14 +51,20 @@ void CustomDashboard::PopUpdate(std::string channel)
    this->Table->PutString(CDBGlobals::Updated, newUpdated);
 }
 
-void CustomDashboard::Log(std::string text)
+void CustomDashboard::PopChannel(std::string channel)
 {
-   this->Table->PutString(CDBGlobals::Log, text);
-   this->Update(CDBGlobals::Log);
+   this->PopUpdate(channel);
+   this->Table->PutString(channel, "");
 }
 
 void CustomDashboard::Send(std::string widget, std::string data)
 {
-   this->Table->PutString(CDBGlobals::WidgetPrefix + widget, data);
-   this->Update(CDBGlobals::WidgetPrefix + widget);
+   this->PushChannel(CDBGlobals::WidgetPrefix + widget + CDBGlobals::RobotSuffix, data);
+}
+
+std::string CustomDashboard::Recive(std::string widget)
+{
+   std::string result = this->Table->GetString(CDBGlobals::WidgetPrefix + widget + CDBGlobals::ClientSuffix);
+   this->PopChannel(CDBGlobals::WidgetPrefix + widget + CDBGlobals::ClientSuffix);
+   return result;
 }
