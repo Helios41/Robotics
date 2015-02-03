@@ -20,7 +20,8 @@ void CustomDashboard::PushUpdate(std::string channel)
 
 void CustomDashboard::PushChannel(std::string channel, std::string data)
 {
-   this->Table->PutString(channel, data);
+   std::string newData = this->Table->GetString(channel) + ":" + data;
+   this->Table->PutString(channel, newData);
    this->PushUpdate(channel);
 }
 
