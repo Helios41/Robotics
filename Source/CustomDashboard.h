@@ -16,12 +16,12 @@
 class CDBGlobals
 {
    public:
-      static const std::string Table = "custom_dashboard";
-      static const std::string Updated = "updated";
-      static const std::string WidgetPrefix = "widget_";
+      static std::string Table = "custom_dashboard";
+      static std::string Updated = "updated";
+      static std::string WidgetPrefix = "widget_";
       
-      static const std::string RobotSuffix = "_robot";
-      static const std::string ClientSuffix = "_client";
+      static std::string RobotSuffix = "_robot";
+      static std::string ClientSuffix = "_client";
 };
 
 class CustomDashboard

@@ -12,10 +12,10 @@ class MechanumDrive
       ~MechanumDrive();
 	  void Drive(float XAxis, float YAxis);
 	  void Drive(float XAxis, float YAxis, float rotate);
-	  void MechanumDrive:DriveForward(float speed);
-	  void MechanumDrive:DriveBackward(float speed);
-	  void MechanumDrive:DriveLeft(float speed);
-	  void MechanumDrive:DriveRight(float speed);
+	  void MechanumDrive::DriveForward(float speed);
+	  void MechanumDrive::DriveBackward(float speed);
+	  void MechanumDrive::DriveLeft(float speed);
+	  void MechanumDrive::DriveRight(float speed);
 };
 
 #endif

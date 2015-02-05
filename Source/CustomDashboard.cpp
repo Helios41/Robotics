@@ -1,6 +1,13 @@
 #include "CustomDashboard.h"
 #include <sstream>
 
+std::string CDBGlobals::Table = "custom_dashboard";
+std::string CDBGlobals::Updated = "updated";
+std::string CDBGlobals::WidgetPrefix = "widget_";
+      
+std::string CDBGlobals::RobotSuffix = "_robot";
+std::string CDBGlobals::ClientSuffix = "_client";
+
 CustomDashboard::CustomDashboard(void)
 {
    this->Table = NetworkTable::GetTable(CDBGlobals::Table);
@@ -15,7 +22,7 @@ CustomDashboard::~CustomDashboard(void)
 void CustomDashboard::PushUpdate(std::string channel)
 {
    std::string newUpdated = this->Table->GetString(CDBGlobals::Updated) + ":" + channel;
-   this->Table->PutString(CDBGlobals::Updated, newUploaded);
+   this->Table->PutString(CDBGlobals::Updated, newUpdated);
 }
 
 void CustomDashboard::PushChannel(std::string channel, std::string data)
@@ -30,7 +37,7 @@ void CustomDashboard::PopUpdate(std::string channel)
    std::string oldUpdated = this->Table->GetString(CDBGlobals::Updated);
    std::string newUpdated = "";
    
-   for (int i=0; i<str.length(); i++)
+   for (unsigned int i = 0; i < oldUpdated.length(); i++)
    {
       if (oldUpdated[i] == ':')
          oldUpdated[i] = ' ';

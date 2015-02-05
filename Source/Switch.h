@@ -6,7 +6,7 @@
 class Switch
 {
    private:
-      DigitalInput Switch;
+      DigitalInput input;
 
    public:
       Switch(int port);

@@ -1,4 +1,4 @@
-#include "Pneumatics.h"
+#include "PneumaticSolenoid.h"
 
 PneumaticSolenoid::PneumaticSolenoid(int forwardPort, int reversePort) : 
 	solenoid(forwardPort, reversePort)

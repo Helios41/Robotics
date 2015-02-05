@@ -15,6 +15,6 @@ class PneumaticSolenoid
 		void Off(void);
 		void Forward(void);
 		void Reverse(void);
-}
+};
 
 #endif

@@ -11,8 +11,8 @@
 class Robot: public SampleRobot
 {
 public:
-	PneumaticSolenoid Solenoid;
 	Gamepad Controller;
+   PneumaticSolenoid Solenoid;
 	MechanumDrive Drive;
    Victor Elevator;
    Switch TopSwitch;

@@ -11,7 +11,7 @@ Gamepad::~Gamepad(void)
 
 }
 
-bool Gamepad::GetYButton(void);
+bool Gamepad::GetYButton(void)
 {
 	return this->Controller.GetRawButton(Gamepad::YButton);
 }
