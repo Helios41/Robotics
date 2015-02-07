@@ -11,7 +11,7 @@ Robot::Robot(void):
    LeftIntake(Globals::LeftIntake),
    RightIntake(Globals::RightIntake)
 {
-	SmartDashboard::PutString("State", "Unknown");
+	
 }
 
 Robot::~Robot(void)
@@ -21,8 +21,6 @@ Robot::~Robot(void)
 
 void Robot::Disabled(void)
 {
-	SmartDashboard::PutString("State", "Disabled");
-	
 	while(IsDisabled())
 	{
 		
@@ -31,8 +29,6 @@ void Robot::Disabled(void)
 
 void Robot::Autonomous(void)
 {
-	SmartDashboard::PutString("State", "Autonomous");
-	
 	float leftSpeed = 0.0f;
 	float rightSpeed = 0.0f;
 	
@@ -56,13 +52,11 @@ void Robot::Autonomous(void)
 
 void Robot::OperatorControl(void)
 {
-	SmartDashboard::PutString("State", "Teleop");
-	
 	while(IsOperatorControl() && IsEnabled())
 	{	
 		float controllerY = this->Controller.GetLAnalogY();
 		float controllerX = this->Controller.GetLAnalogX();
-      float rotate = 0.0f;
+      float rotate = this->Controller.GetRAnalogX();
    
 		if(this->Controller.GetXButton())
 		{
@@ -105,29 +99,9 @@ void Robot::OperatorControl(void)
       {
          this->Elevator.Set(0.0f);
       }
-   
-		if(this->Controller.GetLBumper())
-		{
-			rotate = -0.5f;
-		}
-      
-		if(this->Controller.GetRBumper())
-		{
-			rotate = 0.5f;
-		}
 	
 		this->Drive.Drive(controllerX, controllerY, rotate);
 		Wait(0.005);
-	}
-}
-
-void Robot::Test(void)
-{
-	SmartDashboard::PutString("State", "Test");
-	
-	while(IsTest() && IsEnabled())
-	{
-		
 	}
 }
 

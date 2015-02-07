@@ -38,7 +38,7 @@ bool Gamepad::GetLBumper(void)
 
 bool Gamepad::GetRBumper(void)
 {
-	return this->Controller.GetRawButton(Gamepad::LBButton);
+	return this->Controller.GetRawButton(Gamepad::RBButton);
 }
 
 bool Gamepad::GetLTrigger(void)

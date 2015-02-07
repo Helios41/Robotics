@@ -4,7 +4,7 @@
 class Globals
 {
 	public:
-		static const int Controller = 1;
+		static const int Controller = 0;
 		
 		static const int RightFrontWheel = 0;
 		static const int LeftFrontWheel = 2;

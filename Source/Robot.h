@@ -26,7 +26,6 @@ public:
 	void Disabled(void);
 	void Autonomous(void);
 	void OperatorControl(void);
-	void Test(void);
 };
 
 #endif
