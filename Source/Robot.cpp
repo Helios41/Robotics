@@ -87,11 +87,11 @@ void Robot::OperatorControl(void)
          this->RightIntake.Set(0.0f);
       }
    
-      if((this->Controller.GetDPad() == DPadValue::DPadUp) && TopSwitch.IsOff())
+      if((this->Controller.GetDPad() == DPadValue::DPadUp) && this->TopSwitch.IsOff())
       {
          this->Elevator.Set(1.0f);
       }
-      else if((this->Controller.GetDPad() == DPadValue::DPadDown) && BottomSwitch.IsOff())
+      else if((this->Controller.GetDPad() == DPadValue::DPadDown) && this->BottomSwitch.IsOff())
       {
          this->Elevator.Set(-1.0f);
       }
@@ -100,6 +100,11 @@ void Robot::OperatorControl(void)
          this->Elevator.Set(0.0f);
       }
 	
+      if(this->Controller.GetLButton() || this->TopSwitch.IsOn() || this->BottomSwitch.IsOn())
+      {
+         this->Controller.Rumble(0.25f);
+      }
+   
 		this->Drive.Drive(controllerX, controllerY, rotate);
 		Wait(0.005);
 	}

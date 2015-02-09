@@ -26,10 +26,11 @@ public:
 	static const int LBButton = 5;
 	static const int RBButton = 6;
 	
-	static const int TAxis = 3;
-	
-	static const int LXAxis = 1;
-	static const int LYAxis = 2;
+   static const int LTAxis = 2;
+	static const int RTAxis = 3;
+   
+	static const int LXAxis = 0;
+	static const int LYAxis = 1;
 	static const int LButton = 9;
 	
 	static const int RXAxis = 4;
@@ -63,6 +64,8 @@ public:
 	float GetRAnalogY(void);
 	
 	DPadValue GetDPad(void);
+   
+   void Rumble(float rumble);
 };
 
 #endif

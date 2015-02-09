@@ -43,9 +43,9 @@ bool Gamepad::GetRBumper(void)
 
 bool Gamepad::GetLTrigger(void)
 {
-	float v = this->Controller.GetRawAxis(Gamepad::TAxis);
+	float v = this->Controller.GetRawAxis(Gamepad::TLAxis);
 
-	if((v > 0.0f) && (v < 1.0f))
+	if(v > 0.05f)
 	{
 		return true;
 	}
@@ -55,9 +55,9 @@ bool Gamepad::GetLTrigger(void)
 
 bool Gamepad::GetRTrigger(void)
 {
-	float v = this->Controller.GetRawAxis(Gamepad::TAxis);
+	float v = this->Controller.GetRawAxis(Gamepad::RTAxis);
 
-	if((v < 0.0f) && (v > -1.0f))
+	if(v > 0.05f)
 	{
 		return true;
 	}
@@ -113,4 +113,19 @@ bool Gamepad::GetLButton(void)
 bool Gamepad::GetRButton(void)
 {
 	return this->Controller.GetRawButton(Gamepad::RButton);
+}
+
+void Gamepad::Rumble(float rumble)
+{
+   if(rumble > 1.0f)
+   {
+      rumble = 1.0f;
+   }
+   else if(rumble < 0.0f)
+   {
+      rumble = 0.0f;
+   }
+
+   this->Controller.setRumble(Joystick::RumbleType::kLeftRumble, rumble);
+   this->Controller.setRumble(Joystick::RumbleType::kRightRumble, rumble);
 }
