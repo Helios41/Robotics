@@ -6,10 +6,7 @@ Switch::Switch(int port) :
    
 }
 
-Switch::~Switch(void)
-{
-   
-}
+Switch::~Switch(void) { }
       
 bool Switch::IsOn(void)
 {

@@ -1,6 +1,6 @@
-#include "MechanumDrive.h"
+#include "MecanumDrive.h"
 
-MechanumDrive::MechanumDrive(int frontLeft, int frontRight, int backLeft, int backRight) :
+MecanumDrive::MecanumDrive(int frontLeft, int frontRight, int backLeft, int backRight) :
    DriveTrain(frontLeft, backLeft, frontRight, backRight),
    RotateLimit(1.0f),
    DriveLimit(1.0f),
@@ -12,42 +12,39 @@ MechanumDrive::MechanumDrive(int frontLeft, int frontRight, int backLeft, int ba
    this->DriveTrain.SetSafetyEnabled(false);
 }
 
-MechanumDrive::~MechanumDrive()
-{
+MecanumDrive::~MecanumDrive() { }
 
-}
-
-void MechanumDrive::SetRotateLimit(float limit)
+void MecanumDrive::SetRotateLimit(float limit)
 {
 	this->RotateLimit = limit;
 }
 
-void MechanumDrive::ResetRotateLimit(void)
+void MecanumDrive::ResetRotateLimit(void)
 {
 	this->RotateLimit = 1.0f;
 }
 
-void MechanumDrive::SetDriveLimit(float limit)
+void MecanumDrive::SetDriveLimit(float limit)
 {
 	this->DriveLimit = limit;
 }
 
-void MechanumDrive::ResetDriveLimit(void)
+void MecanumDrive::ResetDriveLimit(void)
 {
 	this->DriveLimit = 1.0f;
 }
 
-void MechanumDrive::SetMultiple(float multiple)
+void MecanumDrive::SetMultiple(float multiple)
 {
 	this->Multiple = multiple;
 }
 
-void MechanumDrive::ResetMultiple()
+void MecanumDrive::ResetMultiple()
 {
 	this->Multiple = 1.0f;
 }
 
-void MechanumDrive::Drive(float XAxis, float YAxis, float rotate)
+void MecanumDrive::Drive(float XAxis, float YAxis, float rotate)
 {
 	XAxis *= this->Multiple;
 	YAxis *= this->Multiple;
@@ -90,27 +87,27 @@ void MechanumDrive::Drive(float XAxis, float YAxis, float rotate)
 	this->DriveTrain.MecanumDrive_Cartesian(XAxis, YAxis, rotate);
 }
 
-void MechanumDrive::Drive(float XAxis, float YAxis)
+void MecanumDrive::Drive(float XAxis, float YAxis)
 {
 	this->Drive(XAxis, YAxis, 0.0f);
 }
 
-void MechanumDrive::DriveForward(float speed)
+void MecanumDrive::DriveForward(float speed)
 {	
 	this->Drive(0.0f, speed);
 }
 
-void MechanumDrive::DriveBackward(float speed)
+void MecanumDrive::DriveBackward(float speed)
 {
 	this->Drive(0.0f, -speed);
 }
 
-void MechanumDrive::DriveLeft(float speed)
+void MecanumDrive::DriveLeft(float speed)
 {
 	this->Drive(speed, 0.0f);
 }
 
-void MechanumDrive::DriveRight(float speed)
+void MecanumDrive::DriveRight(float speed)
 {
 	this->Drive(-speed, 0.0f);
 }

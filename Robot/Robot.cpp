@@ -15,10 +15,7 @@ Robot::Robot(void):
 
 }
 
-Robot::~Robot(void)
-{
-
-}
+Robot::~Robot(void) { }
 
 void Robot::RobotInit(void)
 {
@@ -30,10 +27,7 @@ void Robot::Disabled(void)
 	this->Drive.Drive(0.0f, 0.0f);
 	this->Solenoid.Forward();
 
-	while(IsDisabled())
-	{
-		
-	}
+	while(IsDisabled()) { }
 }
 
 void Robot::Autonomous(void)
@@ -44,9 +38,10 @@ void Robot::Autonomous(void)
 
 	std::string autoSizeStr = CustomDashboard::Get("AutonomousEditor", "size");
 
+   /*
 	if(autoSizeStr == "NOPE")
 	{
-		/*if(IsAutonomous() && IsEnabled())
+		if(IsAutonomous() && IsEnabled())
 		{
 			this->Elevator.Set(0.40f);
 			Wait(2.0);
@@ -55,9 +50,11 @@ void Robot::Autonomous(void)
 			this->Drive.DriveBackward(0.30f);
 			Wait(4.2);
 			this->Drive.Drive(0.0f, 0.0f);
-		}*/
+		}
 	}
-	else
+   */
+   
+	if(autoSizeStr != CustomDashboard::InvalidReturn)
 	{
 		int autoSize = atoi(autoSizeStr.c_str());
 
@@ -190,15 +187,15 @@ void Robot::OperatorControl(void)
 			this->LeftIntake.Set(0.0f);
 			this->RightIntake.Set(0.0f);
 		}
-
-      	if(this->OperatorController.GetRawButton(11) && this->TopSwitch.IsOff())
-      	{
-      		this->Elevator.Set(0.25f);
-      	}
-      	else if(this->OperatorController.GetRawButton(12) && this->TopSwitch.IsOff())
-      	{
-      		this->Elevator.Set(0.40f);
-      	}
+      
+      if(this->OperatorController.GetRawButton(11) && this->TopSwitch.IsOff())
+      {
+      	this->Elevator.Set(0.25f);
+      }
+      else if(this->OperatorController.GetRawButton(12) && this->TopSwitch.IsOff())
+      {
+      	this->Elevator.Set(0.40f);
+      }
 		else if((ElevatorSpeed > 0.0f) && this->TopSwitch.IsOff())
 		{
 			this->Elevator.Set(ElevatorSpeed);

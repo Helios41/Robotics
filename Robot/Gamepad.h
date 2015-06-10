@@ -108,27 +108,6 @@ public:
 
 	GamepadDPad DPad;
 
-	bool GetYButton(void);
-	bool GetXButton(void);
-	bool GetAButton(void);
-	bool GetBButton(void);
-	
-	bool GetLBumper(void);
-	bool GetRBumper(void);
-	
-	bool GetLTrigger(void);
-	bool GetRTrigger(void);
-
-    bool GetLButton(void);
-    bool GetRButton(void);
-	
-	float GetLAnalogX(void);
-	float GetLAnalogY(void);
-	
-	float GetRAnalogX(void);
-	float GetRAnalogY(void);
-	
-	DPadValue GetDPad(void);
 	void Rumble(float rumble);
 };
 

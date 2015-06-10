@@ -19,7 +19,8 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.event.EventHandler;
 
-public class Dashboard extends Application{
+public class Dashboard extends Application
+{
 	public static Canvas DashboardCanvas;
 	public static GraphicsContext DashboardContext;
 	public static Group DashboardPanel;
@@ -33,7 +34,8 @@ public class Dashboard extends Application{
 	public static AtomicReference<Boolean> DrawLoopRunning = new AtomicReference<Boolean>();
 	
 	@Override
-	public void start(Stage stage) throws Exception {
+	public void start(Stage stage) throws Exception 
+   {
 		stage.initStyle(StageStyle.UNDECORATED);
 		stage.setX(0);
 		stage.setY(0);

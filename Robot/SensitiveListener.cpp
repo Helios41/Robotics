@@ -8,10 +8,7 @@ SensitiveListener::SensitiveListener(std::function<bool (void)> callback, int se
 
 }
 
-SensitiveListener::~SensitiveListener(void)
-{
-
-}
+SensitiveListener::~SensitiveListener(void) { }
 
 bool SensitiveListener::GetValue(void)
 {

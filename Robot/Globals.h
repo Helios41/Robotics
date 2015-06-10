@@ -17,13 +17,13 @@ public:
 
 	static const int Elevator = 4;
 
-    static const int LeftIntake = 5;
-    static const int RightIntake = 6;
+   static const int LeftIntake = 5;
+   static const int RightIntake = 6;
       
-    static const int TopSwitch = 0;
-    static const int BottomSwitch = 1;
+   static const int TopSwitch = 0;
+   static const int BottomSwitch = 1;
 
-    static const int HolderForward = 2;
-    static const int HolderReverse = 3;
+   static const int HolderForward = 2;
+   static const int HolderReverse = 3;
 };
 #endif

@@ -1,11 +1,10 @@
 package Team4618.Dashboard;
 
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
-//MOM GET THE CAMERA
 import javafx.application.Application;
 
-public class Startup {
-	
+public class Startup 
+{
 	public static void main(String[] args) throws Exception
 	{
 		NetworkTable.setClientMode();
@@ -17,6 +16,5 @@ public class Startup {
 		Dashboard.DrawLoopRunning.set(false);
 
 		System.exit(0);
-	}
-	
+	}	
 }

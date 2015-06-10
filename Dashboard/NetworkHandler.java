@@ -2,7 +2,8 @@ package Team4618.Dashboard;
 
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 
-public class NetworkHandler {
+public class NetworkHandler 
+{
 	public static final String TableID = "custom_dashboard";
 	private static NetworkTable Table = null;
 	

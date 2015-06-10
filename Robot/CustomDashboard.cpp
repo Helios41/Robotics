@@ -3,15 +3,11 @@
 std::string CustomDashboard::TableID = "custom_dashboard";
 NetworkTable *CustomDashboard::Table = nullptr;
 
-CustomDashboard::CustomDashboard(void)
-{
+const std::string CustomDashboard::InvalidReturn = "__INVALID_RETURN_CUSTOM_DASHBOARD__";
 
-}
+CustomDashboard::CustomDashboard(void) { }
 
-CustomDashboard::~CustomDashboard(void)
-{
-   
-}
+CustomDashboard::~CustomDashboard(void) { }
 
 void CustomDashboard::Init(std::string name)
 {
@@ -27,7 +23,7 @@ std::string CustomDashboard::GetNetworkName(void)
 			return CustomDashboard::Table->GetString("networkName");
 	}
 
-	return "NOPE";
+	return nullptr;
 }
 
 void CustomDashboard::Set(std::string widget, std::string varname, std::string data)
@@ -50,7 +46,7 @@ std::string CustomDashboard::Get(std::string widget, std::string varname)
 			return CustomDashboard::Table->GetString(widget + "_" + varname);
 	}
 
-	return "NOPE";
+	return CustomDashboard::InvalidReturn;
 }
 
 std::string CustomDashboard::GetArray(std::string widget, std::string varname, int index)
@@ -61,5 +57,5 @@ std::string CustomDashboard::GetArray(std::string widget, std::string varname, i
 			return CustomDashboard::Table->GetString(widget + "_" + varname + "[" + std::to_string(index) + "]");
 	}
 
-	return "NOPE";
+	return CustomDashboard::InvalidReturn;
 }

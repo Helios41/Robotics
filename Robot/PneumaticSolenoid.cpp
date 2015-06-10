@@ -6,10 +6,7 @@ PneumaticSolenoid::PneumaticSolenoid(int forwardPort, int reversePort) :
 	
 }
 
-PneumaticSolenoid::~PneumaticSolenoid(void)
-{
-
-}
+PneumaticSolenoid::~PneumaticSolenoid(void) { }
 
 void PneumaticSolenoid::Off(void)
 {
