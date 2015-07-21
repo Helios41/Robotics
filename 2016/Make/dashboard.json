@@ -1,0 +1,23 @@
+{
+   "default": "make",
+   "make":
+   {
+      "project": "Dashboard",
+      "language": "C++",
+      "type": "executable",
+      "build": "../Build/",
+      "source": 
+      [
+         "../Source/Dashboard/",
+         "../Source/BaseIncludes/"
+      ],
+      "dependencies":
+      [
+         {
+            "if": "OS=Windows",
+            "then": "User32.lib"
+         }
+      ],
+      "version": [0, 0, 0, "preseason"]
+   }
+}
