@@ -1,9 +1,16 @@
 {
-   "name": "4618-server",
-   "version": "0.0.1",
-   "dependencies":
-   {
-      "express": "^4.10.6",
-      "mysql"": "^2.5.4"
-   }
+  "name": "4618-server",
+  "version": "0.0.1",
+  "description": "Server for FRC team 4618",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "Jonathan Casella (Helios41)",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.13.1",
+    "socket.io": "^1.3.6"
+  }
 }

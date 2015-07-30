@@ -34,7 +34,6 @@ void *network_thread_func(void *param)
 {
    NetworkInfo *net_info = (NetworkInfo *) param;
    
-   //TODO: lock "network_thread_running" with mutex
    while(network_thread_running)
    {
       
@@ -43,6 +42,12 @@ void *network_thread_func(void *param)
    
    return NULL;
 }
+
+/*
+Problem:
+   First makes you set a static IP,
+   both the laptop and robot are set to the same IP
+*/
 
 namespace Network
 {
@@ -76,7 +81,7 @@ namespace Network
       
          net_thread_info.socketID = socketID;
       
-         network_thread_running = true;
+         __sync_lock_test_and_set(&network_thread_running, true);
       
          if(pthread_create(&network_thread, NULL, network_thread_func, &net_thread_info))
          {
@@ -89,5 +94,8 @@ namespace Network
       return true;
    }
    
-   
+   void StopNetwork(void)
+   {
+      __sync_lock_test_and_set(&network_thread_running, false);
+   }
 }

@@ -1,0 +1,18 @@
+<head>
+   <title>Team 4618</title>
+</head>
+<body>
+   <p id="p1">Welcome! This is the Team 4618 Server</p>
+   <p id="p2">Today is [DATE]</p>
+   <button id="scouting">Scouting</button>
+   <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+   <script>
+      $(document).ready(function()
+      {
+         $('#scouting').bind("click", function()
+         {
+            window.location.href = "/scout/";
+         });
+      });
+   </script>
+</body>
