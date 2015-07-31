@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "Server for FRC team 4618",
   "main": "server.js",
+  "private": true,
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
@@ -12,5 +13,10 @@
   "dependencies": {
     "express": "^4.13.1",
     "socket.io": "^1.3.6"
+  },
+  "repository": {
+    "name": "4618-server",
+    "version": "0.0.1",
+    "private": true
   }
 }
