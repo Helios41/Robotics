@@ -3,9 +3,9 @@
    "make":
    {
       "project": "Dashboard",
-      "language": "C++",
+      "language": "C",
       "type": "executable",
-      "build": "../Build/",
+      "build": "../Build/Dashboard/",
       "source": 
       [
          "../Source/Dashboard/",
@@ -16,8 +16,13 @@
          {
             "if": "OS=Windows",
             "then": "User32.lib"
+         },
+         {
+            "if": "OS=Windows",
+            "then": "Gdi32.lib"
          }
       ],
+      "target": "all",
       "version": [0, 0, 0, "preseason"]
    }
 }
