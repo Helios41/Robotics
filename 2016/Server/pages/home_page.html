@@ -1,17 +1,57 @@
 <head>
    <title>Team 4618</title>
+   <style>
+      body
+      {
+         background-image: url("/assets/general_background.png");
+         background-size: cover;
+      }
+      p
+      {
+         color: white;
+         font-family: "Arial", "Helvectia", sans-serif;
+         font-size: 24px;
+      }
+      #form_div
+      {
+         padding-top: 20px;
+         color: white;
+         font-family: "Arial", "Helvectia", sans-serif;
+      }
+      #username_box
+      {
+         
+      }
+   </style>
 </head>
 <body>
    <p id="p1">Welcome! This is the Team 4618 Server</p>
    <p id="p2">Today is [DATE]</p>
    <button id="scouting">Scouting</button>
+   <div id="form_div">
+      Username: <input type="text" id="username_box" autocomplete="off" /> <br>   
+      Password: <input type="password" id="password_box" autocomplete="off" /> <br>
+      <button id="login_button" >Login</button>
+   </div>
+   <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
    <script>
+      var socket = io();
+   
       $(document).ready(function()
       {
          $('#scouting').bind("click", function()
          {
             window.location.href = "/scout/";
+         });
+         
+         $('#login_button').bind("click", function()
+         {
+            var login_creds = $('#username_box').val() + "____" + $('#password_box').val();
+            socket.emit('internal_login_creds', login_creds);
+            $('#username_box').val('');
+            $('#password_box').val('');
+            window.location.reload();
          });
       });
    </script>

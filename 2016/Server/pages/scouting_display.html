@@ -4,6 +4,8 @@
       body
       {
          margin: 0;
+         background-image: url("/assets/general_background.png");
+         background-size: cover;
       }
       #nav_bar
       {
@@ -31,15 +33,30 @@
          top: 10px;
          left: 30px;
       }
+      p
+      {
+         font-family: "Arial", "Helvectia", sans-serif;
+         font-size: 14px;
+         color: white;
+      }
+      button.link
+      {
+         background: none;
+         border: none;
+         color: white;
+         font-family: "Arial", "Helvectia", sans-serif;
+         font-size: 24px;
+      }
    </style>
 </head>
 <body>
    <div id="nav_bar">
-      <p id="nav_title">Team 4618 Scouting Database</p>
+      <p id="nav_title"><button class="link" id="home">Team 4618</button> Scouting Database</p>
       <input id="search_box" autocomplete="off"/>
       <button id="search_button">Search</button>
    </div>
-   <p>Work In Progress</p>
+   <p>Team [TEAM]</p>
+   [DATA_INSERTION_POINT]
    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
    <script>
       $(document).ready(function()
@@ -57,6 +74,11 @@
             {
                $('#search_box').val("Invalid Team Number!");
             }
+         });
+         
+         $('#home').bind("click", function()
+         {
+            window.location.href = "/";
          });
       });
    </script>

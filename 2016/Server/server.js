@@ -1,10 +1,21 @@
 var express = require('express');
 var fs = require('fs');
-var https = require('http'); //require('http');
+var http = require('http');
 var socketio = require('socket.io');
 
 var app = express();
+app.use('/assets', express.static("./assets"));
 
+/**
+TODO:
+   -encrypt login creds
+   -https
+   -
+*/
+
+var logged_in = [];
+
+/*
 function LoadTeamInfo(team)
 {
    var file_path = "./teams/t" + team + ".json";
@@ -14,11 +25,6 @@ function LoadTeamInfo(team)
    if(is_valid)
    {
       team_json = fs.readFileSync(file_path).toString();
-      console.log(team_json);
-   }
-   else
-   {
-      console.log("no data for team " + team);
    }
    
    var result = 
@@ -45,14 +51,52 @@ function ProcessCommand(command)
    }
    catch(e) {}
 }
+*/
+
+function HTTPGet(url)
+{
+   var options = {
+      host: url + "?X-TBA-App-Id=frc4618:CNFRCWebserver:0",
+      port: 80,
+      path: '/'
+   }
+   
+   var result = null;
+   
+   //TODO: fix this
+   /*
+   var req = http.request(options, function(res)
+   {
+      res.setEncoding('utf8');
+      
+      res.on("data", function(data)
+      {
+         console.log(data);
+         result = data;
+      });      
+   });
+   
+   req.end();
+   */
+   
+   return result;
+}
 
 app.get('/', function(req, res)
 {
-   var page_html = fs.readFileSync("./pages/home_page.html").toString();
-   var date = new Date().toString();
+   if(logged_in[req.connection.remoteAddress])
+   {
+      var page_html = fs.readFileSync("./pages/internal.html").toString();
+      res.send(page_html);
+   }
+   else
+   {
+      var page_html = fs.readFileSync("./pages/home_page.html").toString();
+      var date = new Date().toString();
    
-   page_html = page_html.replace("[DATE]", date);
-   res.send(page_html);
+      page_html = page_html.replace("[DATE]", date);
+      res.send(page_html);
+   }
 });
 
 app.get('/scout/', function(req, res)
@@ -66,33 +110,52 @@ app.get('/scout/display:team', function(req, res)
    var page_html = fs.readFileSync("./pages/scouting_display.html").toString();
    var team = parseInt(req.params.team).toString();
    
+   /*
    var team_info = LoadTeamInfo(team);
    
    if(team_info.valid)
    {
+      var data = "";
+      
       for(var key in team_info.json)
       {
-         page_html = page_html + "<p>" + key + ": " + team_info.json[key] + "</p>";
+         data = data + "<p>" + key + ": " + team_info.json[key] + "</p>";
       }
+      
+      page_html = page_html.replace("[DATA_INSERTION_POINT]", data);
    }
    else
    {
-      page_html = page_html + "<p>Searching for Team " + team + "</p><p>No data found!</p>";
+      page_html = page_html + "<p>No data found for Team " + team + "</p>";
+   }
+   */
+   
+   var bluealliance = HTTPGet("www.thebluealliance.com/api/v2/team/frc" + team);
+   console.log(bluealliance);
+   
+   if(bluealliance != null)
+   {
+      var data = "";
+      var bluealliance_json = JSON.parse(bluealliance);
+      
+      for(var key in bluealliance_json)
+      {
+         data = data + "<p>" + key + ": " + bluealliance_json[key] + "</p>";
+      }
+      
+      page_html = page_html.replace("[DATA_INSERTION_POINT]", data);
+   }
+   else
+   {
+      page_html = page_html.replace("[DATA_INSERTION_POINT]", "<p>No data found for Team " + team + "</p>");
    }
    
    page_html = page_html.replace("[TEAM]", team);
+   
    res.send(page_html);
 });
 
-/*
-var HttpsOptions = 
-{
-  cert: fs.readFileSync('./openssl/key.pem'),  
-  key: fs.readFileSync('./openssl/cert.pem')
-};
-*/
-
-var server = https.createServer(/*HttpsOptions,*/ app);
+var server = http.createServer(app);
 var io = socketio(server);
 
 io.on('connection', function(socket)
@@ -101,8 +164,22 @@ io.on('connection', function(socket)
    
    socket.on('submit_value', function(msg)
    {
-      ProcessCommand(msg);
+      //ProcessCommand(msg);
       io.emit('recive_value', msg);
+   });
+   
+   socket.on('internal_login_creds', function(msg)
+   {
+      var username = msg.split("____")[0];
+      var password = msg.split("____")[1];
+      
+      //TODO: check against actual creds
+      logged_in[socket.handshake.address] = true;
+   });
+   
+   socket.on('internal_logout', function(msg)
+   {
+      logged_in[socket.handshake.address] = false;
    });
    
    socket.on('disconnect', function()
