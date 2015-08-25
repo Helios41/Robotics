@@ -1,0 +1,80 @@
+doctype html
+html(lang="en")
+   block vars
+      - var pageTitle = "Default Title"
+      - var navTitle = "Default Nav"
+      - var navColor = "red"
+   - var username = "DEFAULT"
+   head
+      title= pageTitle
+      block style
+      style.
+         body {
+            margin: 0;
+         }
+         p {
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 14px;
+            color: white;
+         }
+         span {
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 14px;
+            color: white;
+         }
+         #home_link {
+            background: none;
+            border: none;
+            color: white;
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 24px;
+         }
+         #nav_title {
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 24px;
+         }
+         #nav_name {
+            right: 0;
+            top: 5px;
+            padding-right: 50px;
+            position: fixed;
+         }
+         #nav_bar {
+            width: 100%;
+            height: 50px;
+            background-color: #{navColor};
+            color: rgb(128, 255, 128);
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 14px;
+            padding-top: 15px;
+         }
+         #logout_button {
+            right: 0;
+            margin-right: 50px;
+            margin-left: 10px;
+            position: fixed;
+            top: 25px;
+         }
+   body
+      #nav_bar
+         p(id="nav_text") #[button(id="home_link") Team 4618] - #[span(id="nav_title")= navTitle] #[span(id="nav_name")= username] #[button(id="logout_button") Logout]
+      block content
+      script(src="https://cdn.socket.io/socket.io-1.2.0.js")
+      script(src="http://code.jquery.com/jquery-1.11.1.js")
+      block script
+      script.
+         var socket = io();
+      
+         $(document).ready(function()
+         {
+            $('#home_link').bind("click", function()
+            {
+               window.location.href = "/";
+            });
+            
+            $('#logout_button').bind('click', function()
+            {
+               socket.emit("internal_logout");
+               window.location.reload();
+            });
+         });

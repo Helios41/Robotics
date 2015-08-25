@@ -1,0 +1,73 @@
+extends ./base.jade
+
+block vars
+   - var pageTitle = "Team 4618 - Internal"
+   - var navTitle = "Internal"
+   - var navColor = "green"
+   
+block style
+   style.
+      body {
+         background-image: url("/assets/internal_background.png");
+         background-size: cover;
+      }
+      .block {
+         width: 80%;
+         background-color: green;
+         margin-left: 5%;
+         margin-top: 25px;
+         margin-bottom: 25px;
+         outline: rgb(204, 255, 204) solid thick;
+      }
+      .onlinename {
+         margin-top: 0px;
+         margin-bottom: 0px;
+         margin-left: 15px;
+         background: none;
+         border: none;
+         color: white;
+         font-family: "Arial", "Helvectia", sans-serif;
+         font-size: 14px;
+      }
+
+block content
+   #posts.block
+      each post in ["P", "O", "S", "T"]
+         p= post
+   #online.block
+      p(style="margin-top: 5px; margin-bottom: 5px;") People Online:
+      each name in ["Dan", "Nick", "Roulo"]
+         p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + name + "\")")= name]
+   #messages.block
+      p(style="margin-top: 5px; margin-bottom: 5px;") Messages:
+      each post in [{message: "Test", person: "Nick"}, {message: "TeSt", person: "Dan"}]
+         p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + post.person + "\")")= post.person + ": "] #[span= post.message]
+   button(id="libCNFRC") libCNFRC
+   button(id="DashboardV2") Dashboard V2
+   button(id="CNFRCWebserver") CNFRC Webserver
+   
+block script
+   script.
+      function gotoPage(name)
+      {
+         console.log(name);
+      }
+         
+      $(document).ready(function()
+      {
+         $('#libCNFRC').bind("click", function()
+         {
+            
+         });
+         
+         $('#DashboardV2').bind("click", function()
+         {
+            
+         });
+         
+         $('#CNFRCWebserver').bind("click", function()
+         {
+            
+         });
+      });
+      

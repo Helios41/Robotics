@@ -1,11 +1,11 @@
 {
-  "name": "4618-server",
+  "name": "CNFRCWebserver",
   "version": "0.0.1",
   "description": "Server for FRC team 4618",
   "main": "server.js",
   "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "compilestart": "(babel ./src --out-file server.js --modules ignore) && (uglifyjs server.js --compress --mangle -o server.js) && (node server.js)",
     "start": "node server.js"
   },
   "author": "Jonathan Casella (Helios41)",

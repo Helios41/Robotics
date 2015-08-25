@@ -1,0 +1,41 @@
+extends ./base.jade
+
+block vars
+   - var pageTitle = "Team 4618 - Scouting"
+   - var navTitle = "Scouting"
+   - var navColor = "red"
+   
+block style
+   style.
+      body {
+         background-image: url("/assets/general_background.png");
+         background-size: cover;
+      }
+      
+block content
+   input(id="search_box" autocomplete="off")
+   button(id="search_button") Search
+   p Team
+     = ' ' + teamid
+   each tag in bluealliancedata
+      p= tag
+      
+block script
+   script.
+      $(document).ready(function()
+      {
+         $('#search_button').bind("click", function()
+         {
+            var team = parseInt($('#search_box').val());
+            
+            if(!isNaN(team))
+            {
+               window.location.href = ("/scout " + team);   
+               $('#search_box').val('');
+            }
+            else
+            {
+               $('#search_box').val("Invalid Team Number!");
+            }
+         });
+      });

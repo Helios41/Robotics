@@ -5,186 +5,148 @@ var socketio = require('socket.io');
 
 var app = express();
 app.use('/assets', express.static("./assets"));
+app.set('views', './pages');
+app.set('view engine', 'jade');
 
 /**
 TODO:
    -encrypt login creds
    -https
+   -babel & uglifyjs?
+   -logins
+   -scouting data submit
+   -general posts
+   -remove fs.existsSync
+   -caching?
+   -
+ISSUES:
+   -you need to refresh to see bluealliance data
    -
 */
 
 var logged_in = [];
 
-/*
-function LoadTeamInfo(team)
+var httpget_cache = [];
+function HTTPGet(host, path, callback)
 {
-   var file_path = "./teams/t" + team + ".json";
-   var is_valid = fs.existsSync(file_path);
-   var team_json = "NOJSON";
+   var index = host + path;
    
-   if(is_valid)
-   {
-      team_json = fs.readFileSync(file_path).toString();
-   }
-   
-   var result = 
-   {
-      valid: is_valid,
-      json: is_valid ? JSON.parse(team_json) : {}
-   };
-   
-   return result;
-}
+   //TODO: reload this every once in a while
+   if(httpget_cache[index] == null)
+   {   
+      var options = {
+         host: host,
+         port: 80,
+         path: path
+      }
 
-function SetTeamInfo(team, info)
-{
-   var file_path = "./teams/t" + team + ".json";
-   fs.writeFileSync(file_path, JSON.stringify(info));
-}
-
-function ProcessCommand(command)
-{
-   try
-   {
-      var json = JSON.parse(command);
-      SetTeamInfo(json.team, json);
-   }
-   catch(e) {}
-}
-*/
-
-function HTTPGet(url)
-{
-   var options = {
-      host: url + "?X-TBA-App-Id=frc4618:CNFRCWebserver:0",
-      port: 80,
-      path: '/'
-   }
-   
-   var result = null;
-   
-   //TODO: fix this
-   /*
-   var req = http.request(options, function(res)
-   {
-      res.setEncoding('utf8');
-      
-      res.on("data", function(data)
+      var req = http.request(options, function(res)
       {
-         console.log(data);
-         result = data;
-      });      
-   });
+         var result = "";
+         res.setEncoding('utf8');
+         
+         res.on("data", function(data)
+         {
+            result += data;
+         });      
+         
+         res.on("end", function()
+         {
+            httpget_cache[index] = {value: result, timestamp: (new Date().getTime())};
+            callback();
+         });
+      }).end();
+   }
    
-   req.end();
-   */
+   if(httpget_cache[index] != null)
+   {
+      return httpget_cache[index].value;
+   }
    
-   return result;
+   return null;
 }
 
 app.get('/', function(req, res)
 {
    if(logged_in[req.connection.remoteAddress])
    {
-      var page_html = fs.readFileSync("./pages/internal.html").toString();
-      res.send(page_html);
+      res.render('internal');
    }
    else
    {
-      var page_html = fs.readFileSync("./pages/home_page.html").toString();
-      var date = new Date().toString();
-   
-      page_html = page_html.replace("[DATE]", date);
-      res.send(page_html);
+      res.render('home');
    }
 });
 
-app.get('/scout/', function(req, res)
+app.get('/scout', function(req, res)
 {
-   var page_html = fs.readFileSync("./pages/scouting.html").toString();
-   res.send(page_html);
+   res.redirect('/scout 4618');
 });
 
-app.get('/scout/display:team', function(req, res)
+app.get('/scout:team', function(req, res)
 {
-   var page_html = fs.readFileSync("./pages/scouting_display.html").toString();
    var team = parseInt(req.params.team).toString();
+   var bluealliance = HTTPGet("www.thebluealliance.com", "/api/v2/team/frc" + team + "?X-TBA-App-Id=frc4618:CNFRCWebserver:0", function() { console.log(""); });
    
-   /*
-   var team_info = LoadTeamInfo(team);
-   
-   if(team_info.valid)
-   {
-      var data = "";
-      
-      for(var key in team_info.json)
-      {
-         data = data + "<p>" + key + ": " + team_info.json[key] + "</p>";
-      }
-      
-      page_html = page_html.replace("[DATA_INSERTION_POINT]", data);
-   }
-   else
-   {
-      page_html = page_html + "<p>No data found for Team " + team + "</p>";
-   }
-   */
-   
-   var bluealliance = HTTPGet("www.thebluealliance.com/api/v2/team/frc" + team);
-   console.log(bluealliance);
+   var bluealliancedata = [];
    
    if(bluealliance != null)
    {
-      var data = "";
       var bluealliance_json = JSON.parse(bluealliance);
       
       for(var key in bluealliance_json)
       {
-         data = data + "<p>" + key + ": " + bluealliance_json[key] + "</p>";
+         bluealliancedata.push(key + ": " + bluealliance_json[key]);
       }
-      
-      page_html = page_html.replace("[DATA_INSERTION_POINT]", data);
    }
    else
    {
-      page_html = page_html.replace("[DATA_INSERTION_POINT]", "<p>No data found for Team " + team + "</p>");
+      bluealliancedata.push("No data found for Team " + team);
    }
    
-   page_html = page_html.replace("[TEAM]", team);
-   
-   res.send(page_html);
+   res.render('scouting', {"bluealliancedata": bluealliancedata, "teamid": team});
 });
+
+function IsValidLogin(username, password)
+{
+   if(fs.existsSync('./logins.json'))
+   {
+      var login_json = JSON.parse(fs.readFileSync("./logins.json"));
+      
+      for(var i = 0; i < login_json.length; ++i)
+      {
+         var tag = login_json[i];
+         if((tag.username === username) &&
+            (tag.password === password))
+         {
+            return true;
+         }
+      }
+   }
+   
+   return false;
+}
 
 var server = http.createServer(app);
 var io = socketio(server);
 
 io.on('connection', function(socket)
 {
-   io.emit('recive_value', "--connected");
-   
-   socket.on('submit_value', function(msg)
-   {
-      //ProcessCommand(msg);
-      io.emit('recive_value', msg);
-   });
-   
    socket.on('internal_login_creds', function(msg)
    {
       var username = msg.split("____")[0];
       var password = msg.split("____")[1];
       
-      //TODO: check against actual creds
-      logged_in[socket.handshake.address] = true;
+      if(IsValidLogin(username, password))
+      {
+         logged_in[socket.handshake.address] = true;
+         console.log("Valid");
+      }
    });
    
    socket.on('internal_logout', function(msg)
    {
       logged_in[socket.handshake.address] = false;
-   });
-   
-   socket.on('disconnect', function()
-   {
-      io.emit('recive_value', "--disconnected");
    });
 });
 

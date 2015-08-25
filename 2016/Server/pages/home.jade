@@ -1,0 +1,44 @@
+extends ./base.jade
+
+block vars
+   - var pageTitle = "Team 4618"
+   - var navTitle = "Home"
+   - var navColor = "red"
+   
+block style
+   style.
+      body {
+         background-image: url("/assets/general_background.png");
+         background-size: cover;
+      }
+      #form_div {
+         color: white;
+         font-family: "Arial", "Helvectia", sans-serif;
+      }
+
+block content
+   p Welcome! This is the Team 4618 Server
+   button(id="scouting") Scouting
+   #form_div
+      p Username: #[input(type="text", id="username_box" autocomplete="off")]
+      p Password: #[input(type="password", id="password_box" autocomplete="off")]
+      button(id="login_button") Login
+      
+block script
+   script.
+      $(document).ready(function()
+      {
+         $('#scouting').bind("click", function()
+         {
+            window.location.href = "/scout";
+         });
+         
+         $('#login_button').bind("click", function()
+         {
+            var login_creds = $('#username_box').val() + "____" + $('#password_box').val();
+            socket.emit('internal_login_creds', login_creds);
+            $('#username_box').val('');
+            $('#password_box').val('');
+            window.location.reload();
+         });
+      });
