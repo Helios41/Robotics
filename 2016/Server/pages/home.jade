@@ -1,44 +1,133 @@
 extends ./base.jade
 
 block vars
-   - var pageTitle = "Team 4618"
+   - var pageTitle = "Team 4618 - Home"
    - var navTitle = "Home"
    - var navColor = "red"
+   - var backgroundurl = "/assets/general_background.png"
    
 block style
    style.
-      body {
-         background-image: url("/assets/general_background.png");
-         background-size: cover;
+      .block {
+         width: 80%;
+         background-color: #{navColor};
+         margin-left: 5%;
+         margin-top: 25px;
+         margin-bottom: 25px;
+         border: white solid thick;
+         outline: black solid thin;
       }
       #form_div {
          color: white;
          font-family: "Arial", "Helvectia", sans-serif;
       }
+      .onlinename {
+         margin-top: 0px;
+         margin-bottom: 0px;
+         margin-left: 15px;
+         background: none;
+         border: none;
+         color: white;
+         font-family: "Arial", "Helvectia", sans-serif;
+         font-size: 14px;
+         outline: none;
+      }
 
 block content
-   p Welcome! This is the Team 4618 Server
-   button(id="scouting") Scouting
-   #form_div
-      p Username: #[input(type="text", id="username_box" autocomplete="off")]
-      p Password: #[input(type="password", id="password_box" autocomplete="off")]
-      button(id="login_button") Login
-      
+   p Welcome #{username}! This is the Team 4618 Server
+   #scout.block
+      p(style="font-size: 20px; margin-top: 0px; margin-bottom: 5px;") Scouting DB
+      p Team ID: #[input(type="text", id="team_box" autocomplete="off")]
+      button(id="scout_search_button") Search
+   #posts.block
+      if posts
+         each post in posts
+            p #[span= post.user]: #{post.value}
+      else
+         p No Posts
+      p Post #[input(type="text", id="post_box")]
+      button(id="post_button") Upload
+   #online.block
+      if online
+         p(style="margin-top: 5px; margin-bottom: 5px;") People Online:
+         each name in online
+            p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + name + "\")")= name]
+      else
+         p No People Online
+   #messages.block
+      if messages 
+         p(style="margin-top: 5px; margin-bottom: 5px;") Messages:
+         each msg in messages 
+            p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + msg.sender + "\")")= msg.sender + ": "] #[span= msg.value]
+      else
+         p No Messages
+      if online
+         p Message #[input(type="text", id="message_box")]
+         select(id="message_target")
+            each name in online
+               |#[option(value= online)= online]
+         button(id="send_message_button") Send
+     
 block script
    script.
+      function enterHook(e)
+      {
+         if(e.keyCode == 13)
+         {
+            $(this).trigger("enterKey");
+         }
+      }
+      
+      function scoutSearch()
+      {
+         var team = parseInt($('#team_box').val());
+            
+         if(!isNaN(team))
+         {
+            window.location.href = ("/scout " + team);   
+            $('#team_box').val('');
+         }
+         else
+         {
+            $('#team_box').val("Invalid Team Number!");
+         }
+      }
+      
+      function uploadPost()
+      {
+         socket.emit('upload_post', $("#post_box").val());
+         $("#post_box").val('');
+      }
+      
+      function sendMessage()
+      {
+         var message_data = 
+         {
+            value: $("#message_box").val(),
+            target: $("#message_target :selected").text()
+         };
+         socket.emit('send_message', message_data);
+         $("#message_box").val('');
+      }
+      
+      function gotoPage(page)
+      {
+         console.log(page);
+      }
+   
       $(document).ready(function()
       {
-         $('#scouting').bind("click", function()
-         {
-            window.location.href = "/scout";
-         });
+         $('#team_box').keyup(enterHook);
+         $('#post_box').keyup(enterHook);
+         $('#message_box').keyup(enterHook);
          
-         $('#login_button').bind("click", function()
-         {
-            var login_creds = $('#username_box').val() + "____" + $('#password_box').val();
-            socket.emit('internal_login_creds', login_creds);
-            $('#username_box').val('');
-            $('#password_box').val('');
-            window.location.reload();
-         });
+         $('#scout_search_button').bind("click", scoutSearch);
+         $('#team_box').bind("enterKey", scoutSearch);
+         $('#team_box').bind("click", function() { $(this).val(''); });
+         
+         $('#post_box').bind("enterKey", uploadPost);
+         $('#post_button').bind("click", uploadPost);
+         
+         $('#message_box').bind("enterKey", sendMessage);
+         $('#send_message_button').bind("click", sendMessage);
       });

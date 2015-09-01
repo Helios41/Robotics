@@ -1,0 +1,42 @@
+extends ./base.jade
+
+block vars
+   - var pageTitle = "Team 4618 - Posts"
+   - var navTitle = "Posts"
+   - var navColor = "red"
+   - var backgroundurl = "/assets/general_background.png"
+
+block style
+   style.
+      .block {
+         width: 80%;
+         background-color: #{navColor};
+         margin-left: 5%;
+         margin-top: 25px;
+         margin-bottom: 25px;
+         border: white solid thick;
+         outline: black solid thin;
+      }
+      #form_div {
+         color: white;
+         font-family: "Arial", "Helvectia", sans-serif;
+      }
+      .onlinename {
+         margin-top: 0px;
+         margin-bottom: 0px;
+         margin-left: 15px;
+         background: none;
+         border: none;
+         color: white;
+         font-family: "Arial", "Helvectia", sans-serif;
+         font-size: 14px;
+         outline: none;
+      }
+
+block content
+   if posts
+      each post in posts
+         .block
+            p= post.value
+   else
+      p No Posts

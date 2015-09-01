@@ -1,16 +1,14 @@
 doctype html
 html(lang="en")
    block vars
-      - var pageTitle = "Default Title"
-      - var navTitle = "Default Nav"
-      - var navColor = "red"
-   - var username = "DEFAULT"
    head
       title= pageTitle
       block style
       style.
          body {
             margin: 0;
+            background-image: url(#{backgroundurl});
+            background-size: cover;
          }
          p {
             font-family: "Arial", "Helvectia", sans-serif;
@@ -28,16 +26,16 @@ html(lang="en")
             color: white;
             font-family: "Arial", "Helvectia", sans-serif;
             font-size: 24px;
+            outline: none;
          }
          #nav_title {
             font-family: "Arial", "Helvectia", sans-serif;
             font-size: 24px;
          }
          #nav_name {
-            right: 0;
-            top: 5px;
-            padding-right: 50px;
-            position: fixed;
+            margin-left: 20px;
+            text-decoration: underline;
+            font-size: 18px;
          }
          #nav_bar {
             width: 100%;
@@ -48,25 +46,84 @@ html(lang="en")
             font-size: 14px;
             padding-top: 15px;
          }
+         .portal_button {
+            background: none;
+            border: none;
+            color: white;
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 18px;
+            outline: none;
+         }
+         #portal_bar {
+            width: 100%;
+            background-color: #{navColor};
+            padding-top: 5px;
+            padding-bottom: 5px;
+            margin-top: 15px;
+         }
+         .horizontal_bar {
+            width: 100%;
+            background-color: #{navColor};
+            padding-top: 5px;
+            padding-bottom: 5px;
+            padding-left: 5px;
+            margin-top: 15px;
+         }
+         button {
+            background: #{navColor};
+            border: solid white;
+            color: white;
+            font-family: "Arial", "Helvectia", sans-serif;
+            outline: solid black thin;
+         }
          #logout_button {
-            right: 0;
-            margin-right: 50px;
-            margin-left: 10px;
-            position: fixed;
-            top: 25px;
+            margin-left: 25px;
+            margin-top: 5px;
+            position: absolute;
          }
    body
       #nav_bar
-         p(id="nav_text") #[button(id="home_link") Team 4618] - #[span(id="nav_title")= navTitle] #[span(id="nav_name")= username] #[button(id="logout_button") Logout]
+         span(id="nav_text") #[button(id="home_link") Team 4618] - #[span(id="nav_title")= navTitle] 
+         if loggedIn
+            |#[span(id="nav_name")= username] #[button(id="logout_button") Logout]
+      if navPortals
+         #portal_bar
+            each portal in navPortals
+               button(id="portal_" + portal, class="portal_button")= portal
       block content
       script(src="https://cdn.socket.io/socket.io-1.2.0.js")
       script(src="http://code.jquery.com/jquery-1.11.1.js")
+      script(src="/assets/js.cookie.js")
       block script
       script.
          var socket = io();
       
          $(document).ready(function()
          {
+            #{nav_portal_events}
+         
+            socket.on('reload', function(msg)
+            {
+               console.log("reload");
+               if(msg)
+               {
+                  if(msg.location !== undefined)
+                     window.location.href = msg.location;
+               }
+               
+               window.location.reload();
+            });
+         
+            socket.on('set_cookie', function(msg)
+            {
+               Cookies.set(msg.name, msg.value);
+            });
+         
+            socket.on('clear_cookie', function(msg)
+            {
+               Cookies.remove(msg);
+            });
+         
             $('#home_link').bind("click", function()
             {
                window.location.href = "/";
@@ -74,7 +131,6 @@ html(lang="en")
             
             $('#logout_button').bind('click', function()
             {
-               socket.emit("internal_logout");
-               window.location.reload();
+               socket.emit("logout");
             });
          });

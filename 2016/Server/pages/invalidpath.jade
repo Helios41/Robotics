@@ -1,0 +1,13 @@
+doctype html
+html(lang="en")
+   head
+      title Invalid Path
+   body
+      p Invalid path with current credentials
+      p Resetting invalid cookies
+      button(onclick="window.location.reload()") Reload
+      script(src="/assets/js.cookie.js")
+      script.
+         Cookies.remove('password');
+         Cookies.remove('username');
+         

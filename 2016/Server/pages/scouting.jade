@@ -4,23 +4,67 @@ block vars
    - var pageTitle = "Team 4618 - Scouting"
    - var navTitle = "Scouting"
    - var navColor = "red"
+   - var backgroundurl = "/assets/general_background.png"
    
 block style
    style.
-      body {
-         background-image: url("/assets/general_background.png");
-         background-size: cover;
+      .block {
+         width: 80%;
+         background-color: #{navColor};
+         margin-left: 5%;
+         margin-top: 25px;
+         margin-bottom: 25px;
+         border: white solid thick;
+         outline: black solid thin;
       }
       
 block content
-   input(id="search_box" autocomplete="off")
-   button(id="search_button") Search
-   p Team
-     = ' ' + teamid
-   each tag in bluealliancedata
-      p= tag
-      
+   #search_div.horizontal_bar
+      span Search: 
+      input(id="search_box" autocomplete="off")
+      button(id="search_button") Search
+   if teamid
+      if bluealliancedata
+         p Team #{teamid}
+         each tag in bluealliancedata
+            p= tag
+      else
+         p No data available for Team #{teamid}
+      if loggedIn
+         if submitted
+            each post in submitted
+               .block
+                  p By #{post.user} 
+                  p= post.value
+         else
+            p No submitted data
+         .block
+            p Submit scouting info
+            p Scouting: #[input(id="scout_box")]
+            button(id="submit_scout_button") Submit
+   else
+      p Search for a team
 block script
+   if loggedIn
+      script.
+         $(document).ready(function()
+         {
+            //TODO: handle scouting data submit
+         });
+   if teamid
+      script.
+         $(document).ready(function()
+         {
+            socket.emit('request_scout_data', #{teamid});
+         
+            socket.on('recive_scout_data', function(msg)
+            {
+               if(msg.teamid == #{teamid})
+               {
+                  //TODO: replace with reload
+               }
+            });
+         });
    script.
       $(document).ready(function()
       {

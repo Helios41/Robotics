@@ -4,16 +4,13 @@ block vars
    - var pageTitle = "Team 4618 - Internal"
    - var navTitle = "Internal"
    - var navColor = "green"
+   - var backgroundurl = "/assets/internal_background.png"
    
 block style
    style.
-      body {
-         background-image: url("/assets/internal_background.png");
-         background-size: cover;
-      }
       .block {
          width: 80%;
-         background-color: green;
+         background-color: #{navColor};
          margin-left: 5%;
          margin-top: 25px;
          margin-bottom: 25px;
@@ -31,43 +28,50 @@ block style
       }
 
 block content
-   #posts.block
-      each post in ["P", "O", "S", "T"]
-         p= post
-   #online.block
-      p(style="margin-top: 5px; margin-bottom: 5px;") People Online:
-      each name in ["Dan", "Nick", "Roulo"]
-         p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + name + "\")")= name]
-   #messages.block
-      p(style="margin-top: 5px; margin-bottom: 5px;") Messages:
-      each post in [{message: "Test", person: "Nick"}, {message: "TeSt", person: "Dan"}]
-         p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + post.person + "\")")= post.person + ": "] #[span= post.message]
-   button(id="libCNFRC") libCNFRC
-   button(id="DashboardV2") Dashboard V2
-   button(id="CNFRCWebserver") CNFRC Webserver
+   #login_create.block
+      p Create Login
+      p Username: #[input(type="text", id="username_box" autocomplete="off")]
+      p Password: #[input(type="password", id="password_box" autocomplete="off")]
+      p Access: #[input(type="text", id="access_box" autocomplete="off")]
+      button(id="create_login_button") Create Login
+   #admin.block
+      p Admin Controls
+      button(id="clear_posts_button") Clear Posts
    
 block script
    script.
-      function gotoPage(name)
+      function createLogin()
       {
-         console.log(name);
+         var login_info = {
+                              username: $('#username_box').val(),
+                              password: $('#password_box').val(),
+                              access: $('#access_box').val()
+                          };
+         socket.emit('create_login', login_info);
+         $('#username_box').val('');
+         $('#password_box').val('');
+         $('#access_box').val('');
       }
-         
+      
+      function enterHook(e)
+      {
+         if(e.keyCode == 13)
+         {
+            $(this).trigger("enterKey");
+         }
+      }
+      
       $(document).ready(function()
       {
-         $('#libCNFRC').bind("click", function()
-         {
-            
-         });
+         $('#username_box').keyup(enterHook);
+         $('#password_box').keyup(enterHook);
+         $('#access_box').keyup(enterHook);
          
-         $('#DashboardV2').bind("click", function()
-         {
-            
-         });
+         $('#login_button').bind("click", createLogin);
+         $('#username_box').bind("enterKey", createLogin);
+         $('#password_box').bind("enterKey", createLogin);
+         $('#access_box').bind("enterKey", createLogin);
          
-         $('#CNFRCWebserver').bind("click", function()
-         {
-            
-         });
+         $('#clear_posts_button').bind("click", function(){ socket.emit('clear_posts'); });
       });
       
