@@ -32,6 +32,12 @@ block style
          font-size: 14px;
          outline: none;
       }
+      #message_box {
+         resize: none;
+      }
+      #post_box {
+         resize: none;
+      }
 
 block content
    p Welcome #{username}! This is the Team 4618 Server
@@ -40,32 +46,37 @@ block content
       p Team ID: #[input(type="text", id="team_box" autocomplete="off")]
       button(id="scout_search_button") Search
    #posts.block
-      if posts
-         each post in posts
-            p #[span= post.user]: #{post.value}
-      else
-         p No Posts
-      p Post #[input(type="text", id="post_box")]
-      button(id="post_button") Upload
+      #postdata_block
+         if posts
+            each post in posts
+               p #[span= post.user]: #{post.value}
+         else
+            p No Posts
+      textarea(rows="4", cols="25", id="post_box")
+      br
+      button(id="post_button") Post
    #online.block
-      if online
-         p(style="margin-top: 5px; margin-bottom: 5px;") People Online:
-         each name in online
-            p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + name + "\")")= name]
-      else
-         p No People Online
+      #onlinedata_block
+         if online
+            p(style="margin-top: 5px; margin-bottom: 5px;") People Online:
+               each name in online
+                  p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + name + "\")")= name]
+         else
+            p No People Online
    #messages.block
-      if messages 
-         p(style="margin-top: 5px; margin-bottom: 5px;") Messages:
-         each msg in messages 
-            p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + msg.sender + "\")")= msg.sender + ": "] #[span= msg.value]
-      else
-         p No Messages
+      #messagedata_block
+         if messages 
+            p(style="margin-top: 5px; margin-bottom: 5px;") Messages:
+               each msg in messages 
+                  p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + msg.sender + "\")")= msg.sender + ": "] #[span= msg.value]
+         else
+            p No Messages
       if online
-         p Message #[input(type="text", id="message_box")]
+         textarea(rows="4", cols="25", id="message_box")
+         br
          select(id="message_target")
             each name in online
-               |#[option(value= online)= online]
+               |#[option(value= name)= name]
          button(id="send_message_button") Send
      
 block script
@@ -125,9 +136,9 @@ block script
          $('#team_box').bind("enterKey", scoutSearch);
          $('#team_box').bind("click", function() { $(this).val(''); });
          
-         $('#post_box').bind("enterKey", uploadPost);
+         //$('#post_box').bind("enterKey", uploadPost);
          $('#post_button').bind("click", uploadPost);
          
-         $('#message_box').bind("enterKey", sendMessage);
+         //$('#message_box').bind("enterKey", sendMessage);
          $('#send_message_button').bind("click", sendMessage);
       });

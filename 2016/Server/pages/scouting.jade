@@ -17,6 +17,9 @@ block style
          border: white solid thick;
          outline: black solid thin;
       }
+      #scout_box {
+         resize: none;
+      }
       
 block content
    #search_div.horizontal_bar
@@ -24,32 +27,55 @@ block content
       input(id="search_box" autocomplete="off")
       button(id="search_button") Search
    if teamid
-      if bluealliancedata
-         p Team #{teamid}
-         each tag in bluealliancedata
-            p= tag
-      else
-         p No data available for Team #{teamid}
-      if loggedIn
-         if submitted
-            each post in submitted
-               .block
-                  p By #{post.user} 
-                  p= post.value
+      #bluealliancedata_block
+         if bluealliancedata
+            p Team #{teamid}
+            each tag in bluealliancedata
+               p= tag
          else
-            p No submitted data
+            p No data available for Team #{teamid}
+      if loggedIn
+         #submitteddata_block
+            if submitted
+               each post in submitted
+                  .block
+                     p By #{post.user} 
+                     p= post.value
          .block
-            p Submit scouting info
-            p Scouting: #[input(id="scout_box")]
+            p Scouting info
+            textarea(rows="4", cols="25" id="scout_box")
+            br
             button(id="submit_scout_button") Submit
    else
       p Search for a team
 block script
-   if loggedIn
+   if loggedIn && teamid
       script.
+         function enterHook(e)
+         {
+            if(e.keyCode == 13)
+            {
+               $(this).trigger("enterKey");
+            }
+         }
+      
+         function submitScoutData()
+         {
+            var scout_data =
+            {
+               team: "#{teamid}",
+               value: $('#scout_box').val()
+            };
+            socket.emit('submit_scout_data', scout_data);
+            $('#scout_box').val('');
+         }
+      
          $(document).ready(function()
          {
-            //TODO: handle scouting data submit
+            $('#scout_box').keyup(enterHook);
+            
+            $('#submit_scout_button').on('click', submitScoutData);
+            //$('#scout_box').on('enterKey', submitScoutData);
          });
    if teamid
       script.
@@ -59,10 +85,7 @@ block script
          
             socket.on('recive_scout_data', function(msg)
             {
-               if(msg.teamid == #{teamid})
-               {
-                  //TODO: replace with reload
-               }
+               updateDiv("bluealliancedata_block", msg.value);
             });
          });
    script.

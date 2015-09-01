@@ -66,7 +66,6 @@ html(lang="en")
             background-color: #{navColor};
             padding-top: 5px;
             padding-bottom: 5px;
-            padding-left: 5px;
             margin-top: 15px;
          }
          button {
@@ -94,9 +93,14 @@ html(lang="en")
       script(src="https://cdn.socket.io/socket.io-1.2.0.js")
       script(src="http://code.jquery.com/jquery-1.11.1.js")
       script(src="/assets/js.cookie.js")
-      block script
       script.
          var socket = io();
+      
+         function updateDiv(id, html)
+         {
+            var updated_html = $('<div/>').append(html);
+            $('#' + id).html(updated_html.find('#' + id).html());
+         }
       
          $(document).ready(function()
          {
@@ -105,13 +109,22 @@ html(lang="en")
             socket.on('reload', function(msg)
             {
                console.log("reload");
-               if(msg)
-               {
-                  if(msg.location !== undefined)
-                     window.location.href = msg.location;
-               }
-               
                window.location.reload();
+            });
+         
+            socket.on('update_div', function(msg)
+            {
+               console.log(msg);
+               if(msg != undefined)
+               {
+                  if((msg.html != undefined) &&
+                     (msg.id != undefined) &&
+                     (msg.view != undefined))
+                  {
+                     if(msg.view == "#{view_name}")
+                        updateDiv(msg.id, msg.html);
+                  }
+               }
             });
          
             socket.on('set_cookie', function(msg)
@@ -134,3 +147,4 @@ html(lang="en")
                socket.emit("logout");
             });
          });
+      block script

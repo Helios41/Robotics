@@ -2,13 +2,13 @@
    "default": "make",
    "make":
    {
-      "project": "Dashboard",
+      "project": "DashboardV2",
       "language": "C",
       "type": "executable",
-      "build": "../Build/Dashboard/",
+      "build": "../Build/DashboardV2/",
       "source": 
       [
-         "../Source/Dashboard/",
+         "../Source/DashboardV2/",
          "../Source/BaseIncludes/"
       ],
       "dependencies":

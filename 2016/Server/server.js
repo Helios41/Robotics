@@ -10,6 +10,19 @@ var app = express();
 app.set('views', './pages');
 app.set('view engine', 'jade');
 
+function jadeCompile(viewname, locals)
+{
+   var render_data = {};
+   render_data["view_name"] = viewname;
+   
+   for(var attrib in locals)
+   {
+      render_data[attrib] = locals[attrib];
+   }
+   
+   return jade.compileFile(("./pages/" + viewname + ".jade"), {})(render_data);
+}
+
 app.use(cookieParser());
 
 /**
@@ -17,18 +30,13 @@ TODO:
    -encrypt login creds
    -https
    
-   -scouting data submit
-   -finish scouting reload
-   
    -remove fs.existsSync   
-   -stop relying on refreshing the page for new info
+   -replace reload with updateDiv
    
-   -change reload to take a destination
    -cleanup jade 
    -button clicks dont show outline while held
-   -anything can be passed as an argument to /scout
-   -not getting removed from online list when logging out
    -save posts & messages to a file
+   -use a database (mongodb)
    -delete specific messages
    -
 ISSUES:
@@ -95,6 +103,9 @@ function addPortals(render_data, username, password)
 
 function HasCreds(cookies)
 {
+   if(cookies == undefined)
+      return false;
+   
    if((cookies.username == undefined) ||
       (cookies.password == undefined))
    {
@@ -144,6 +155,16 @@ function UploadPost(value, username, password)
    }
 }
 
+function IsNumber(in_value)
+{
+   var value = parseInt(in_value);
+            
+   if(isNaN(value))
+      return false;
+   
+   return true;
+}
+
 app.get('/', function(req, res)
 {
    if(HasCreds(req.cookies))
@@ -160,7 +181,7 @@ app.get('/login', function(req, res)
 {
    if(!HasCreds(req.cookies))
    {
-      renderLogin(res);
+      res.send(renderLogin());
    }
    else
    {
@@ -172,7 +193,7 @@ app.get('/home', function(req, res)
 {
    if(RequireLogin(req.cookies, res))
    {
-      renderHome(req.cookies, res);
+      res.send(renderHome(req.cookies));
    }
 });
 
@@ -180,7 +201,7 @@ app.get('/posts', function(req, res)
 {
    if(RequireLogin(req.cookies, res))
    {
-      renderPosts(req.cookies, res);
+      res.send(renderPosts(req.cookies));
    }
 });
 
@@ -188,26 +209,33 @@ app.get('/internal', function(req, res)
 {
    if(RequireLogin(req.cookies, res))
    {
-      renderInternal(req.cookies, res);
+      res.send(renderInternal(req.cookies));
    }
 });
 
 app.get('/scout', function(req, res)
 {
-   renderScout(req.cookies, res, null);
+   res.send(renderScout(req.cookies, null));
 });
 
 app.get('/scout:team', function(req, res)
 {
-   renderScout(req.cookies, res, req.params.team);
+   if(IsNumber(req.params.team) && (req.params.team > 0))
+   {
+      res.send(renderScout(req.cookies, req.params.team));
+   }
+   else
+   {
+      res.redirect('/scout');
+   }
 });
 
-function renderLogin(res)
+function renderLogin()
 {
-   res.render('login');
+   return jadeCompile('login');
 }
 
-function renderHome(cookies, res)
+function renderHome(cookies)
 {
    var login_data = GetLoginData(cookies.username, cookies.password);
    var render_data = {};
@@ -231,14 +259,13 @@ function renderHome(cookies, res)
       
       addPortals(render_data, login_data.username, login_data.password);
       
-      res.render('home', render_data);
-      return;
+      return jadeCompile('home', render_data);
    }
    
-   res.render('invalidpath');
+   return jadeCompile('invalidpath');
 }
 
-function renderPosts(cookies, res)
+function renderPosts(cookies)
 {
    var login_data = GetLoginData(cookies.username, cookies.password);
    var render_data = {};
@@ -253,14 +280,13 @@ function renderPosts(cookies, res)
       
       addPortals(render_data, login_data.username, login_data.password);
       
-      res.render('posts', render_data);
-      return;
+      return jadeCompile('posts', render_data);
    }
    
-   res.render('invalidpath');
+   return jadeCompile('invalidpath');
 }
 
-function renderInternal(cookies, res)
+function renderInternal(cookies)
 {
    var login_data = GetLoginData(cookies.username, cookies.password);
    var render_data = {};
@@ -272,15 +298,15 @@ function renderInternal(cookies, res)
       
       addPortals(render_data, login_data.username, login_data.password);
       
-      res.render('internal', render_data);
-      return;
+      return jadeCompile('internal', render_data);
    }
    
-   res.render('invalidpath');
+   return jadeCompile('invalidpath');
 }
 
-function renderScout(cookies, res, team)
+function renderScout(cookies, team_in)
 {
+   var team = parseInt(team_in).toString();
    var render_data = {};
    
    if(HasCreds(cookies))
@@ -295,18 +321,15 @@ function renderScout(cookies, res, team)
       }
    }
    
-   if(team)
+   if(team && team_in)
    {
       render_data["teamid"] = team;
       
-      console.log(scouting_data);
-      
-      //TODO: fix this, lookup failing
       if(scouting_data[team] != undefined)      
          render_data["submitted"] = scouting_data[team];
    }
    
-   res.render('scouting', render_data);
+   return jadeCompile('scouting', render_data);
 }
 
 app.use('/assets', express.static("./assets"));
@@ -359,6 +382,18 @@ function GetLoginData(username, password)
    }
    
    return {valid: false};
+}
+
+//TODO: remove viewname arg
+function UpdateDiv(socket, viewname, compiledjade, divname)
+{
+   var update_data = 
+   {
+      html: compiledjade,
+      id: divname,
+      view: viewname
+   };
+   socket.emit('update_div', update_data);
 }
 
 var server = http.createServer(app);
@@ -424,7 +459,7 @@ io.on('connection', function(socket)
                        socket.request.headers.cookie.username,
                        socket.request.headers.cookie.password);
                     
-            socket.emit('reload');
+            io.emit('reload');
          }
       }
    });
@@ -439,7 +474,7 @@ io.on('connection', function(socket)
          if(login_data.valid && (login_data.access === 'root'))
          {
             posts = [];
-            socket.emit('reload');
+            io.emit('reload');
          }
       }
    });
@@ -453,6 +488,8 @@ io.on('connection', function(socket)
          var login_data = GetLoginData(socket.request.headers.cookie.username,
                                        socket.request.headers.cookie.password);
          
+         //TODO: is target a vaild username
+         
          if(login_data.valid)
          {
             if(messages[msg.target] == undefined) 
@@ -464,8 +501,9 @@ io.on('connection', function(socket)
                sender: login_data.username
             };
 
+            //TODO: only reload sender & target
             messages[msg.target].push(message_data);
-            socket.emit('reload');
+            UpdateDiv(io, 'home', renderHome(socket.request.headers.cookie), "messagedata_block");
          }
       }
    });
@@ -491,7 +529,7 @@ io.on('connection', function(socket)
             };
             
             scouting_data[msg.team].push(scout_data);
-            socket.emit('reload');
+            UpdateDiv(io, 'scouting', renderScout(socket.request.headers.cookie, msg.team), "submitteddata_block");
          }
       }
    });
@@ -531,11 +569,27 @@ io.on('connection', function(socket)
          var scout_data = 
          {
             teamid: team,
-            value: jade.compileFile("./pages/scouting.jade", {})(render_data)
+            value: jadeCompile("scouting", render_data)
          };
          
-         io.emit('recive_scout_data', scout_data);
+         socket.emit('recive_scout_data', scout_data);
       });
+   });
+   
+   socket.on('disconnect', function()
+   {
+      if(HasCreds(socket.request.headers.cookie))
+      {
+         var login_data = GetLoginData(socket.request.headers.cookie.username,
+                                       socket.request.headers.cookie.password);
+                                       
+         if(login_data.valid)
+         {
+            //TODO: what if youre logged on in 2 computers?
+            if(online.indexOf(login_data.username) > -1)
+               online.splice(online.indexOf(login_data.username), 1); 
+         }
+      }
    });
 });
 
