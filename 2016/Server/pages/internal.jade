@@ -5,73 +5,63 @@ block vars
    - var navTitle = "Internal"
    - var navColor = "green"
    - var backgroundurl = "/assets/internal_background.png"
-   
-block style
-   style.
-      .block {
-         width: 80%;
-         background-color: #{navColor};
-         margin-left: 5%;
-         margin-top: 25px;
-         margin-bottom: 25px;
-         outline: rgb(204, 255, 204) solid thick;
-      }
-      .onlinename {
-         margin-top: 0px;
-         margin-bottom: 0px;
-         margin-left: 15px;
-         background: none;
-         border: none;
-         color: white;
-         font-family: "Arial", "Helvectia", sans-serif;
-         font-size: 14px;
-      }
 
 block content
    #login_create.block
       p Create Login
       p Username: #[input(type="text", id="username_box" autocomplete="off")]
       p Password: #[input(type="password", id="password_box" autocomplete="off")]
-      p Access: #[input(type="text", id="access_box" autocomplete="off")]
+      select(id="access_level")
+         each level in access_levels
+            option(value= level)= level
       button(id="create_login_button") Create Login
    #admin.block
       p Admin Controls
       button(id="clear_posts_button") Clear Posts
-   
+      button(id="check_access_levels") Check Access Levels
+      #invalid_accessdata_block
+         each invalid_user in invalid_access_levels
+            p= invalid_user
+      p Delete Username: #[input(type="text", id="delete_username_box" autocomplete="off")]
+      button(id="delete_user_button") Delete User
+   #accounts.block
+      each account in accounts
+         p= account
 block script
    script.
       function createLogin()
       {
-         var login_info = {
-                              username: $('#username_box').val(),
-                              password: $('#password_box').val(),
-                              access: $('#access_box').val()
-                          };
+         var login_info = 
+         {
+            username: $('#username_box').val(),
+            password: $('#password_box').val(),
+            access: $('#access_level :selected').text()
+         };
          socket.emit('create_login', login_info);
          $('#username_box').val('');
          $('#password_box').val('');
-         $('#access_box').val('');
       }
       
-      function enterHook(e)
+      function deleteUser()
       {
-         if(e.keyCode == 13)
-         {
-            $(this).trigger("enterKey");
-         }
+         socket.emit('delete_user', $('#delete_username_box').val());
+         $('#delete_username_box').val('');
       }
       
       $(document).ready(function()
       {
-         $('#username_box').keyup(enterHook);
-         $('#password_box').keyup(enterHook);
-         $('#access_box').keyup(enterHook);
+         registerEnterKey("username_box");
+         registerEnterKey("password_box");
+         registerEnterKey("delete_username_box");
          
-         $('#login_button').bind("click", createLogin);
+         $('#create_login_button').bind("click", createLogin);
          $('#username_box').bind("enterKey", createLogin);
          $('#password_box').bind("enterKey", createLogin);
-         $('#access_box').bind("enterKey", createLogin);
+         
+         $('#delete_user_button').bind("click", deleteUser);
+         $('#delete_username_box').bind("enterKey", deleteUser);
          
          $('#clear_posts_button').bind("click", function(){ socket.emit('clear_posts'); });
+         $('#check_access_levels').bind("click", function(){ socket.emit('check_access_levels'); });
       });
       

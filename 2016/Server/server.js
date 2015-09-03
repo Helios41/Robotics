@@ -6,9 +6,50 @@ var cookieParser = require('cookie-parser');
 var socketio_cookieParser = require('socket.io-cookie');
 var jade = require('jade');
 
+var crypto = require('crypto');
+var encryption = 'aes-256-ctr';
+var encryption_key = fs.readFileSync("./key.dat");
+
+const logins_file = "./logins.json";
+
+var RenderFunctions = 
+{
+   login: renderLogin,
+   home: renderHome,
+   posts: renderPosts,
+   profile: renderProfile,
+   internal: renderInternal,
+   scouting: renderScout,
+   messages: renderMessages
+};
+Object.freeze(RenderFunctions);
+
+function encryptString(string, key)
+{
+   var cipher = crypto.createCipher(encryption, key);
+   var crypted = cipher.update(string, 'utf8', 'hex');
+   crypted += cipher.final('hex');
+   return crypted;
+}
+
+function decryptString(string, key)
+{
+   var decipher = crypto.createDecipher(encryption, key);
+   var dec = decipher.update(string, 'hex', 'utf8');
+   dec += decipher.final('utf8');
+   return dec;
+}
+
+//console.log(encryptString("test", encryption_key));
+
 var app = express();
 app.set('views', './pages');
 app.set('view engine', 'jade');
+
+const AccessLevel_User = "User";
+const AccessLevel_SU = "SU";
+var AccessLevels = [AccessLevel_User, AccessLevel_SU];
+Object.freeze(AccessLevels);
 
 function jadeCompile(viewname, locals)
 {
@@ -26,17 +67,19 @@ function jadeCompile(viewname, locals)
 app.use(cookieParser());
 
 /**
+NOTE:
+   this server is fairly insecure (eg. unencrypted data packets)
+         --it is not intended to be commercially used--
+*/
+
+/**
 TODO:
-   -encrypt login creds
+   -finish encryption
    -https
    
-   -remove fs.existsSync   
-   -replace reload with updateDiv
+   -message search not working
    
-   -cleanup jade 
-   -button clicks dont show outline while held
    -save posts & messages to a file
-   -use a database (mongodb)
    -delete specific messages
    -
 ISSUES:
@@ -93,8 +136,10 @@ function addPortals(render_data, username, password)
       addPortal(render_data, "Home");
       addPortal(render_data, "Scout");
       addPortal(render_data, "Posts");
+      addPortal(render_data, "Profile");
+      addPortal(render_data, "Messages");
       
-      if(login_data.access === 'root')
+      if(login_data.access === AccessLevel_SU)
       { 
          addPortal(render_data, "Internal");
       }
@@ -205,6 +250,22 @@ app.get('/posts', function(req, res)
    }
 });
 
+app.get('/messages', function(req, res)
+{
+   if(RequireLogin(req.cookies, res))
+   {
+      res.send(renderMessages(req.cookies));
+   }
+});
+
+app.get('/profile', function(req, res)
+{
+   if(RequireLogin(req.cookies, res))
+   {
+      res.send(renderProfile(req.cookies));
+   }
+});
+
 app.get('/internal', function(req, res)
 {
    if(RequireLogin(req.cookies, res))
@@ -286,15 +347,80 @@ function renderPosts(cookies)
    return jadeCompile('invalidpath');
 }
 
+function renderMessages(cookies, sender)
+{
+   var login_data = GetLoginData(cookies.username, cookies.password);
+   var render_data = {};
+   
+   if(login_data.valid)
+   {
+      render_data["loggedIn"] = true;
+      render_data["username"] = login_data.username;
+      
+      if(online.length)
+         render_data["online"] = online;
+      
+      if(sender == undefined)
+      {
+         if(messages[login_data.username] != undefined)
+            render_data["messages"] = messages[login_data.username];
+      }
+      else
+      {
+         if(messages[login_data.username] != undefined)
+         {
+            render_data["messages"] = [];
+            
+            for(var i = 0; i < messages[login_data.username].length; ++i)
+            {
+               var message = messages[login_data.username][i];
+               if(message.sender == sender)
+                  render_data["messages"].push(message);
+            }
+         }
+      }
+      
+      addPortals(render_data, login_data.username, login_data.password);
+      
+      return jadeCompile('messages', render_data);
+   }
+   
+   return jadeCompile('invalidpath');
+}
+
+function renderProfile(cookies)
+{
+   var login_data = GetLoginData(cookies.username, cookies.password);
+   var render_data = {};
+   
+   if(login_data.valid)
+   {
+      render_data["loggedIn"] = true;
+      render_data["username"] = login_data.username;
+      
+      render_data["access_level"] = login_data.access;
+      
+      addPortals(render_data, login_data.username, login_data.password);
+      
+      return jadeCompile('profile', render_data);
+   }
+   
+   return jadeCompile('invalidpath');
+}
+
 function renderInternal(cookies)
 {
    var login_data = GetLoginData(cookies.username, cookies.password);
    var render_data = {};
    
-   if((login_data.valid) && (login_data.access === 'root'))
+   if(login_data.valid && (login_data.access === AccessLevel_SU))
    {
       render_data["loggedIn"] = true;
       render_data["username"] = login_data.username;
+      
+      render_data["access_levels"] = AccessLevels;
+      render_data["invalid_access_levels"] = CheckAccessLevels();
+      render_data["accounts"] = GetUsernames();
       
       addPortals(render_data, login_data.username, login_data.password);
       
@@ -336,43 +462,80 @@ app.use('/assets', express.static("./assets"));
 
 function CreateAccount(username, password, access)
 {
-   if(fs.existsSync('./logins.json'))
+   if(fs.existsSync(logins_file))
    {
-      var login_json = JSON.parse(fs.readFileSync("./logins.json"));
-      
-      //TODO: check if login exists already
-      
-      var login_info = {
-                           username: username,
-                           password: password,
-                           access: access
-                       };
-      
-      login_json.push(login_info);
-      
-      var login_json_str = JSON.stringify(login_json);
-      fs.writeFileSync("./logins.json", login_json_str);
-   }
-}
-
-function GetLoginData(username, password)
-{
-   if(fs.existsSync('./logins.json'))
-   {
-      var login_json = JSON.parse(fs.readFileSync("./logins.json"));
+      var login_json = JSON.parse(fs.readFileSync(logins_file));
       
       for(var i = 0; i < login_json.length; ++i)
       {
          var tag = login_json[i];
          
-         if((tag.username === username) &&
-            (tag.password === password))
+         if(tag.username == username)
          {
+            console.log("[ERROR] tryed to create duplicate account: " + username);
+            return;
+         }
+      }
+      
+      var login_info = 
+      {
+         username: username,
+         password: encryptString(password, encryption_key),
+         access: access
+      };
+      
+      login_json.push(login_info);
+      
+      var login_json_str = JSON.stringify(login_json);
+      fs.writeFileSync(logins_file, login_json_str);
+   }
+}
+
+function DeleteAccount(username)
+{
+   if(fs.existsSync(logins_file))
+   {
+      var login_json = JSON.parse(fs.readFileSync(logins_file));
+      var index = 0;
+      
+      for(; index < login_json.length; ++index)
+      {
+         var tag = login_json[index];
+         
+         if(tag.username == username)
+            break;
+      }
+      
+      login_json = login_json.splice(index - 1, 1);
+      
+      var login_json_str = JSON.stringify(login_json);
+      fs.writeFileSync(logins_file, login_json_str);
+   }
+}
+
+function GetLoginData(username, password)
+{
+   if(fs.existsSync(logins_file))
+   {
+      var login_json = JSON.parse(fs.readFileSync(logins_file));
+      
+      for(var i = 0; i < login_json.length; ++i)
+      {
+         var tag = login_json[i];
+         
+         if((tag.username == username) &&
+            (tag.password == encryptString(password, encryption_key)))
+         {
+            if(AccessLevels.indexOf(tag.access) < 0)
+            {
+               console.log("[ERROR] Invalid access level for " + tag.username + ": " + tag.access);
+            }
+            
             var login_data = 
             {
                valid: true,
                username: tag.username,
-               password: tag.password,
+               password: decryptString(tag.password, encryption_key),
                access: tag.access
             };
             
@@ -384,16 +547,80 @@ function GetLoginData(username, password)
    return {valid: false};
 }
 
-//TODO: remove viewname arg
-function UpdateDiv(socket, viewname, compiledjade, divname)
+function CheckAccessLevels()
 {
+   if(fs.existsSync(logins_file))
+   {
+      var invalid_users = [];
+      var login_json = JSON.parse(fs.readFileSync(logins_file));
+      
+      for(var i = 0; i < login_json.length; ++i)
+      {
+         var tag = login_json[i];
+         
+         if(AccessLevels.indexOf(tag.access) < 0)
+         {
+            invalid_users.push(tag.username + ": " + tag.access);
+         }
+      }
+      
+      if(invalid_users.length > 0)
+         return invalid_users;
+   }
+   
+   return ["No Invalid Access Levels"];
+}
+
+function DoesUsernameExist(username)
+{
+   if(fs.existsSync(logins_file))
+   {
+      var login_json = JSON.parse(fs.readFileSync(logins_file));
+      
+      for(var i = 0; i < login_json.length; ++i)
+      {
+         var tag = login_json[i];
+         
+         if(tag.username == username)
+            return true;
+      }
+   }
+   
+   return false;
+}
+
+function GetUsernames()
+{
+   var usernames = [];
+   
+   if(fs.existsSync(logins_file))
+   {
+      var login_json = JSON.parse(fs.readFileSync(logins_file));
+      
+      for(var i = 0; i < login_json.length; ++i)
+      {
+         var tag = login_json[i];
+         usernames.push(tag.username);
+      }
+   }
+   
+   return usernames;
+}
+
+function UpdateDiv(socket, viewname, divname, in_params)
+{
+   var params = [];
+   
+   if(in_params != undefined)
+      params = in_params;
+   
    var update_data = 
    {
-      html: compiledjade,
+      params: params,
       id: divname,
       view: viewname
    };
-   socket.emit('update_div', update_data);
+   socket.emit('update_div_callback', update_data);
 }
 
 var server = http.createServer(app);
@@ -414,16 +641,46 @@ io.on('connection', function(socket)
          {
             socket.emit('set_cookie', {name: "username", value: msg.username});
             socket.emit('set_cookie', {name: "password", value: msg.password});
-            socket.emit('reload');
+            
+            socket.emit('goto_page', '/home');
          }
       }
    });
 
+   socket.on('update_div_callback', function(msg)
+   {
+      if(msg == undefined)
+         return;
+      
+      if((msg.params != undefined) &&
+         (msg.id != undefined) &&
+         (msg.view != undefined))
+      {
+         if(RenderFunctions.hasOwnProperty(msg.view) > -1)
+         {
+            var param_array = [socket.request.headers.cookie];
+            
+            for(var i = 0; i < msg.params.length; ++i)
+               param_array.push(msg.params[i]);
+            
+            var update_data = 
+            {
+               html: RenderFunctions[msg.view].apply(null, param_array),
+               id: msg.id,
+               view: msg.view
+            };
+         
+            socket.emit('update_div', update_data);
+         }
+      }
+   });
+   
    socket.on('logout', function(msg)
    {
       socket.emit('clear_cookie', "username");
       socket.emit('clear_cookie', "password");
-      socket.emit('reload');
+      
+      socket.emit('goto_page', '/login');
    });
    
    socket.on('create_login', function(msg)
@@ -436,12 +693,26 @@ io.on('connection', function(socket)
       {
          var login_data = GetLoginData(username, password);
          
-         if(login_data.valid)
+         if(login_data.valid && (login_data.access === AccessLevel_SU))
          {
-            if(login_data.access === 'root')
-            {
-               CreateAccount(msg.username, msg.password, msg.access);
-            }
+            CreateAccount(msg.username, msg.password, msg.access);
+         }
+      }
+   });
+   
+   socket.on('delete_user', function(msg)
+   {
+      var username = socket.request.headers.cookie.username;
+      var password = socket.request.headers.cookie.password;
+      
+      if((username != undefined) &&
+         (password != undefined))
+      {
+         var login_data = GetLoginData(username, password);
+         
+         if(login_data.valid && (login_data.access === AccessLevel_SU))
+         {
+            DeleteAccount(msg);
          }
       }
    });
@@ -459,7 +730,8 @@ io.on('connection', function(socket)
                        socket.request.headers.cookie.username,
                        socket.request.headers.cookie.password);
                     
-            io.emit('reload');
+            UpdateDiv(io, 'home', "postdata_block");
+            UpdateDiv(io, 'posts', "postdata_block");
          }
       }
    });
@@ -471,12 +743,31 @@ io.on('connection', function(socket)
          var login_data = GetLoginData(socket.request.headers.cookie.username,
                                        socket.request.headers.cookie.password);
                                        
-         if(login_data.valid && (login_data.access === 'root'))
+         if(login_data.valid && (login_data.access === AccessLevel_SU))
          {
             posts = [];
-            io.emit('reload');
+            
+            UpdateDiv(io, 'home', "postdata_block");
+            UpdateDiv(io, 'posts', "postdata_block");
          }
       }
+   });
+   
+   socket.on('check_access_levels', function(msg)
+   {
+      if(HasCreds(socket.request.headers.cookie))
+      {
+         var login_data = GetLoginData(socket.request.headers.cookie.username,
+                                       socket.request.headers.cookie.password);
+         
+         if(login_data.valid && (login_data.access === AccessLevel_SU))
+            UpdateDiv(socket, 'internal', "invalid_accessdata_block");
+      }      
+   });
+   
+   socket.on('request_specific_messages', function(msg)
+   {
+      UpdateDiv(socket, 'messages', "messagesdata_block", [msg]);
    });
    
    socket.on('send_message', function(msg)
@@ -488,9 +779,7 @@ io.on('connection', function(socket)
          var login_data = GetLoginData(socket.request.headers.cookie.username,
                                        socket.request.headers.cookie.password);
          
-         //TODO: is target a vaild username
-         
-         if(login_data.valid)
+         if(login_data.valid && DoesUsernameExist(msg.target))
          {
             if(messages[msg.target] == undefined) 
                messages[msg.target] = [];
@@ -501,9 +790,9 @@ io.on('connection', function(socket)
                sender: login_data.username
             };
 
-            //TODO: only reload sender & target
             messages[msg.target].push(message_data);
-            UpdateDiv(io, 'home', renderHome(socket.request.headers.cookie), "messagedata_block");
+            UpdateDiv(io, 'home', "messagedata_block");
+            UpdateDiv(io, 'messages', "messagesdata_block");
          }
       }
    });
@@ -529,7 +818,7 @@ io.on('connection', function(socket)
             };
             
             scouting_data[msg.team].push(scout_data);
-            UpdateDiv(io, 'scouting', renderScout(socket.request.headers.cookie, msg.team), "submitteddata_block");
+            UpdateDiv(io, 'scouting', "submitteddata_block");
          }
       }
    });
@@ -578,6 +867,8 @@ io.on('connection', function(socket)
    
    socket.on('disconnect', function()
    {
+      //TODO: fix this, it doesnt work
+      return;
       if(HasCreds(socket.request.headers.cookie))
       {
          var login_data = GetLoginData(socket.request.headers.cookie.username,

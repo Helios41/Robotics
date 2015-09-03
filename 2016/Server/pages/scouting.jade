@@ -5,21 +5,6 @@ block vars
    - var navTitle = "Scouting"
    - var navColor = "red"
    - var backgroundurl = "/assets/general_background.png"
-   
-block style
-   style.
-      .block {
-         width: 80%;
-         background-color: #{navColor};
-         margin-left: 5%;
-         margin-top: 25px;
-         margin-bottom: 25px;
-         border: white solid thick;
-         outline: black solid thin;
-      }
-      #scout_box {
-         resize: none;
-      }
       
 block content
    #search_div.horizontal_bar
@@ -43,7 +28,7 @@ block content
                      p= post.value
          .block
             p Scouting info
-            textarea(rows="4", cols="25" id="scout_box")
+            textarea(rows="4", cols="25" id="scout_box", class="consttextarea")
             br
             button(id="submit_scout_button") Submit
    else

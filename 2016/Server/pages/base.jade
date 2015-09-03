@@ -3,7 +3,6 @@ html(lang="en")
    block vars
    head
       title= pageTitle
-      block style
       style.
          body {
             margin: 0;
@@ -19,6 +18,51 @@ html(lang="en")
             font-family: "Arial", "Helvectia", sans-serif;
             font-size: 14px;
             color: white;
+         }
+         button {
+            background: #{navColor};
+            border: solid white;
+            color: white;
+            font-family: "Arial", "Helvectia", sans-serif;
+            outline: solid black thin;
+         }
+         .portal_button {
+            background: none;
+            border: none;
+            color: white;
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 18px;
+            outline: none;
+         }
+         .block {
+            width: 80%;
+            background-color: #{navColor};
+            margin-left: 5%;
+            margin-top: 25px;
+            margin-bottom: 25px;
+            border: white solid thick;
+            outline: black solid thin;
+         }
+         .bar {
+            width: 100%;
+            background-color: #{navColor};
+            padding-top: 5px;
+            padding-bottom: 5px;
+            margin-top: 15px;
+         }
+         .consttextarea {
+            resize: none;
+         }
+         .onlinename {
+            margin-top: 0px;
+            margin-bottom: 0px;
+            margin-left: 15px;
+            background: none;
+            border: none;
+            color: white;
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 14px;
+            outline: none;
          }
          #home_link {
             background: none;
@@ -37,56 +81,19 @@ html(lang="en")
             text-decoration: underline;
             font-size: 18px;
          }
-         #nav_bar {
-            width: 100%;
-            height: 50px;
-            background-color: #{navColor};
-            color: rgb(128, 255, 128);
-            font-family: "Arial", "Helvectia", sans-serif;
-            font-size: 14px;
-            padding-top: 15px;
-         }
-         .portal_button {
-            background: none;
-            border: none;
-            color: white;
-            font-family: "Arial", "Helvectia", sans-serif;
-            font-size: 18px;
-            outline: none;
-         }
-         #portal_bar {
-            width: 100%;
-            background-color: #{navColor};
-            padding-top: 5px;
-            padding-bottom: 5px;
-            margin-top: 15px;
-         }
-         .horizontal_bar {
-            width: 100%;
-            background-color: #{navColor};
-            padding-top: 5px;
-            padding-bottom: 5px;
-            margin-top: 15px;
-         }
-         button {
-            background: #{navColor};
-            border: solid white;
-            color: white;
-            font-family: "Arial", "Helvectia", sans-serif;
-            outline: solid black thin;
-         }
          #logout_button {
             margin-left: 25px;
             margin-top: 5px;
             position: absolute;
          }
+      block style
    body
-      #nav_bar
+      #nav_bar.bar(style="padding-top: 15px; height: 50px; margin-top: 0px")
          span(id="nav_text") #[button(id="home_link") Team 4618] - #[span(id="nav_title")= navTitle] 
          if loggedIn
             |#[span(id="nav_name")= username] #[button(id="logout_button") Logout]
       if navPortals
-         #portal_bar
+         #portal_bar.bar
             each portal in navPortals
                button(id="portal_" + portal, class="portal_button")= portal
       block content
@@ -102,14 +109,31 @@ html(lang="en")
             $('#' + id).html(updated_html.find('#' + id).html());
          }
       
+         function registerEnterKey(id)
+         {
+            var enterHookHandler = function(e)
+            {
+               if(e.keyCode == 13)
+               {
+                  $(this).trigger("enterKey");
+               }
+            }
+            
+            $('#' + id).keyup(enterHookHandler);
+         }
+      
          $(document).ready(function()
          {
             #{nav_portal_events}
          
-            socket.on('reload', function(msg)
+            socket.on('goto_page', function(msg)
             {
-               console.log("reload");
-               window.location.reload();
+               window.location.href = msg;
+            });
+         
+            socket.on('update_div_callback', function(msg)
+            {
+               socket.emit('update_div_callback', msg);
             });
          
             socket.on('update_div', function(msg)

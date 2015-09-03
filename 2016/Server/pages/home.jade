@@ -5,39 +5,6 @@ block vars
    - var navTitle = "Home"
    - var navColor = "red"
    - var backgroundurl = "/assets/general_background.png"
-   
-block style
-   style.
-      .block {
-         width: 80%;
-         background-color: #{navColor};
-         margin-left: 5%;
-         margin-top: 25px;
-         margin-bottom: 25px;
-         border: white solid thick;
-         outline: black solid thin;
-      }
-      #form_div {
-         color: white;
-         font-family: "Arial", "Helvectia", sans-serif;
-      }
-      .onlinename {
-         margin-top: 0px;
-         margin-bottom: 0px;
-         margin-left: 15px;
-         background: none;
-         border: none;
-         color: white;
-         font-family: "Arial", "Helvectia", sans-serif;
-         font-size: 14px;
-         outline: none;
-      }
-      #message_box {
-         resize: none;
-      }
-      #post_box {
-         resize: none;
-      }
 
 block content
    p Welcome #{username}! This is the Team 4618 Server
@@ -52,7 +19,7 @@ block content
                p #[span= post.user]: #{post.value}
          else
             p No Posts
-      textarea(rows="4", cols="25", id="post_box")
+      textarea(rows="4", cols="25", class="consttextarea", id="post_box")
       br
       button(id="post_button") Post
    #online.block
@@ -72,23 +39,15 @@ block content
          else
             p No Messages
       if online
-         textarea(rows="4", cols="25", id="message_box")
+         textarea(rows="4", cols="25", class="consttextarea", id="message_box")
          br
          select(id="message_target")
             each name in online
-               |#[option(value= name)= name]
+               option(value= name)= name
          button(id="send_message_button") Send
      
 block script
    script.
-      function enterHook(e)
-      {
-         if(e.keyCode == 13)
-         {
-            $(this).trigger("enterKey");
-         }
-      }
-      
       function scoutSearch()
       {
          var team = parseInt($('#team_box').val());
@@ -123,14 +82,14 @@ block script
       
       function gotoPage(page)
       {
-         console.log(page);
+         //console.log(page);
       }
    
       $(document).ready(function()
       {
-         $('#team_box').keyup(enterHook);
-         $('#post_box').keyup(enterHook);
-         $('#message_box').keyup(enterHook);
+         registerEnterKey("team_box");
+         registerEnterKey("post_box");
+         registerEnterKey("message_box");
          
          $('#scout_search_button').bind("click", scoutSearch);
          $('#team_box').bind("enterKey", scoutSearch);

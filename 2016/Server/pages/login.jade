@@ -5,18 +5,6 @@ block vars
    - var navTitle = "Home"
    - var navColor = "red"
    - var backgroundurl = "/assets/general_background.png"
-   
-block style
-   style.
-      .block {
-         width: 80%;
-         background-color: #{navColor};
-         margin-left: 5%;
-         margin-top: 25px;
-         margin-bottom: 25px;
-         border: white solid thick;
-         outline: black solid thin;
-      }
       
 block content
    p Welcome! This is the Team 4618 Server
@@ -33,21 +21,14 @@ block script
    script.
       function tryLogin()
       {
-         var login_creds = {
-                              username: $('#username_box').val(),
-                              password: $('#password_box').val()
-                           };
+         var login_creds = 
+         {
+            username: $('#username_box').val(),
+            password: $('#password_box').val()
+         };
          socket.emit('login', login_creds);
          $('#username_box').val('');
          $('#password_box').val('');
-      }
-      
-      function enterHook(e)
-      {
-         if(e.keyCode == 13)
-         {
-            $(this).trigger("enterKey");
-         }
       }
       
       $(document).ready(function()
@@ -67,8 +48,8 @@ block script
             }
          });
          
-         $('#username_box').keyup(enterHook);
-         $('#password_box').keyup(enterHook);
+         registerEnterKey('username_box');
+         registerEnterKey('password_box');
          
          $('#login_button').bind("click", tryLogin);
          $('#username_box').bind("enterKey", tryLogin);

@@ -19,6 +19,7 @@
 # OpenSSL
 /2016/Server/openssl/
 /2016/Server/logins.json
+/2016/Server/key.dat
 
 # NodeJS
 /2016/Server/node_modules/

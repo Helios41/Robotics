@@ -6,37 +6,28 @@ block vars
    - var navColor = "red"
    - var backgroundurl = "/assets/general_background.png"
 
-block style
-   style.
-      .block {
-         width: 80%;
-         background-color: #{navColor};
-         margin-left: 5%;
-         margin-top: 25px;
-         margin-bottom: 25px;
-         border: white solid thick;
-         outline: black solid thin;
-      }
-      #form_div {
-         color: white;
-         font-family: "Arial", "Helvectia", sans-serif;
-      }
-      .onlinename {
-         margin-top: 0px;
-         margin-bottom: 0px;
-         margin-left: 15px;
-         background: none;
-         border: none;
-         color: white;
-         font-family: "Arial", "Helvectia", sans-serif;
-         font-size: 14px;
-         outline: none;
-      }
-
 block content
-   if posts
-      each post in posts
-         .block
-            p= post.value
-   else
-      p No Posts
+   #postdata_block
+      if posts
+         each post in posts
+            .block
+               p= post.value
+      else
+         p No Posts
+   #post_submit.block
+      br
+      textarea(rows="4", cols="25", class="consttextarea", id="post_box")
+      br
+      button(id="post_button") Post
+      
+block script
+   script.
+      function uploadPost()
+      {
+         socket.emit('upload_post', $("#post_box").val());
+         $("#post_box").val('');
+      }
+      $(document).ready(function()
+      {
+         $('#post_button').bind("click", uploadPost);
+      });

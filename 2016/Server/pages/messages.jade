@@ -1,0 +1,58 @@
+extends ./base.jade
+
+block vars
+   - var pageTitle = "Team 4618 - Messages"
+   - var navTitle = "Messages"
+   - var navColor = "red"
+   - var backgroundurl = "/assets/general_background.png"
+
+block content
+   #messagesdata_block.block
+      if messages
+         p(style="margin-top: 5px; margin-bottom: 5px;") Messages:
+         each msg in messages
+            p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="")= msg.sender + ": "] #[span= msg.value]
+      else
+         p No messages
+   #messages_control.block
+      p Messages from #[input(id="target_user")]
+      button(id="search_messages") Search
+      br
+      br
+      if online
+         textarea(rows="4", cols="25", class="consttextarea", id="message_box")
+         br
+         select(id="message_target")
+            each name in online
+               option(value= name)= name
+         button(id="send_message_button") Send
+         
+block script
+   script.
+      function searchForUser()
+      {
+         socket.emit('request_specific_messages', $('#search_messages').val());
+         $('#search_messages').val('');
+      }
+      
+      function sendMessage()
+      {
+         var message_data = 
+         {
+            value: $("#message_box").val(),
+            target: $("#message_target :selected").text()
+         };
+         socket.emit('send_message', message_data);
+         $("#message_box").val('');
+      }
+      
+      $(document).ready(function()
+      {
+         registerEnterKey('target_user');
+         
+         $('#send_message_button').bind("click", sendMessage);
+         
+         $('#target_user').on('enterKey', searchForUser);
+         $('#search_messages').on('click', searchForUser);
+      });
+      
