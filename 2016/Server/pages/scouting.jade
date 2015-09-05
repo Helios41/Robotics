@@ -1,13 +1,19 @@
 extends ./base.jade
+include ./include/utils.jade
+
+//TODO: make this dynamic
+include ./events/RecycleRush.jade
 
 block vars
    - var pageTitle = "Team 4618 - Scouting"
    - var navTitle = "Scouting"
    - var navColor = "red"
    - var backgroundurl = "/assets/general_background.png"
+   - var events = ["RecycleRush"]
+   - var event_data = {}
       
 block content
-   #search_div.horizontal_bar
+   #search_div.bar
       span Search: 
       input(id="search_box" autocomplete="off")
       button(id="search_button") Search
@@ -27,40 +33,68 @@ block content
                      p By #{post.user} 
                      p= post.value
          .block
+            p Filter Scouting Info
+            p If contains: #[input(id="scouting_filter_box")]
+            button(id="scouting_filter_button") Filter
+         .block
             p Scouting info
             textarea(rows="4", cols="25" id="scout_box", class="consttextarea")
             br
             button(id="submit_scout_button") Submit
+         each event in events
+            .block
+               +#{event}(event_data)
    else
       p Search for a team
 block script
+   mixin scoutSearchScript("search_button", "search_box")
    if loggedIn && teamid
       script.
-         function enterHook(e)
-         {
-            if(e.keyCode == 13)
-            {
-               $(this).trigger("enterKey");
-            }
-         }
-      
          function submitScoutData()
          {
+            var scout_value = $('#scout_box').val();
+            var event_data_values = !{JSON.stringify(event_data)}
+            
+            for(var event_name in event_data_values)
+            {
+               var event_data = event_data_values[event_name];
+               for(var i = 0; i < event_data.length; ++i)
+               {
+                  var event_attribute_value = $(('#' + event_name + "_" + event_data[i]).replace(/ /g, "_")).val();
+                  if(event_attribute_value.match(/\S/))
+                     scout_value += " " + event_data[i] + ": " + event_attribute_value;
+               }
+            }
+            
             var scout_data =
             {
                team: "#{teamid}",
-               value: $('#scout_box').val()
+               value: scout_value
             };
             socket.emit('submit_scout_data', scout_data);
             $('#scout_box').val('');
          }
       
+         function filterScoutingData()
+         {
+            Cookies.set('scout_search_keyword', $('#scouting_filter_box').val());
+            var filter_scouting_data = 
+            {
+               team: #{teamid},
+               cookie: Cookies.get('scout_search_keyword')
+            };
+            socket.emit('filter_scouting_data', filter_scouting_data);
+            $('#scouting_filter_box').val('');
+         }
+      
          $(document).ready(function()
          {
-            $('#scout_box').keyup(enterHook);
+            registerEnterKey('scouting_filter_box');
+            
+            $('#scouting_filter_box').on('enterKey', filterScoutingData);
+            $('#scouting_filter_button').on('click', filterScoutingData);
             
             $('#submit_scout_button').on('click', submitScoutData);
-            //$('#scout_box').on('enterKey', submitScoutData);
          });
    if teamid
       script.
@@ -73,21 +107,3 @@ block script
                updateDiv("bluealliancedata_block", msg.value);
             });
          });
-   script.
-      $(document).ready(function()
-      {
-         $('#search_button').bind("click", function()
-         {
-            var team = parseInt($('#search_box').val());
-            
-            if(!isNaN(team))
-            {
-               window.location.href = ("/scout " + team);   
-               $('#search_box').val('');
-            }
-            else
-            {
-               $('#search_box').val("Invalid Team Number!");
-            }
-         });
-      });

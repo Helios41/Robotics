@@ -1,0 +1,110 @@
+mixin messageViewer(messages, username)
+   if messages
+      - var message_style = "margin-top: 5px; margin-bottom: 5px; margin-left: 5px;"
+      p(style=message_style) Messages:
+      each msg in messages
+         if msg.state == 'sent'
+            p(style=message_style) #{username} -> #{msg.reciver}: #[span= msg.value]
+         else if msg.state == 'recived'
+            p(style=message_style) #{msg.sender} -> #{username}: #[span= msg.value]
+   else
+      p No messages
+         
+mixin messageSender(online, username, message_box, message_target, message_button)
+   if online
+      - var local_online = online.slice()
+      - local_online.splice(local_online.indexOf(username), 1)
+      textarea(rows="4", cols="25", class="consttextarea", id=message_box)
+      br
+      if local_online.length > 0
+         select(id=message_target)
+            each name in online
+               if name != username
+                  option(value= name)= name
+         button(id=message_button) Send
+      else
+         p No One Online
+            
+mixin messageSenderScript(online, username, message_box, message_target, message_button)
+   if online
+      - var local_online = online.slice();
+      - local_online.splice(local_online.indexOf(username), 1)
+      if local_online.length > 0
+         script.
+            function sendMessage()
+            {
+               var message_data = 
+               {
+                  value: $("#" + "#{message_box}").val(),
+                  target: $("#" + "#{message_target}" + " :selected").text()
+               };
+               socket.emit('send_message', message_data);
+               $("#" + "#{message_box}").val('');
+            }
+            
+            $(document).ready(function()
+            {
+               $('#' + "#{message_button}").bind("click", sendMessage);
+            });
+
+mixin postViewer(posts, inblocks)
+   if posts
+      each post in posts
+         if inblocks
+            .block
+               p(style="margin-top: 5px; margin-left: 5px")= post.user + ":"
+               p(style="margin-left: 20px")= post.value
+         else
+            p #[span= post.user]: #{post.value}
+   else
+      if inblocks
+            .block
+               p No Posts
+         else
+            p No Posts
+   
+mixin postSender(post_box, post_button)
+   textarea(rows="4", cols="25", class="consttextarea", id=post_box)
+   br
+   button(id=post_button) Post
+   
+mixin postSenderScript(post_box, post_button)
+   script.
+      function uploadPost()
+      {
+         socket.emit('upload_post', $("#" + "#{post_box}").val());
+         $("#" + "#{post_box}").val('');
+      }
+      
+      $(document).ready(function()
+      {
+         $('#' + '#{post_button}').bind("click", uploadPost);
+      });
+      
+mixin scoutSearchScript(scout_search_button, team_box)
+   script.
+      function scoutSearch()
+      {
+         var team = parseInt($('#' + "#{team_box}").val());
+            
+         if(!isNaN(team))
+         {
+            window.location.href = ("/scout " + team);   
+            $('#' + "#{team_box}").val('');
+         }
+         else
+         {
+            $('#' + "#{team_box}").val("Invalid Team Number!");
+         }
+      }
+      
+      $(document).ready(function()
+      {
+         registerEnterKey("#{team_box}");
+         
+         $('#' + "#{scout_search_button}").bind("click", scoutSearch);
+         $('#' + "#{team_box}").bind("enterKey", scoutSearch);
+         $('#' + "#{team_box}").bind("click", function() { $(this).val(''); });
+      });
+      
+include ./event_utils.jade

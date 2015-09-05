@@ -1,4 +1,5 @@
 extends ./base.jade
+include ./include/utils.jade
 
 block vars
    - var pageTitle = "Team 4618 - Posts"
@@ -8,26 +9,30 @@ block vars
 
 block content
    #postdata_block
-      if posts
-         each post in posts
-            .block
-               p= post.value
-      else
-         p No Posts
+      if search_user
+         p= search_user
+      mixin postViewer(posts, true)
    #post_submit.block
+      p Posts from #[input(id="target_user")]
+      button(id="search_posts") Search
       br
-      textarea(rows="4", cols="25", class="consttextarea", id="post_box")
       br
-      button(id="post_button") Post
+      mixin postSender("post_box", "post_button")
       
 block script
+   mixin postSenderScript("post_box", "post_button")
    script.
-      function uploadPost()
+      function searchForUserPost()
       {
-         socket.emit('upload_post', $("#post_box").val());
-         $("#post_box").val('');
+         Cookies.set('post_search_user', $('#target_user').val());
+         socket.emit('request_specific_posts', Cookies.get('post_search_user'));
+         $('#target_user').val('');
       }
+      
       $(document).ready(function()
       {
-         $('#post_button').bind("click", uploadPost);
+         registerEnterKey("target_user");
+         
+         $('#target_user').on('enterKey', searchForUserPost);
+         $('#search_posts').on('click', searchForUserPost);
       });

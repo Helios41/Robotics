@@ -1,4 +1,5 @@
 extends ./base.jade
+include ./include/utils.jade
 
 block vars
    - var pageTitle = "Team 4618 - Login"
@@ -18,6 +19,7 @@ block content
       button(id="login_button") Login
       
 block script
+   mixin scoutSearchScript("scout_search_button", "team_box")
    script.
       function tryLogin()
       {
@@ -33,21 +35,6 @@ block script
       
       $(document).ready(function()
       {
-         $('#scout_search_button').bind("click", function()
-         {
-            var team = parseInt($('#team_box').val());
-            
-            if(!isNaN(team))
-            {
-               window.location.href = ("/scout " + team);   
-               $('#search_box').val('');
-            }
-            else
-            {
-               $('#search_box').val("Invalid Team Number!");
-            }
-         });
-         
          registerEnterKey('username_box');
          registerEnterKey('password_box');
          

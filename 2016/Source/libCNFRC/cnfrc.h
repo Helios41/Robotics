@@ -16,7 +16,15 @@ typedef struct
    void (* operatorControl)(void *data);
 }cnfrcCallbacks;
 
+typedef enum
+{
+   cnfrcAlliance_Blue,
+   cnfrcAlliance_Red,
+   cnfrcAlliance_Unknown
+}cnfrcAlliance;
+
 b32 cnfrcInit(cnfrcState *state);
 void cnfrcStartLoop(cnfrcState *state, cnfrcCallbacks callbacks);
+cnfrcAlliance cnfrcGetAlliance();
 
 #endif

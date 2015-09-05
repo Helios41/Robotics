@@ -11,12 +11,12 @@ html(lang="en")
          }
          p {
             font-family: "Arial", "Helvectia", sans-serif;
-            font-size: 14px;
+            font-size: 1em;
             color: white;
          }
          span {
             font-family: "Arial", "Helvectia", sans-serif;
-            font-size: 14px;
+            font-size: 1em;
             color: white;
          }
          button {
@@ -31,7 +31,7 @@ html(lang="en")
             border: none;
             color: white;
             font-family: "Arial", "Helvectia", sans-serif;
-            font-size: 18px;
+            font-size: 1em;
             outline: none;
          }
          .block {
@@ -53,33 +53,22 @@ html(lang="en")
          .consttextarea {
             resize: none;
          }
-         .onlinename {
-            margin-top: 0px;
-            margin-bottom: 0px;
-            margin-left: 15px;
-            background: none;
-            border: none;
-            color: white;
-            font-family: "Arial", "Helvectia", sans-serif;
-            font-size: 14px;
-            outline: none;
-         }
          #home_link {
             background: none;
             border: none;
             color: white;
             font-family: "Arial", "Helvectia", sans-serif;
-            font-size: 24px;
+            font-size: 2em;
             outline: none;
          }
          #nav_title {
             font-family: "Arial", "Helvectia", sans-serif;
-            font-size: 24px;
+            font-size: 2em;
          }
          #nav_name {
             margin-left: 20px;
             text-decoration: underline;
-            font-size: 18px;
+            font-size: 1.5em;
          }
          #logout_button {
             margin-left: 25px;
@@ -100,6 +89,8 @@ html(lang="en")
       script(src="https://cdn.socket.io/socket.io-1.2.0.js")
       script(src="http://code.jquery.com/jquery-1.11.1.js")
       script(src="/assets/js.cookie.js")
+      //script(src="/assets/jquery.contextMenu.js")
+      //script(src="/assets/notify.min.js")
       script.
          var socket = io();
       
@@ -138,7 +129,8 @@ html(lang="en")
          
             socket.on('update_div', function(msg)
             {
-               console.log(msg);
+               //console.log(msg);
+               console.log("update div: " + msg.view + " : " + msg.id);
                if(msg != undefined)
                {
                   if((msg.html != undefined) &&

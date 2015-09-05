@@ -1,0 +1,6 @@
+mixin attribute(event_name, attrib_name, data)
+   - data[event_name].push(attrib_name)
+   - var attrib_id = (event_name + "_" + attrib_name).replace(/ /g, "_")
+   span #{attrib_name}: #[input(type="text", id= attrib_id)]
+   br
+   

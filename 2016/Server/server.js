@@ -1,6 +1,7 @@
 var express = require('express');
 var fs = require('fs');
 var http = require('http');
+var https = require('https');
 var socketio = require('socket.io');
 var cookieParser = require('cookie-parser');
 var socketio_cookieParser = require('socket.io-cookie');
@@ -10,6 +11,7 @@ var crypto = require('crypto');
 var encryption = 'aes-256-ctr';
 var encryption_key = fs.readFileSync("./key.dat");
 
+const backup_file = "./data.json";
 const logins_file = "./logins.json";
 
 var RenderFunctions = 
@@ -23,6 +25,12 @@ var RenderFunctions =
    messages: renderMessages
 };
 Object.freeze(RenderFunctions);
+
+var HTTPSOptions = 
+{
+   key: fs.readFileSync("./openssl/server.key"),
+   cert: fs.readFileSync("./openssl/server.crt")
+};
 
 function encryptString(string, key)
 {
@@ -67,28 +75,41 @@ function jadeCompile(viewname, locals)
 app.use(cookieParser());
 
 /**
-NOTE:
-   this server is fairly insecure (eg. unencrypted data packets)
-         --it is not intended to be commercially used--
+TODO:
+   -delete messages, posts & scouting info
 */
 
-/**
-TODO:
-   -finish encryption
-   -https
-   
-   -message search not working
-   
-   -save posts & messages to a file
-   -delete specific messages
-   -
-ISSUES:
-   -
-*/
 var online = [];
 var posts = [];
 var messages = {};
 var scouting_data = {};
+
+if(fs.existsSync(backup_file))
+{
+   var data_object = JSON.parse(fs.readFileSync(backup_file));
+   
+   if(data_object["messages"] != undefined)
+      messages = data_object["messages"];
+   
+   if(data_object["scouting_data"] != undefined)
+      scouting_data = data_object["scouting_data"];
+   
+   if(data_object["posts"] != undefined)
+      posts = data_object["posts"];
+}
+
+function BackupSubmittedData()
+{
+   var data_object = {};
+   
+   data_object["messages"] = JSON.parse(JSON.stringify(messages));
+   data_object["scouting_data"] = JSON.parse(JSON.stringify(scouting_data));
+   data_object["posts"] = JSON.parse(JSON.stringify(posts));
+   
+   fs.writeFileSync(backup_file, JSON.stringify(data_object));
+}
+
+setInterval(BackupSubmittedData, 6000);
 
 function HTTPGet(host, path, callback)
 {
@@ -114,6 +135,17 @@ function HTTPGet(host, path, callback)
       });
    }).end();  
 }
+
+function capitalizeFirstLetter(string)
+{
+   return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+var blacklisted_bluealliance_tags =
+[
+   "key",
+   "team_number"
+]
 
 function addPortal(render_data, portal_name)
 {
@@ -303,9 +335,6 @@ function renderHome(cookies)
    
    if(login_data.valid)
    {
-      if(online.indexOf(login_data.username) < 0)
-         online.push(login_data.username); 
-      
       render_data["loggedIn"] = true;
       render_data["username"] = login_data.username;
       
@@ -336,8 +365,36 @@ function renderPosts(cookies)
       render_data["loggedIn"] = true;
       render_data["username"] = login_data.username;
       
-      if(Object.keys(posts).length)
-         render_data["posts"] = posts.slice().reverse();
+      if(posts.length)
+      {
+         var filter_posts = (cookies.post_search_user != undefined);
+         
+         if(filter_posts)
+            filter_posts = cookies.post_search_user.match(/\S/);
+         
+         if(!filter_posts)
+         {
+            render_data["posts"] = posts.slice().reverse();
+         }
+         else
+         {
+            render_data["search_user"] = cookies.post_search_user;
+            
+            var filtered_posts = [];
+            var local_posts = posts.slice().reverse();
+            
+            for(var i = 0; i < local_posts.length; ++i)
+            {
+               var post = local_posts[i];
+               
+               if(post.user == cookies.post_search_user)
+                  filtered_posts.push(post);
+            }
+            
+            if(filtered_posts.length > 0)
+               render_data["posts"] = filtered_posts;
+         }
+      }
       
       addPortals(render_data, login_data.username, login_data.password);
       
@@ -347,7 +404,7 @@ function renderPosts(cookies)
    return jadeCompile('invalidpath');
 }
 
-function renderMessages(cookies, sender)
+function renderMessages(cookies)
 {
    var login_data = GetLoginData(cookies.username, cookies.password);
    var render_data = {};
@@ -360,13 +417,20 @@ function renderMessages(cookies, sender)
       if(online.length)
          render_data["online"] = online;
       
-      if(sender == undefined)
+      var filter_messages = (cookies.msg_search_user != undefined);
+      
+      if(filter_messages)
+         filter_messages = cookies.msg_search_user.match(/\S/);
+      
+      if(!filter_messages)
       {
          if(messages[login_data.username] != undefined)
             render_data["messages"] = messages[login_data.username];
       }
       else
       {
+         render_data["search_user"] = cookies.msg_search_user;
+         
          if(messages[login_data.username] != undefined)
          {
             render_data["messages"] = [];
@@ -374,8 +438,17 @@ function renderMessages(cookies, sender)
             for(var i = 0; i < messages[login_data.username].length; ++i)
             {
                var message = messages[login_data.username][i];
-               if(message.sender == sender)
-                  render_data["messages"].push(message);
+               
+               if(message.state == 'sent')
+               {
+                  if(message.reciver == cookies.msg_search_user)
+                     render_data["messages"].push(message);
+               }
+               else if(message.state == 'recived')
+               {
+                  if(message.sender == cookies.msg_search_user)
+                     render_data["messages"].push(message);                  
+               }
             }
          }
       }
@@ -451,8 +524,33 @@ function renderScout(cookies, team_in)
    {
       render_data["teamid"] = team;
       
+      var filter_scouting_data = (cookies.scout_search_keyword != undefined);
+      
+      if(filter_scouting_data)
+         filter_scouting_data = cookies.scout_search_keyword.match(/\S/);
+      
       if(scouting_data[team] != undefined)      
-         render_data["submitted"] = scouting_data[team];
+      {
+         var local_scouting_data = scouting_data[team].slice();
+         var result_scouting_data = [];
+         
+         if(filter_scouting_data)
+         {
+            for(var i = 0; i < local_scouting_data.length; ++i)
+            {
+               var post = local_scouting_data[i];
+               
+               if(post.value.indexOf(cookies.scout_search_keyword) > -1)
+                  result_scouting_data.push(post);
+            }
+         }
+         else
+         {
+            result_scouting_data = local_scouting_data;
+         }
+         
+         render_data["submitted"] = result_scouting_data;
+      }
    }
    
    return jadeCompile('scouting', render_data);
@@ -623,6 +721,46 @@ function UpdateDiv(socket, viewname, divname, in_params)
    socket.emit('update_div_callback', update_data);
 }
 
+function UpdateOnlineState()
+{
+   UpdateDiv(io, 'home', 'onlinedata_block');
+   UpdateDiv(io, 'home', 'messagesender_block');
+   UpdateDiv(io, 'messages', 'messagesender_block');
+}
+
+function SetStateOnline(cookies)
+{
+   if(HasCreds(cookies))
+   {
+      var login_data = GetLoginData(cookies.username, cookies.password);
+      
+      if(login_data.valid)
+      {
+         if(online.indexOf(login_data.username) < 0)
+            online.push(login_data.username); 
+         
+         UpdateOnlineState();
+      }
+   }
+}
+
+function SetStateOffline(cookies)
+{
+   if(HasCreds(cookies))
+   {
+      var login_data = GetLoginData(cookies.username, cookies.password);
+      
+      if(login_data.valid)
+      {
+         if(online.indexOf(login_data.username) > -1)
+            online.splice(online.indexOf(login_data.username), 1); 
+         
+         UpdateOnlineState();
+      }
+   }
+}
+
+//var server = https.createServer(HTTPSOptions, app);
 var server = http.createServer(app);
 var io = socketio(server);
 
@@ -630,6 +768,8 @@ io.use(socketio_cookieParser);
 
 io.on('connection', function(socket)
 {  
+   SetStateOnline(socket.request.headers.cookie);
+
    socket.on('login', function(msg)
    {
       if((msg.username !== undefined) &&
@@ -662,7 +802,7 @@ io.on('connection', function(socket)
             
             for(var i = 0; i < msg.params.length; ++i)
                param_array.push(msg.params[i]);
-            
+         
             var update_data = 
             {
                html: RenderFunctions[msg.view].apply(null, param_array),
@@ -767,7 +907,24 @@ io.on('connection', function(socket)
    
    socket.on('request_specific_messages', function(msg)
    {
-      UpdateDiv(socket, 'messages', "messagesdata_block", [msg]);
+      socket.request.headers.cookie["msg_search_user"] = msg;
+      UpdateDiv(socket, 'messages', "messagesdata_block");
+   });
+   
+   socket.on('request_specific_posts', function(msg)
+   {
+      socket.request.headers.cookie["post_search_user"] = msg;
+      UpdateDiv(socket, 'posts', "postdata_block");
+   });
+   
+   socket.on('filter_scouting_data', function(msg)
+   {
+      if((msg.team != undefined) &&
+         (msg.cookie != undefined))
+      {
+         socket.request.headers.cookie["scout_search_keyword"] = msg.cookie;
+         UpdateDiv(socket, 'scouting', "submitteddata_block", [msg.team]);
+      }
    });
    
    socket.on('send_message', function(msg)
@@ -781,16 +938,15 @@ io.on('connection', function(socket)
          
          if(login_data.valid && DoesUsernameExist(msg.target))
          {
-            if(messages[msg.target] == undefined) 
+            if(messages[msg.target] == undefined)
                messages[msg.target] = [];
             
-            var message_data = 
-            {
-               value: msg.value,
-               sender: login_data.username
-            };
+            if(messages[login_data.username] == undefined) 
+               messages[login_data.username] = [];
 
-            messages[msg.target].push(message_data);
+            messages[msg.target].push({value: msg.value, sender: login_data.username, state: "recived"});
+            messages[login_data.username].push({value: msg.value, reciver: msg.target, state: "sent"});
+            
             UpdateDiv(io, 'home', "messagedata_block");
             UpdateDiv(io, 'messages', "messagesdata_block");
          }
@@ -818,7 +974,8 @@ io.on('connection', function(socket)
             };
             
             scouting_data[msg.team].push(scout_data);
-            UpdateDiv(io, 'scouting', "submitteddata_block");
+            
+            UpdateDiv(io, 'scouting', "submitteddata_block", [msg.team]);
          }
       }
    });
@@ -849,7 +1006,11 @@ io.on('connection', function(socket)
          
          for(var key in bluealliance_json)
          {
-            bluealliancedata.push(key + ": " + bluealliance_json[key]);
+            if(blacklisted_bluealliance_tags.indexOf(key) < 0)
+            {
+               if(bluealliance_json[key] != null)
+                  bluealliancedata.push(capitalizeFirstLetter(key).replace("_", " ") + ": " + bluealliance_json[key]);
+            }
          }
          
          render_data["teamid"] = team;
@@ -867,20 +1028,7 @@ io.on('connection', function(socket)
    
    socket.on('disconnect', function()
    {
-      //TODO: fix this, it doesnt work
-      return;
-      if(HasCreds(socket.request.headers.cookie))
-      {
-         var login_data = GetLoginData(socket.request.headers.cookie.username,
-                                       socket.request.headers.cookie.password);
-                                       
-         if(login_data.valid)
-         {
-            //TODO: what if youre logged on in 2 computers?
-            if(online.indexOf(login_data.username) > -1)
-               online.splice(online.indexOf(login_data.username), 1); 
-         }
-      }
+      SetStateOffline(socket.request.headers.cookie);
    });
 });
 

@@ -1,0 +1,7 @@
+include ../include/utils.jade
+
+mixin RecycleRush(data)
+   p Recycle Rush
+   - data["Recycle Rush"] = [];
+   mixin attribute("Recycle Rush", "Average Stack Size", data)
+   mixin attribute("Recycle Rush", "Average Stack Count", data)

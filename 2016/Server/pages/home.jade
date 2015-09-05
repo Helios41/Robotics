@@ -1,4 +1,5 @@
 extends ./base.jade
+include ./include/utils.jade
 
 block vars
    - var pageTitle = "Team 4618 - Home"
@@ -9,95 +10,42 @@ block vars
 block content
    p Welcome #{username}! This is the Team 4618 Server
    #scout.block
-      p(style="font-size: 20px; margin-top: 0px; margin-bottom: 5px;") Scouting DB
+      p(style="font-size: 2em; margin-top: 0px; margin-bottom: 5px;") Scouting DB
       p Team ID: #[input(type="text", id="team_box" autocomplete="off")]
       button(id="scout_search_button") Search
    #posts.block
       #postdata_block
-         if posts
-            each post in posts
-               p #[span= post.user]: #{post.value}
-         else
-            p No Posts
+         mixin postViewer(posts)
       textarea(rows="4", cols="25", class="consttextarea", id="post_box")
       br
       button(id="post_button") Post
-   #online.block
-      #onlinedata_block
-         if online
-            p(style="margin-top: 5px; margin-bottom: 5px;") People Online:
-               each name in online
-                  p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + name + "\")")= name]
-         else
-            p No People Online
+   #onlinedata_block.block
+      if online
+         p(style="margin-top: 5px; margin-bottom: 5px;") People Online:
+            each name in online
+               p(style="margin-top: 5px; margin-bottom: 5px;")= name
+      else
+         p No People Online
    #messages.block
       #messagedata_block
-         if messages 
-            p(style="margin-top: 5px; margin-bottom: 5px;") Messages:
-               each msg in messages 
-                  p(style="margin-top: 5px; margin-bottom: 5px;") #[button(class="onlinename" onClick="gotoPage(\"" + msg.sender + "\")")= msg.sender + ": "] #[span= msg.value]
-         else
-            p No Messages
-      if online
-         textarea(rows="4", cols="25", class="consttextarea", id="message_box")
-         br
-         select(id="message_target")
-            each name in online
-               option(value= name)= name
-         button(id="send_message_button") Send
+         mixin messageViewer(messages, username)
+      br
+      #messagesender_block
+         mixin messageSender(online, username, "message_box", "message_target", "message_button")
      
 block script
+   mixin scoutSearchScript("scout_search_button", "team_box")
+   mixin messageSenderScript(online, username, "message_box", "message_target", "message_button")
    script.
-      function scoutSearch()
-      {
-         var team = parseInt($('#team_box').val());
-            
-         if(!isNaN(team))
-         {
-            window.location.href = ("/scout " + team);   
-            $('#team_box').val('');
-         }
-         else
-         {
-            $('#team_box').val("Invalid Team Number!");
-         }
-      }
-      
       function uploadPost()
       {
          socket.emit('upload_post', $("#post_box").val());
          $("#post_box").val('');
       }
-      
-      function sendMessage()
-      {
-         var message_data = 
-         {
-            value: $("#message_box").val(),
-            target: $("#message_target :selected").text()
-         };
-         socket.emit('send_message', message_data);
-         $("#message_box").val('');
-      }
-      
-      function gotoPage(page)
-      {
-         //console.log(page);
-      }
    
       $(document).ready(function()
       {
-         registerEnterKey("team_box");
          registerEnterKey("post_box");
-         registerEnterKey("message_box");
          
-         $('#scout_search_button').bind("click", scoutSearch);
-         $('#team_box').bind("enterKey", scoutSearch);
-         $('#team_box').bind("click", function() { $(this).val(''); });
-         
-         //$('#post_box').bind("enterKey", uploadPost);
          $('#post_button').bind("click", uploadPost);
-         
-         //$('#message_box').bind("enterKey", sendMessage);
-         $('#send_message_button').bind("click", sendMessage);
       });
