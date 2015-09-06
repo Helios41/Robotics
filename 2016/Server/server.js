@@ -74,11 +74,6 @@ function jadeCompile(viewname, locals)
 
 app.use(cookieParser());
 
-/**
-TODO:
-   -delete messages, posts & scouting info
-*/
-
 var online = [];
 var posts = [];
 var messages = {};
@@ -222,6 +217,9 @@ function UploadPost(value, username, password)
    
    if(login_data.valid)
    {
+      if(!value.match(/\S/))
+         return;
+      
       var post_data = 
       {
          value: value,
@@ -342,7 +340,10 @@ function renderHome(cookies)
          render_data["posts"] = GetPosts(4);
       
       if(messages[login_data.username] != undefined)
-         render_data["messages"] = messages[login_data.username];
+      {
+         if(messages[login_data.username].length > 0)
+            render_data["messages"] = messages[login_data.username];
+      }
       
       if(online.length)
          render_data["online"] = online;
@@ -365,34 +366,46 @@ function renderPosts(cookies)
       render_data["loggedIn"] = true;
       render_data["username"] = login_data.username;
       
+      var filter_posts = (cookies.post_search_user != undefined);
+         
+      if(filter_posts)
+         filter_posts = cookies.post_search_user.match(/\S/);
+      
+      if(filter_posts)
+         render_data["search_user"] = cookies.post_search_user;
+      
       if(posts.length)
       {
-         var filter_posts = (cookies.post_search_user != undefined);
-         
-         if(filter_posts)
-            filter_posts = cookies.post_search_user.match(/\S/);
-         
          if(!filter_posts)
          {
-            render_data["posts"] = posts.slice().reverse();
-         }
-         else
-         {
-            render_data["search_user"] = cookies.post_search_user;
-            
-            var filtered_posts = [];
-            var local_posts = posts.slice().reverse();
+            render_data["posts"] = [];
+            var local_posts = JSON.parse(JSON.stringify(posts));
             
             for(var i = 0; i < local_posts.length; ++i)
             {
                var post = local_posts[i];
+               post["index"] = i;
+               render_data["posts"].push(post);
+            }
+            
+            render_data["posts"].reverse();
+         }
+         else
+         {
+            var filtered_posts = [];
+            var local_posts = JSON.parse(JSON.stringify(posts));
+            
+            for(var i = 0; i < local_posts.length; ++i)
+            {
+               var post = local_posts[i];
+               post["index"] = i;
                
                if(post.user == cookies.post_search_user)
                   filtered_posts.push(post);
             }
             
             if(filtered_posts.length > 0)
-               render_data["posts"] = filtered_posts;
+               render_data["posts"] = filtered_posts.reverse();
          }
       }
       
@@ -414,6 +427,12 @@ function renderMessages(cookies)
       render_data["loggedIn"] = true;
       render_data["username"] = login_data.username;
       
+      if(messages[login_data.username] != undefined)
+      {
+         if(messages[login_data.username].length > 0)
+            render_data["messages"] = [];
+      }
+      
       if(online.length)
          render_data["online"] = online;
       
@@ -425,7 +444,14 @@ function renderMessages(cookies)
       if(!filter_messages)
       {
          if(messages[login_data.username] != undefined)
-            render_data["messages"] = messages[login_data.username];
+         {
+            for(var i = 0; i < messages[login_data.username].length; ++i)
+            {
+               var client_message = JSON.parse(JSON.stringify(messages[login_data.username][i]));
+               client_message["index"] = i;
+               render_data["messages"].push(client_message);
+            }
+         }
       }
       else
       {
@@ -433,21 +459,21 @@ function renderMessages(cookies)
          
          if(messages[login_data.username] != undefined)
          {
-            render_data["messages"] = [];
-            
             for(var i = 0; i < messages[login_data.username].length; ++i)
             {
                var message = messages[login_data.username][i];
+               var client_message = JSON.parse(JSON.stringify(message));
+               client_message["index"] = i;
                
                if(message.state == 'sent')
                {
                   if(message.reciver == cookies.msg_search_user)
-                     render_data["messages"].push(message);
+                     render_data["messages"].push(client_message);
                }
                else if(message.state == 'recived')
                {
                   if(message.sender == cookies.msg_search_user)
-                     render_data["messages"].push(message);                  
+                     render_data["messages"].push(client_message);       
                }
             }
          }
@@ -503,7 +529,7 @@ function renderInternal(cookies)
    return jadeCompile('invalidpath');
 }
 
-function renderScout(cookies, team_in)
+function renderScout(cookies, team_in, event_attribs)
 {
    var team = parseInt(team_in).toString();
    var render_data = {};
@@ -517,6 +543,9 @@ function renderScout(cookies, team_in)
          render_data["loggedIn"] = true;
          render_data["username"] = login_data.username;
          addPortals(render_data, login_data.username, login_data.password);
+         
+         if(login_data.access == AccessLevel_SU)
+            render_data["SuperUser"] = true;
       }
    }
    
@@ -531,7 +560,7 @@ function renderScout(cookies, team_in)
       
       if(scouting_data[team] != undefined)      
       {
-         var local_scouting_data = scouting_data[team].slice();
+         var local_scouting_data = JSON.parse(JSON.stringify(scouting_data[team]));
          var result_scouting_data = [];
          
          if(filter_scouting_data)
@@ -539,6 +568,7 @@ function renderScout(cookies, team_in)
             for(var i = 0; i < local_scouting_data.length; ++i)
             {
                var post = local_scouting_data[i];
+               post["index"] = i;
                
                if(post.value.indexOf(cookies.scout_search_keyword) > -1)
                   result_scouting_data.push(post);
@@ -546,7 +576,12 @@ function renderScout(cookies, team_in)
          }
          else
          {
-            result_scouting_data = local_scouting_data;
+            for(var i = 0; i < local_scouting_data.length; ++i)
+            {
+               var post = local_scouting_data[i];
+               post["index"] = i;
+               result_scouting_data.push(post);
+            }
          }
          
          render_data["submitted"] = result_scouting_data;
@@ -583,6 +618,38 @@ function CreateAccount(username, password, access)
       };
       
       login_json.push(login_info);
+      
+      var login_json_str = JSON.stringify(login_json);
+      fs.writeFileSync(logins_file, login_json_str);
+   }
+}
+
+function EditAccount(username, password, access)
+{
+   if(fs.existsSync(logins_file))
+   {
+      var login_json = JSON.parse(fs.readFileSync(logins_file));
+      var index = 0;
+      
+      for(var i = 0; i < login_json.length; ++i)
+      {
+         var tag = login_json[i];
+         
+         if(tag.username == username)
+         {
+            index = i;
+            break;
+         }
+      }
+      
+      var login_info = 
+      {
+         username: username,
+         password: encryptString(password, encryption_key),
+         access: access
+      };
+      
+      login_json[index] = login_info;
       
       var login_json_str = JSON.stringify(login_json);
       fs.writeFileSync(logins_file, login_json_str);
@@ -724,6 +791,7 @@ function UpdateDiv(socket, viewname, divname, in_params)
 function UpdateOnlineState()
 {
    UpdateDiv(io, 'home', 'onlinedata_block');
+   
    UpdateDiv(io, 'home', 'messagesender_block');
    UpdateDiv(io, 'messages', 'messagesender_block');
 }
@@ -909,12 +977,14 @@ io.on('connection', function(socket)
    {
       socket.request.headers.cookie["msg_search_user"] = msg;
       UpdateDiv(socket, 'messages', "messagesdata_block");
+      UpdateDiv(socket, 'messages', "messagessearch_block");
    });
    
    socket.on('request_specific_posts', function(msg)
    {
       socket.request.headers.cookie["post_search_user"] = msg;
       UpdateDiv(socket, 'posts', "postdata_block");
+      UpdateDiv(socket, 'posts', "postsearch_block");
    });
    
    socket.on('filter_scouting_data', function(msg)
@@ -927,6 +997,93 @@ io.on('connection', function(socket)
       }
    });
    
+   socket.on('update_password', function(msg)
+   {
+      if(HasCreds(socket.request.headers.cookie))
+      {
+         var login_data = GetLoginData(socket.request.headers.cookie.username,
+                                       socket.request.headers.cookie.password);
+                                       
+         if(login_data.valid)
+         {
+            socket.request.headers.cookie["password"] = msg;
+            socket.emit('set_cookie', {name: "password", value: msg});
+            
+            EditAccount(login_data.username, msg, login_data.access);
+         }
+      }
+   });
+   
+   socket.on('delete_message', function(msg)
+   {
+      if(msg >= messages[login_data.username].length)
+         return;
+      
+      if(HasCreds(socket.request.headers.cookie))
+      {
+         var login_data = GetLoginData(socket.request.headers.cookie.username,
+                                       socket.request.headers.cookie.password);
+                                       
+         if(login_data.valid)
+         {
+            messages[login_data.username].splice(msg, 1);
+            
+            UpdateDiv(io, 'home', "messagedata_block");
+            UpdateDiv(io, 'messages', "messagesdata_block");
+         }
+      }
+   });
+   
+   socket.on('delete_post', function(msg)
+   {
+      if(msg >= posts.length)
+         return;
+      
+      if(HasCreds(socket.request.headers.cookie))
+      {
+         var login_data = GetLoginData(socket.request.headers.cookie.username,
+                                       socket.request.headers.cookie.password);
+                                       
+         if(login_data.valid)
+         {
+            var post = posts[msg];
+            
+            if((login_data.username == post.user) || (login_data.access == AccessLevel_SU))
+            {
+               posts.splice(msg, 1);
+               
+               UpdateDiv(io, 'home', "postdata_block");
+               UpdateDiv(io, 'posts', "postdata_block");
+            }
+         }
+      }
+   });
+   
+   socket.on('delete_scout_submit', function(msg)
+   {
+      if((msg.team != undefined) &&
+         (msg.index != undefined))
+      {
+         if(msg.index >= scouting_data[msg.team].length)
+            return;
+         
+         if(HasCreds(socket.request.headers.cookie))
+         {
+            var login_data = GetLoginData(socket.request.headers.cookie.username,
+                                       socket.request.headers.cookie.password);
+                                       
+            if(login_data.valid)
+            {
+               if(login_data.access == AccessLevel_SU)
+               {
+                  scouting_data[msg.team].splice(msg.index, 1);
+                  UpdateDiv(io, 'scouting', "submitteddata_block", [msg.team]);
+               }
+            }
+         }
+      }
+   });
+   
    socket.on('send_message', function(msg)
    {
       if(HasCreds(socket.request.headers.cookie) &&
@@ -935,6 +1092,9 @@ io.on('connection', function(socket)
       {
          var login_data = GetLoginData(socket.request.headers.cookie.username,
                                        socket.request.headers.cookie.password);
+         
+         if(!msg.value.match(/\S/))
+            return;
          
          if(login_data.valid && DoesUsernameExist(msg.target))
          {
@@ -962,6 +1122,27 @@ io.on('connection', function(socket)
          var login_data = GetLoginData(socket.request.headers.cookie.username,
                                        socket.request.headers.cookie.password);
          
+         var invalid_value = !msg.value.match(/\S/);
+         
+         if(msg.event_attribs != undefined)
+         {
+            for(var event_name in msg.event_attribs)
+            {
+               var event_array = msg.event_attribs[event_name];
+               
+               for(var event_attrib_index in event_array)
+               {
+                  var event_attrib = event_array[event_attrib_index];
+                  
+                  if(event_attrib.value.match(/\S/))
+                     invalid_value = false;
+               }
+            }
+         }
+         
+         if(invalid_value)
+            return;
+         
          if(login_data.valid)
          {
             if(scouting_data[msg.team] == undefined)
@@ -970,8 +1151,12 @@ io.on('connection', function(socket)
             var scout_data = 
             {
                user: login_data.username,
-               value: msg.value
+               value: msg.value,
+               attribs: {}
             };
+            
+            if(msg.event_attribs != undefined)
+               scout_data["attribs"] = msg.event_attribs;
             
             scouting_data[msg.team].push(scout_data);
             

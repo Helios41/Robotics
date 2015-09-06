@@ -7,5 +7,21 @@ block vars
    - var backgroundurl = "/assets/general_background.png"
 
 block content
-   p Username: #{username}
-   p Access Level: #{access_level}
+   .block
+      p Account Info
+      p Username: #{username}
+      p Access Level: #{access_level}
+   .block
+      p Change Password #[input(id="new_password_box")]
+      button(id="new_password_button") Change Password
+      
+block script
+   script.
+      $(document).ready(function()
+      {
+         $('#new_password_button').on("click", function()
+         {
+            socket.emit('update_password', $('#new_password_box').val());
+            $('#new_password_box').val('');
+         });
+      });

@@ -35,7 +35,8 @@ block content
      
 block script
    mixin scoutSearchScript("scout_search_button", "team_box")
-   mixin messageSenderScript(online, username, "message_box", "message_target", "message_button")
+   #messagesenderscript_block
+      mixin messageSenderScript(online, username, "message_box", "message_target", "message_button")
    script.
       function uploadPost()
       {

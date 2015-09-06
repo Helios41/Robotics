@@ -17,6 +17,8 @@ block content
       span Search: 
       input(id="search_box" autocomplete="off")
       button(id="search_button") Search
+      if SuperUser
+         button(id="delete_button") Delete
    if teamid
       #bluealliancedata_block
          if bluealliancedata
@@ -31,7 +33,11 @@ block content
                each post in submitted
                   .block
                      p By #{post.user} 
-                     p= post.value
+                     p(class="submit_text", id=post.index)= post.value
+                     - for(var event_attribs in post.attribs)
+                        p(class="submit_text")= event_attribs
+                        each attrib in post.attribs[event_attribs]
+                           p(class="submit_text")= attrib.name + ": " + attrib.value 
          .block
             p Filter Scouting Info
             p If contains: #[input(id="scouting_filter_box")]
@@ -52,8 +58,8 @@ block script
       script.
          function submitScoutData()
          {
-            var scout_value = $('#scout_box').val();
             var event_data_values = !{JSON.stringify(event_data)}
+            var event_attributes = {};
             
             for(var event_name in event_data_values)
             {
@@ -61,15 +67,23 @@ block script
                for(var i = 0; i < event_data.length; ++i)
                {
                   var event_attribute_value = $(('#' + event_name + "_" + event_data[i]).replace(/ /g, "_")).val();
+                  
                   if(event_attribute_value.match(/\S/))
-                     scout_value += " " + event_data[i] + ": " + event_attribute_value;
+                  {
+                     if(event_attributes[event_name] == undefined)
+                        event_attributes[event_name] = [];
+                     
+                     $(('#' + event_name + "_" + event_data[i]).replace(/ /g, "_")).val('');
+                     event_attributes[event_name].push({name: event_data[i], value: event_attribute_value});
+                  }
                }
             }
             
             var scout_data =
             {
                team: "#{teamid}",
-               value: scout_value
+               value: $('#scout_box').val(),
+               event_attribs: event_attributes
             };
             socket.emit('submit_scout_data', scout_data);
             $('#scout_box').val('');
@@ -95,6 +109,35 @@ block script
             $('#scouting_filter_button').on('click', filterScoutingData);
             
             $('#submit_scout_button').on('click', submitScoutData);
+         });
+   if SuperUser && loggedIn && teamid
+      script.
+         var is_delete_mode = false;
+         
+         function toggleDeleteMode()
+         {
+            is_delete_mode = !is_delete_mode;
+            $('#delete_button').text("Delete" + (is_delete_mode ? " ON" : ""));
+         }
+      
+         function submitOnClick()
+         {
+            if(is_delete_mode)
+            {
+               var submit_index = $(this).prop('id');
+               var delete_scout_submit_data = 
+               {
+                  team: #{teamid},
+                  index: submit_index
+               };
+               socket.emit('delete_scout_submit', delete_scout_submit_data);
+            }
+         }
+         
+         $(document).ready(function()
+         {
+            $('#delete_button').on('click', toggleDeleteMode);
+            $('body').on("click", ".submit_text", submitOnClick);
          });
    if teamid
       script.

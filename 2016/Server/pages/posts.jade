@@ -8,10 +8,13 @@ block vars
    - var backgroundurl = "/assets/general_background.png"
 
 block content
+   .bar
+      button(id="delete_button", style="margin-left: 10px; margin-right: 10px") Delete
+      div(id="postsearch_block", style="display: inline-block")
+         if search_user
+            span= "Searching for posts by: " + search_user
    #postdata_block
-      if search_user
-         p= search_user
-      mixin postViewer(posts, true)
+      mixin postViewer(posts, true, "post_text")
    #post_submit.block
       p Posts from #[input(id="target_user")]
       button(id="search_posts") Search
@@ -22,6 +25,8 @@ block content
 block script
    mixin postSenderScript("post_box", "post_button")
    script.
+      var is_delete_mode = false;
+   
       function searchForUserPost()
       {
          Cookies.set('post_search_user', $('#target_user').val());
@@ -29,9 +34,28 @@ block script
          $('#target_user').val('');
       }
       
+      function toggleDeleteMode()
+      {
+         is_delete_mode = !is_delete_mode;
+         $('#delete_button').text("Delete" + (is_delete_mode ? " ON" : ""));
+      }
+      
+      function onPostClick()
+      {
+         if(is_delete_mode)
+         {
+            var post_index = $(this).prop('id');
+            socket.emit('delete_post', post_index);
+         }
+      }
+      
       $(document).ready(function()
       {
          registerEnterKey("target_user");
+         
+         $('body').on('click', '#delete_button', toggleDeleteMode);
+         
+         $('body').on('click', '.post_text', onPostClick);
          
          $('#target_user').on('enterKey', searchForUserPost);
          $('#search_posts').on('click', searchForUserPost);

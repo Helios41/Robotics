@@ -8,10 +8,13 @@ block vars
    - var backgroundurl = "/assets/general_background.png"
 
 block content
-   if search_user
-      p= search_user
+   .bar
+      button(id="delete_button", style="margin-left: 10px; margin-right: 10px;") Delete
+      div(id="messagessearch_block", style="display: inline-block")
+         if search_user
+            span= "Searching for messages from: " + search_user
    #messagesdata_block.block
-      mixin messageViewer(messages, username)
+      mixin messageViewer(messages, username, "message_text")
    #messages_control.block
       p Messages from #[input(id="target_user")]
       button(id="search_messages") Search
@@ -23,6 +26,8 @@ block content
 block script
    mixin messageSenderScript(online, username, "message_box", "message_target", "message_button")
    script.
+      var is_delete_mode = false;
+      
       function searchForUserMsg()
       {
          Cookies.set('msg_search_user', $('#target_user').val());
@@ -30,9 +35,28 @@ block script
          $('#target_user').val('');
       }
       
+      function toggleDeleteMode()
+      {
+         is_delete_mode = !is_delete_mode;
+         $('#delete_button').text("Delete" + (is_delete_mode ? " ON" : ""));
+      }
+      
+      function onMessageClick()
+      {
+         if(is_delete_mode)
+         {
+            var msg_index = $(this).prop('id');
+            socket.emit('delete_message', msg_index);
+         }
+      }
+      
       $(document).ready(function()
       {
          registerEnterKey('target_user');
+         
+         $('#delete_button').on('click', toggleDeleteMode);
+         
+         $('body').on('click', '.message_text', onMessageClick);
          
          $('#target_user').on('enterKey', searchForUserMsg);
          $('#search_messages').on('click', searchForUserMsg);
