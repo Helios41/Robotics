@@ -30,8 +30,9 @@ b32 cnfrcInit(cnfrcState *state)
              
    HALNetworkCommunicationObserveUserProgramStarting();
    
-   LiveWindow &lw = LiveWindow::GetInstance();
-
+   LiveWindow *lw = (LiveWindow *) LiveWindow::GetInstance();
+   state->live_window = lw;
+   
    HALReport(HALUsageReporting::kResourceType_Framework,
              HALUsageReporting::kFramework_Simple);
 
@@ -40,7 +41,13 @@ b32 cnfrcInit(cnfrcState *state)
                  ->GetSubTable("~STATUS~")
                  ->PutBoolean("LW Enabled", false);
                  
-   lw.SetEnabled(false);
+   lw->SetEnabled(false);
+   InitDriverStation();
+}
+
+static void InitDriverStation()
+{
+   
 }
 
 static r32 GetBatteryVoltage()

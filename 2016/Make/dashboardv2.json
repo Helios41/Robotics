@@ -3,7 +3,7 @@
    "make":
    {
       "project": "DashboardV2",
-      "language": "C",
+      "language": "C++",
       "type": "executable",
       "build": "../Build/DashboardV2/",
       "source": 
@@ -22,7 +22,18 @@
             "then": "Gdi32.lib"
          }
       ],
-      "target": "all",
-      "version": [0, 0, 0, "preseason"]
+      "per-operations":
+      [
+         ["copy", "../Resources/test.bmp", "[OUTPUT_DIRECTORY]/test.bmp"],
+         "build"
+      ],
+      "doesnt_work_dependencies":
+      [
+         {
+            "if": "OS=Windows",
+            "then": ["User32.lib", "Gdi32.lib"]
+         }
+      ],
+      "target": "all"
    }
 }

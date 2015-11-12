@@ -5,7 +5,7 @@
 
 typedef struct 
 {
-   //TODO: state data
+   void *live_window;
 }cnfrcState;
 
 typedef struct

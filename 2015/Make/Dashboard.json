@@ -1,0 +1,17 @@
+{
+   "default": "make",
+   "make":
+   {
+      "language": "Java",
+      "type": "executable",
+      "build" : "../Build/Dashboard/",
+      "source": 
+      [
+         ["../Source/Dashboard/", ".java"],
+         ["../Source/NetworkTables/", ".java"]
+      ],
+      "target": "all",
+      "project": "Dashboard",
+      "MainClass": "Team4618.Dashboard.Startup"
+   }
+}

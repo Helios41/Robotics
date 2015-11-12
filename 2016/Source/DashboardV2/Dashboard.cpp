@@ -1,7 +1,8 @@
+#if 0
+
 #include "Definitions.h"
-#include <windows.h>
 #include <stdio.h>
-#include <stdarg.h>
+#include "Dashboard.h"
 
 const char WindowClassName[] = "WindowClass";
 WNDCLASSEX WindowClass = {0};
@@ -55,22 +56,8 @@ inline v4 V4(r32 x, r32 y, r32 z, r32 w)
 }
 
 b32 Running = false;
-HANDLE hstdout;
 
 LRESULT CALLBACK WindowMessageEvent(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
-
-Win32Printf(HANDLE stream, const char* fmt, ...)
-{
-   va_list args;
-   va_start(args, fmt);
-   
-   char buffer[1024];
-   
-   vsprintf(buffer, fmt, args);
-   WriteFile(stream, buffer, strlen(buffer), 0, 0);
-   
-   va_end(args);
-}
 
 //TODO: aligned bitmap memory (aligned to DWord)
 void Win32SetBitmapSize(Win32Bitmap *bitmap, u32 width, u32 height)
@@ -91,24 +78,12 @@ void Win32SetBitmapSize(Win32Bitmap *bitmap, u32 width, u32 height)
    bitmap->bmp.height = height;
    
    u32 memory_size = (width * height * sizeof(u32));
-   bitmap->bmp.memory = VirtualAlloc(0, memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+   bitmap->bmp.memory = (u32 *)VirtualAlloc(0, memory_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
    
    Win32Printf(hstdout, "W: %u H: %u\n", width, height);
 }
 
-void Win32BlitBitmap(HDC renderContext, u32 x, u32 y, u32 width, u32 height, Win32Bitmap *bitmap)
-{
-   //TODO: rewrite this
-   StretchDIBits(renderContext,
-                 x, y, bitmap->bmp.width, bitmap->bmp.height,
-                 0, 0, bitmap->bmp.width, bitmap->bmp.height,
-                 bitmap->bmp.memory,
-                 &bitmap->info,
-                 DIB_RGB_COLORS,
-                 SRCCOPY);
-}
-
-s32 dbRoundR32ToS32(r32 real)
+s32 RoundR32ToS32(r32 real)
 {
    s32 result = (s32)(real + 0.5f);
    return result;
@@ -141,13 +116,21 @@ void dbDrawBitmap(dbBitmap *dest, r32 rminx, r32 rminy, r32 rmaxx, r32 rmaxy, db
       maxy = dest->height;
    }
    
-   //TODO: finish this
-   /*
-   u32 *row = (bitmap->memory + minx + (miny * bitmap->width)); 
+   {
+      s32 new_miny = dest->height - miny;
+      s32 new_maxy = dest->height - maxy;
+      
+      maxy = new_miny;
+      miny = new_maxy;
+   }
+   
+   u32 *row = (dest->memory + minx + (miny * dest->width)); 
+   u32 *src_row = (src->memory + minx + (miny * src->width)); 
    
    for(u32 y = miny; y < maxy; ++y)
    {
       u32 *pixel = row;
+      u32 *src_pixel = src_row;
       
       for(u32 x = minx; x < maxx; ++x)
       {
@@ -156,19 +139,24 @@ void dbDrawBitmap(dbBitmap *dest, r32 rminx, r32 rminy, r32 rmaxx, r32 rmaxy, db
          r32 oldg = ((r32)((color32 & 0x0000FF00) >> 8)) / 255.0f;
          r32 oldb = ((r32)((color32 & 0x000000FF) >> 0)) / 255.0f;
          
-         u32 src_color = *;
+         u32 src_color = *src_pixel;
+         r32 srca = 1.0; //((r32)((src_color & 0xFF000000) >> 24)) / 255.0f; //TODO: alpha
+         r32 srcr = ((r32)((src_color & 0x00FF0000) >> 16)) / 255.0f;
+         r32 srcg = ((r32)((src_color & 0x0000FF00) >> 8)) / 255.0f;
+         r32 srcb = ((r32)((src_color & 0x000000FF) >> 0)) / 255.0f;
          
-         u8 rcolor = (u8)((color.r.a * color.r.r + (1 - color.r.a) * oldr) * 255);
-         u8 gcolor = (u8)((color.r.a * color.r.g + (1 - color.r.a) * oldg) * 255);
-         u8 bcolor = (u8)((color.r.a * color.r.b + (1 - color.r.a) * oldb) * 255);
+         u8 rcolor = (u8)((srca * srcr + (1 - srca) * oldr) * 255);
+         u8 gcolor = (u8)((srca * srcg + (1 - srca) * oldg) * 255);
+         u8 bcolor = (u8)((srca * srcb + (1 - srca) * oldb) * 255);
          
          u32 color = ((rcolor << 16) | (gcolor << 8) | (bcolor << 0));
          *pixel++ = color;
+         src_pixel++;
       }
       
-      row += bitmap->width;
+      row += dest->width;
+      src_row += src->width;
    }
-   */
 }
 
 void dbFillRectRaw(dbBitmap *bitmap, r32 rminx, r32 rminy, r32 rmaxx, r32 rmaxy, v4 color)
@@ -198,7 +186,13 @@ void dbFillRectRaw(dbBitmap *bitmap, r32 rminx, r32 rminy, r32 rmaxx, r32 rmaxy,
       maxy = bitmap->height;
    }
    
-   //TODO: fix coord system
+   {
+      s32 new_miny = bitmap->height - miny;
+      s32 new_maxy = bitmap->height - maxy;
+      
+      maxy = new_miny;
+      miny = new_maxy;
+   }
    
    u32 *row = (bitmap->memory + minx + (miny * bitmap->width)); 
    
@@ -232,12 +226,6 @@ void dbFillRect(dbBitmap *bitmap, r32 x, r32 y, r32 width, r32 height, v4 color)
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
-   AllocConsole();
-   SetConsoleTitleA("Dashboard V2 Console");
-   hstdout = GetStdHandle(STD_OUTPUT_HANDLE);
-   
-   Win32Printf(hstdout, "Starting...\n");
-   
    WindowClass.cbSize = sizeof(WNDCLASSEX);
    WindowClass.style = CS_OWNDC;
    WindowClass.lpfnWndProc = WindowMessageEvent;
@@ -266,6 +254,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    RECT client_rect = {0};
    GetClientRect(WindowHandle, &client_rect);
    
+   //Setup background backbuffer
+   Win32Bitmap background_backbuffer = {0};
+   Win32SetBitmapSize(&background_backbuffer, client_rect.right, client_rect.bottom);
+   
+   dbFillRect(&background_backbuffer.bmp, 0, 0, background_backbuffer.bmp.width, background_backbuffer.bmp.height, V4(1.0f, 1.0f, 1.0f, 1.0f));
+      
+   dbFillRect(&background_backbuffer.bmp, 0, 0, background_backbuffer.bmp.width, background_backbuffer.bmp.height / 4, V4(1.0f, 0.0f, 0.0f, 1.0f));
+   dbFillRect(&background_backbuffer.bmp, 0, background_backbuffer.bmp.height / 4, background_backbuffer.bmp.width, background_backbuffer.bmp.height / 16, V4(0.0f, 0.0f, 0.0f, 1.0f));
+   
+   dbFillRect(&background_backbuffer.bmp, 0, 300, background_backbuffer.bmp.width, background_backbuffer.bmp.height / 8, V4(1.0f, 0.0f, 0.0f, 1.0f));
+   dbFillRect(&background_backbuffer.bmp, 0, 300 + (background_backbuffer.bmp.height / 8), background_backbuffer.bmp.width, background_backbuffer.bmp.height / 32, V4(0.0f, 0.0f, 0.0f, 1.0f));
+   
+   //Allocate real backbuffer
    Win32Bitmap backbuffer = {0};
    Win32SetBitmapSize(&backbuffer, client_rect.right, client_rect.bottom);
    
@@ -289,11 +290,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                switch(msg.wParam)
                {
                   case VK_UP:
-                     y++;
+                     y--;
                      break;
                      
                   case VK_DOWN:
-                     y--;
+                     y++;
                      break;
                      
                   case VK_LEFT:
@@ -305,7 +306,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                      break;
                      
                   case VK_RETURN:
-                     Win32Printf(hstdout, "\n");
+                     
                      break;
                }
             }
@@ -313,7 +314,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
             
             case WM_CHAR:
             {
-               Win32Printf(hstdout, "%c", msg.wParam);
+               
             }
             break;
             
@@ -334,14 +335,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			DispatchMessage(&msg);
       }
       
-      //Background
-      dbFillRect(&backbuffer.bmp, 0, 0, backbuffer.bmp.width, backbuffer.bmp.height, V4(1.0f, 1.0f, 1.0f, 1.0f));
-      
-      dbFillRect(&backbuffer.bmp, 0, 0, backbuffer.bmp.width, backbuffer.bmp.height / 4, V4(1.0f, 0.0f, 0.0f, 1.0f));
-      dbFillRect(&backbuffer.bmp, 0, backbuffer.bmp.height / 4, backbuffer.bmp.width, backbuffer.bmp.height / 16, V4(0.0f, 0.0f, 0.0f, 1.0f));
-      
-      dbFillRect(&backbuffer.bmp, 0, 300, backbuffer.bmp.width, backbuffer.bmp.height / 8, V4(1.0f, 0.0f, 0.0f, 1.0f));
-      dbFillRect(&backbuffer.bmp, 0, 300 + (backbuffer.bmp.height / 8), backbuffer.bmp.width, backbuffer.bmp.height / 32, V4(0.0f, 0.0f, 0.0f, 1.0f));
+      //blit background
+      dbDrawBitmap(&backbuffer.bmp, 0, 0, backbuffer.bmp.width, backbuffer.bmp.height, &background_backbuffer.bmp);
       
       //Random test square
       dbFillRect(&backbuffer.bmp, x, y, 100, 100, V4(0.0f, 1.0f, 0.0f, 0.5f));
@@ -404,3 +399,5 @@ LRESULT CALLBACK WindowMessageEvent(HWND window, UINT message, WPARAM wParam, LP
 		
 	return DefWindowProc(window, message, wParam, lParam);;
 }
+
+#endif
