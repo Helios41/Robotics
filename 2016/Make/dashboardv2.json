@@ -24,7 +24,9 @@
       ],
       "per-operations":
       [
-         ["copy", "../Resources/test.bmp", "[OUTPUT_DIRECTORY]/test.bmp"],
+         ["copy", "../Resources/logo.bmp", "[OUTPUT_DIRECTORY]/logo.bmp"],
+         ["copy", "../Resources/icon.ico", "[OUTPUT_DIRECTORY]/icon.ico"],
+         ["copy", "../Resources/home.bmp", "[OUTPUT_DIRECTORY]/home.bmp"],
          "build"
       ],
       "doesnt_work_dependencies":
