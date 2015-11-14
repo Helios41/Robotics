@@ -3,10 +3,20 @@
 
 /**
 TODO:
-   -clean up
    -memory arenas
    -platform agnostic
-   -fonts
+   -properly clamp drawing area
+   -transforms
+   -font
+   -open file dialog
+   -fullscreen/boarderless
+   -
+   
+*/
+
+/**
+NOTE:
+   -Chrome locks C:/Windows/Fonts/arial.ttf while open, blocking programs from using it
    -
    
 */
@@ -124,10 +134,18 @@ struct LoadedBitmap
    u32 *pixels;
 };
 
+struct LoadedFont
+{
+   LoadedBitmap bitmap;
+   v2 offset;
+};
+
 enum PageType
 {
    PageType_Home,
-   PageType_Auto
+   PageType_Config,
+   PageType_Auto,
+   PageType_Fun
 };
 
 struct EntireFile

@@ -25,8 +25,11 @@
       "per-operations":
       [
          ["copy", "../Resources/logo.bmp", "[OUTPUT_DIRECTORY]/logo.bmp"],
-         ["copy", "../Resources/icon.ico", "[OUTPUT_DIRECTORY]/icon.ico"],
-         ["copy", "../Resources/home.bmp", "[OUTPUT_DIRECTORY]/home.bmp"],
+         ["||", "../Resources/icon.ico", "[OUTPUT_DIRECTORY]/icon.ico"],
+         ["||", "../Resources/home.bmp", "[OUTPUT_DIRECTORY]/home.bmp"],
+         ["||", "../Resources/gear.bmp", "[OUTPUT_DIRECTORY]/gear.bmp"],
+         ["||", "../Resources/arial.ttf", "[OUTPUT_DIRECTORY]/font.ttf"],
+         ["||", "../Resources/dinosaur.bmp", "[OUTPUT_DIRECTORY]/dinosaur.bmp"],
          "build"
       ],
       "doesnt_work_dependencies":
@@ -36,6 +39,8 @@
             "then": ["User32.lib", "Gdi32.lib"]
          }
       ],
+      "DebugEnabled": "true",
+      "optimized": false,
       "target": "all"
    }
 }
