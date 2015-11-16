@@ -30,6 +30,7 @@
          ["||", "../Resources/gear.bmp", "[OUTPUT_DIRECTORY]/gear.bmp"],
          ["||", "../Resources/arial.ttf", "[OUTPUT_DIRECTORY]/font.ttf"],
          ["||", "../Resources/dinosaur.bmp", "[OUTPUT_DIRECTORY]/dinosaur.bmp"],
+         ["||", "../Resources/eraser.bmp", "[OUTPUT_DIRECTORY]/eraser.bmp"],
          "build"
       ],
       "doesnt_work_dependencies":

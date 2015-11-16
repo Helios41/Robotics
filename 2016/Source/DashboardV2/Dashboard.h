@@ -10,6 +10,7 @@ TODO:
    -font
    -open file dialog
    -fullscreen/boarderless
+   -only trigger click on release
    -
    
 */

@@ -380,21 +380,47 @@ v2 GetCursorPosition(HWND window)
    return result;
 }
 
-void DrawAutoBuilderBlock(LoadedBitmap *dest, u32 selected_block_id, v2 pos, v4 color)
+void DrawAutoBuilderBlock(LoadedBitmap *dest, u32 selected_block_id, v2 pos, v4 color, stbtt_fontinfo *font)
 {
+   if(selected_block_id > 0)
+      DrawRectangle(dest, pos.x, pos.y, 100, 20, color);
+
    switch(selected_block_id)
    {
       case 0:
          break;
          
       case 1:
+         DrawText(dest, font, V2(pos.x, pos.y), "Test1", 20);
+         break;
+         
       case 2:
+         DrawText(dest, font, V2(pos.x, pos.y), "Test2", 20);
+         break;
+         
       case 3:
+         DrawText(dest, font, V2(pos.x, pos.y), "Test3", 20);
+         break;
+         
       case 4:
+         DrawText(dest, font, V2(pos.x, pos.y), "Test4", 20);
+         break;
+         
       case 5:
-         DrawRectangle(dest, pos.x, pos.y, 100, 20, color);
+         DrawText(dest, font, V2(pos.x, pos.y), "Test5", 20);
          break;
    }
+}
+
+b32 AutoBuilderButton(LoadedBitmap *dest, u32 selected_block_id, v2 pos, v2 mouse, v4 color, b32 left_mouse, stbtt_fontinfo *font)
+{
+   b32 result = Contains(RectPosSize(pos.x, pos.y, 100, 20), mouse) && left_mouse;
+   
+   if(result)
+      DrawRectangle(dest, pos.x - 5, pos.y - 5, 110, 30, V4(0.0f, 0.0f, 0.0f, 1.0f));
+   
+   DrawAutoBuilderBlock(dest, selected_block_id, pos, color, font);
+   return result;
 }
 
 HDC SetupWindow(HINSTANCE hInstance, int nCmdShow, HWND *window, LoadedBitmap *backbuffer)
@@ -451,6 +477,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    LoadedBitmap home = LoadBitmapFromBMP("home.bmp");
    LoadedBitmap gear = LoadBitmapFromBMP("gear.bmp");
    LoadedBitmap dinosaur = LoadBitmapFromBMP("dinosaur.bmp");
+   LoadedBitmap eraser = LoadBitmapFromBMP("eraser.bmp");
    
    b32 running = true;
    b32 left_mouse = false;
@@ -462,16 +489,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    PageType page = PageType_Home;
    v2 mouse = V2(0, 0);
    MSG msg = {};
+   b32 auto_block_eraser = false;
    
    u32 selected_block_id = 0;
    u32 auto_blocks[100];
    u32 auto_block_count = 0;
-   v4 auto_block_colors[4] = 
+   v4 auto_block_colors[5] = 
    {
       {1.0f, 0.0f, 0.0f, 1.0f},
       {0.0f, 1.0f, 0.0f, 1.0f},
       {0.0f, 0.0f, 1.0f, 1.0f},
-      {1.0f, 1.0f, 0.0f, 1.0f}
+      {1.0f, 1.0f, 0.0f, 1.0f},
+      {0.0f, 1.0f, 1.0f, 1.0f}
    };
    char *auto_file_name = "unnamed";
    
@@ -607,9 +636,22 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          DrawRectangle(&backbuffer, 280, 20, 800, 675, V4(0.5f, 0.0f, 0.0f, 0.5f));
          DrawText(&backbuffer, &font, V2(600, 40), auto_file_name, 25);
          
-         for(u32 i = 1; i <= 4; ++i)
+         if(GUIButton(&backbuffer, mouse, RectPosSize(160, 20, 40, 40), left_mouse, &eraser))
          {
-            if(GUIButton(&backbuffer, mouse, RectPosSize(160, 20 + ((i - 1) * 25), 100, 20), left_mouse, "Test", &font))
+            auto_block_eraser = !auto_block_eraser;
+         }
+         
+         if(auto_block_eraser)
+         {
+            DrawRectangle(&backbuffer, 160, 20, 5, 5, V4(0.0f, 0.0f, 0.0f, 1.0f));
+         }
+         
+         for(u32 i = 1; i <= 5; ++i)
+         {
+            b32 hit = AutoBuilderButton(&backbuffer, i, V2(160, 70 + ((i - 1) * 25)), 
+                                        mouse, auto_block_colors[i - 1], left_mouse, &font);
+            
+            if(hit)
             {
                selected_block_id = i;
                button_clicked = true;
@@ -627,13 +669,29 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          }
          
          if(selected_block_id > 0)
-            DrawAutoBuilderBlock(&backbuffer, selected_block_id, mouse, auto_block_colors[selected_block_id - 1]);
+            DrawAutoBuilderBlock(&backbuffer, selected_block_id, mouse, auto_block_colors[selected_block_id - 1], &font);
          
          for(u32 i = 0; i < auto_block_count; ++i)
          {
-            DrawAutoBuilderBlock(&backbuffer, auto_blocks[i],
-                                 V2(sandbox_bounds.min.x + 10, sandbox_bounds.min.y + 10 + (30 * i)),
-                                 auto_block_colors[auto_blocks[i] - 1]);
+            if(auto_blocks[i] > 0)
+            {
+               b32 hit = AutoBuilderButton(&backbuffer, auto_blocks[i], 
+                                           V2(sandbox_bounds.min.x + 10, sandbox_bounds.min.y + 10 + (30 * i)), 
+                                           mouse, auto_block_colors[auto_blocks[i] - 1], left_mouse, &font);
+               
+               if(hit && auto_block_eraser)
+               {
+                  for(u32 i2 = i; i2 < auto_block_count; ++i2)
+                  {
+                     if((i2 + 1) < auto_block_count)
+                     {
+                        auto_blocks[i2] = auto_blocks[i2 + 1];
+                     }
+                  }
+                  auto_block_count -= 1;
+                  auto_block_eraser = false;
+               }
+            }
          }
          
          if(GUIButton(&backbuffer, mouse, RectPosSize(1100, 20, 100, 20), left_mouse, "Save", &font))
