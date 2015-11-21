@@ -229,6 +229,9 @@ void DrawRectangle(LoadedBitmap *dest, r32 rx, r32 ry, r32 rwidth, r32 rheight, 
 
 void DrawBitmap(LoadedBitmap *dest, LoadedBitmap *src, r32 rx, r32 ry)
 {   
+   if(!dest || !src)
+      return;
+
    s32 minx = RoundR32ToS32(rx);
    s32 miny = RoundR32ToS32(ry);
    s32 maxx = RoundR32ToS32(rx) + src->width;
@@ -305,6 +308,9 @@ void DrawBitmap(LoadedBitmap *dest, LoadedBitmap *src, r32 rx, r32 ry)
 
 void DrawText(LoadedBitmap *dest, stbtt_fontinfo *font, v2 pos, char *text, u32 scale)
 {
+   if(!dest || !text)
+      return;
+   
    u32 xoffset = 0;
    while(*text)
    {
@@ -322,60 +328,47 @@ void DrawText(LoadedBitmap *dest, stbtt_fontinfo *font, v2 pos, char *text, u32 
    }
 }
 
-b32 GUIButton(LoadedBitmap *dest, v2 mouse, rect2 bounds, b32 left_mouse, LoadedBitmap *icon)
+b32 GUIButton(RenderContext *context, MouseState mouse, rect2 bounds, LoadedBitmap *icon, char *text)
 {
-   b32 selected = Contains(bounds, mouse);
+   b32 hot = Contains(bounds, mouse.pos);
    
-   if(selected && left_mouse)
+   if(hot && mouse.left_down)
    {
-      DrawRectangle(dest, bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, V4(1.0f, 0.0f, 0.75f, 1.0f));
+      DrawRectangle(context->target, bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, V4(1.0f, 0.0f, 0.75f, 1.0f));
    }
-   else if(selected)
+   else if(hot)
    {
-      DrawRectangle(dest, bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, V4(1.0f, 0.0f, 0.0f, 1.0f));
+      DrawRectangle(context->target, bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, V4(1.0f, 0.0f, 0.0f, 1.0f));
    }
    else
    {
-      DrawRectangle(dest, bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, V4(0.5f, 0.0f, 0.0f, 1.0f));
+      DrawRectangle(context->target, bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, V4(0.5f, 0.0f, 0.0f, 1.0f));
    }
    
-   DrawBitmap(dest, icon, bounds.min.x, bounds.min.y);
+   v2 bounds_size = RectGetSize(bounds);
    
-   return selected && left_mouse;
-}
-
-b32 GUIButton(LoadedBitmap *dest, v2 mouse, rect2 bounds, b32 left_mouse, char *text, stbtt_fontinfo *font)
-{
-   b32 selected = Contains(bounds, mouse);
-   
-   if(selected && left_mouse)
+   if(bounds_size.x == bounds_size.y)
    {
-      DrawRectangle(dest, bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, V4(1.0f, 0.0f, 0.75f, 1.0f));
-   }
-   else if(selected)
-   {
-      DrawRectangle(dest, bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, V4(1.0f, 0.0f, 0.0f, 1.0f));
+      DrawBitmap(context->target, icon, bounds.min.x, bounds.min.y);
+      DrawText(context->target, context->font_info, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
    }
    else
    {
-      DrawRectangle(dest, bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, V4(0.5f, 0.0f, 0.0f, 1.0f));
+      DrawBitmap(context->target, icon, bounds.min.x + 5, bounds.min.y);
+      DrawText(context->target, context->font_info, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
    }
    
-   DrawText(dest, font, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
-   
-   return selected && left_mouse;
+   return hot && mouse.left_up;
 }
 
-v2 GetCursorPosition(HWND window)
+b32 GUIButton(RenderContext *context, MouseState mouse, rect2 bounds, LoadedBitmap *icon, char *text, b32 triggered)
 {
-   v2 result = {};
+   v2 bounds_size = RectGetSize(bounds);
+   b32 result = GUIButton(context, mouse, bounds, icon, text);
    
-   POINT p;
-   GetCursorPos(&p);
-   ScreenToClient(window, &p);
-   
-   result.x = p.x;
-   result.y = p.y;
+   DrawRectangle(context->target, bounds.min.x, bounds.min.y, 5,
+                 (bounds_size.x == bounds_size.y) ? 5 : bounds_size.y,
+                 triggered ? V4(0.0f, 0.0f, 0.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 0.0f));
    
    return result;
 }
@@ -412,15 +405,26 @@ void DrawAutoBuilderBlock(LoadedBitmap *dest, u32 selected_block_id, v2 pos, v4 
    }
 }
 
-b32 AutoBuilderButton(LoadedBitmap *dest, u32 selected_block_id, v2 pos, v2 mouse, v4 color, b32 left_mouse, stbtt_fontinfo *font)
+b32 AutoBuilderButton(LoadedBitmap *dest, u32 selected_block_id, v2 pos, MouseState mouse, v4 color, stbtt_fontinfo *font)
 {
-   b32 result = Contains(RectPosSize(pos.x, pos.y, 100, 20), mouse) && left_mouse;
+   b32 hot = Contains(RectPosSize(pos.x, pos.y, 100, 20), mouse.pos);
    
-   if(result)
-      DrawRectangle(dest, pos.x - 5, pos.y - 5, 110, 30, V4(0.0f, 0.0f, 0.0f, 1.0f));
+   if(hot && mouse.left_down)
+   {
+      DrawRectangle(dest, pos.x - 2, pos.y - 2, 104, 24, V4(0.1f, 0.1f, 0.1f, 1.0f));
+      DrawAutoBuilderBlock(dest, selected_block_id, pos, color, font);
+   }
+   else if(hot)
+   {
+      DrawRectangle(dest, pos.x - 2, pos.y - 2, 104, 24, V4(0.25f, 0.25f, 0.25f, 1.0f));
+      DrawAutoBuilderBlock(dest, selected_block_id, pos, color, font);
+   }
+   else
+   {
+      DrawAutoBuilderBlock(dest, selected_block_id, pos, color, font);
+   }
    
-   DrawAutoBuilderBlock(dest, selected_block_id, pos, color, font);
-   return result;
+   return hot && mouse.left_up;
 }
 
 HDC SetupWindow(HINSTANCE hInstance, int nCmdShow, HWND *window, LoadedBitmap *backbuffer)
@@ -451,6 +455,18 @@ HDC SetupWindow(HINSTANCE hInstance, int nCmdShow, HWND *window, LoadedBitmap *b
    return GetDC(*window);
 }
 
+void UpdateMouseState(MouseState *mouse, HWND window)
+{
+   POINT p;
+   GetCursorPos(&p);
+   ScreenToClient(window, &p);
+   
+   mouse->pos.x = p.x;
+   mouse->pos.y = p.y;
+   
+   mouse->left_up = false;
+}
+
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
    WNDCLASSEX window_class = {};
@@ -476,18 +492,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    LoadedBitmap logo = LoadBitmapFromBMP("logo.bmp");
    LoadedBitmap home = LoadBitmapFromBMP("home.bmp");
    LoadedBitmap gear = LoadBitmapFromBMP("gear.bmp");
-   LoadedBitmap dinosaur = LoadBitmapFromBMP("dinosaur.bmp");
    LoadedBitmap eraser = LoadBitmapFromBMP("eraser.bmp");
+   LoadedBitmap competition = LoadBitmapFromBMP("competition.bmp");
    
    b32 running = true;
-   b32 left_mouse = false;
-   b32 up_arrow = false;
-   b32 down_arrow = false;
-   b32 left_arrow = false;
-   b32 right_arrow = false;
+   MouseState mouse = {};
+   
+   RenderContext context = {};
+   context.target = &backbuffer;
+   context.font_info = &font;
+   
    b32 connected = false;
    PageType page = PageType_Home;
-   v2 mouse = V2(0, 0);
    MSG msg = {};
    b32 auto_block_eraser = false;
    
@@ -508,37 +524,26 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    while(running)
    {
+      UpdateMouseState(&mouse, window);
+      
       while(PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE))
       {
          switch(msg.message)
          {            
             case WM_LBUTTONUP:
-               left_mouse = false;
+               mouse.left_down = false;
+               mouse.left_up = true;
                break;
          
             case WM_LBUTTONDOWN:
-               left_mouse = true;
+               mouse.left_down = true;
+               mouse.left_up = false;
                break;
                
             case WM_KEYDOWN:
             {
                switch(msg.wParam)
                {
-                  case VK_LEFT:
-                     left_arrow = true;
-                     break;
-                     
-                  case VK_RIGHT:
-                     right_arrow = true;
-                     break;
-                     
-                  case VK_UP:
-                     up_arrow = true;
-                     break;
-                     
-                  case VK_DOWN:
-                     down_arrow = true;
-                     break;
                }
             }
             break;
@@ -547,21 +552,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
             {
                switch(msg.wParam)
                {
-                  case VK_LEFT:
-                     left_arrow = false;
-                     break;
-                     
-                  case VK_RIGHT:
-                     right_arrow = false;
-                     break;
-                     
-                  case VK_UP:
-                     up_arrow = false;
-                     break;
-                     
-                  case VK_DOWN:
-                     down_arrow = false;
-                     break;
                }
             }
             break;
@@ -575,68 +565,54 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			DispatchMessageA(&msg);
       }
       
-      mouse = GetCursorPosition(window);
-      
       DrawRectangle(&backbuffer, 0, 0, backbuffer.width, backbuffer.height, V4(1.0f, 1.0f, 1.0f, 1.0f));
       DrawBitmap(&backbuffer, &logo, (backbuffer.width / 2) - (logo.width / 2), (backbuffer.height / 2) - (logo.height / 2));
       
       DrawRectangle(&backbuffer, 0, 0, backbuffer.width, 15, V4(1.0f, 0.0f, 0.0f, 1.0f));
       
-      if(connected)
-      {
-         DrawRectangle(&backbuffer, 10, 3, 10, 10, V4(0.0f, 1.0f, 0.0f, 1.0f));
-      }
-      else
-      {
-         DrawRectangle(&backbuffer, 10, 3, 10, 10, V4(0.0f, 0.0f, 0.0f, 1.0f));
-      }
+      v4 connected_icon_color = connected ? V4(0.0f, 1.0f, 0.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f);
+      DrawRectangle(&backbuffer, 10, 3, 10, 10, connected_icon_color);
       
-      if(GUIButton(&backbuffer, mouse, RectPosSize(10, 20, 40, 40), left_mouse, &home))
+      if(GUIButton(&context, mouse, RectPosSize(10, 20, 40, 40), &home, NULL, (page == PageType_Home)))
       {
          page = PageType_Home;
       }
       
-      if(GUIButton(&backbuffer, mouse, RectPosSize(60, 20, 40, 40), left_mouse, &gear))
+      if(GUIButton(&context, mouse, RectPosSize(60, 20, 40, 40), &gear, NULL, (page == PageType_Config)))
       {
          page = PageType_Config;
       }
       
-      if(GUIButton(&backbuffer, mouse, RectPosSize(110, 20, 15, 40), left_mouse, "", &font))
+      if(GUIButton(&context, mouse, RectPosSize(10, 70, 120, 40), &competition, "Competition", (page == PageType_Competition)))
       {
-         running = false;
+         page = PageType_Competition;
       }
       
-      if(GUIButton(&backbuffer, mouse, RectPosSize(10, 70, 120, 40), left_mouse, "Autonomous Builder", &font))
+      if(GUIButton(&context, mouse, RectPosSize(10, 120, 120, 40), NULL, "Autonomous Builder", (page == PageType_Auto)))
       {
          page = PageType_Auto;
       }
       
-      if(GUIButton(&backbuffer, mouse, RectPosSize(10, 120, 120, 40), left_mouse, "Fun", &font))
-      {
-         page = PageType_Fun;
-      }
+      GUIButton(&context, mouse, RectPosSize(10, 170, 120, 40), NULL, NULL, false);
       
       if(page == PageType_Home)
       {
-         DrawRectangle(&backbuffer, 10, 20, 5, 5, V4(0.0f, 0.0f, 0.0f, 1.0f));
-         
          DrawRectangle(&backbuffer, 280, 20, 800, 85, V4(0.5f, 0.0f, 0.0f, 0.5f));
          DrawText(&backbuffer, &font, V2(600, 40), "CN Robotics", 40);
       }
       else if(page == PageType_Config)
       {
-         DrawRectangle(&backbuffer, 60, 20, 5, 5, V4(0.0f, 0.0f, 0.0f, 1.0f));
+         
       }
       else if(page == PageType_Auto)
       {
-         DrawRectangle(&backbuffer, 10, 70, 5, 40, V4(0.0f, 0.0f, 0.0f, 1.0f));
          b32 button_clicked = false;
          
          rect2 sandbox_bounds = RectPosSize(280, 20, 800, 675);
          DrawRectangle(&backbuffer, 280, 20, 800, 675, V4(0.5f, 0.0f, 0.0f, 0.5f));
          DrawText(&backbuffer, &font, V2(600, 40), auto_file_name, 25);
          
-         if(GUIButton(&backbuffer, mouse, RectPosSize(160, 20, 40, 40), left_mouse, &eraser))
+         if(GUIButton(&context, mouse, RectPosSize(160, 20, 40, 40), &eraser, NULL, auto_block_eraser))
          {
             auto_block_eraser = !auto_block_eraser;
          }
@@ -649,7 +625,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          for(u32 i = 1; i <= 5; ++i)
          {
             b32 hit = AutoBuilderButton(&backbuffer, i, V2(160, 70 + ((i - 1) * 25)), 
-                                        mouse, auto_block_colors[i - 1], left_mouse, &font);
+                                        mouse, auto_block_colors[i - 1], &font);
             
             if(hit)
             {
@@ -658,18 +634,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
             }
          }
          
-         if(Contains(sandbox_bounds, mouse) && left_mouse && selected_block_id)
+         if(Contains(sandbox_bounds, mouse.pos) && mouse.left_up && selected_block_id)
          {
             auto_blocks[auto_block_count++] = selected_block_id;
             selected_block_id = 0;
          }
-         else if(!button_clicked && left_mouse)
+         else if(!button_clicked && mouse.left_up)
          {
             selected_block_id = 0;
          }
          
          if(selected_block_id > 0)
-            DrawAutoBuilderBlock(&backbuffer, selected_block_id, mouse, auto_block_colors[selected_block_id - 1], &font);
+            DrawAutoBuilderBlock(&backbuffer, selected_block_id, mouse.pos, auto_block_colors[selected_block_id - 1], &font);
          
          for(u32 i = 0; i < auto_block_count; ++i)
          {
@@ -677,7 +653,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
             {
                b32 hit = AutoBuilderButton(&backbuffer, auto_blocks[i], 
                                            V2(sandbox_bounds.min.x + 10, sandbox_bounds.min.y + 10 + (30 * i)), 
-                                           mouse, auto_block_colors[auto_blocks[i] - 1], left_mouse, &font);
+                                           mouse, auto_block_colors[auto_blocks[i] - 1], &font);
                
                if(hit && auto_block_eraser)
                {
@@ -689,47 +665,24 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                      }
                   }
                   auto_block_count -= 1;
-                  auto_block_eraser = false;
                }
             }
          }
          
-         if(GUIButton(&backbuffer, mouse, RectPosSize(1100, 20, 100, 20), left_mouse, "Save", &font))
+         if(GUIButton(&context, mouse, RectPosSize(1100, 20, 100, 20), NULL, "Save"))
          {
             //TODO: open file dialog
          }
          
-         if(GUIButton(&backbuffer, mouse, RectPosSize(1100, 45, 100, 20), left_mouse, "Open", &font))
+         if(GUIButton(&context, mouse, RectPosSize(1100, 45, 100, 20), NULL, "Open"))
          {
             
          }
          
-         GUIButton(&backbuffer, mouse, RectPosSize(1100, 70, 100, 20), left_mouse, "Upload", &font);
-      }
-      else if(page == PageType_Fun)
-      {
-         DrawRectangle(&backbuffer, 10, 120, 5, 40, V4(0.0f, 0.0f, 0.0f, 1.0f));
-         
-         DrawRectangle(&backbuffer, 180, 20, 1200, 675, V4(0.5f, 0.0f, 0.0f, 0.5f));
-         
-         if(up_arrow)
-         {
-            player_pos.y++;
-         }
-         
-         if(down_arrow && (player_pos.y > 0))
-         {
-            player_pos.y--;
-         }
-         
-         if(player_pos.y > 0)
-            player_pos.y -= 0.5f;
-         
-         DrawBitmap(&backbuffer, &dinosaur, player_pos.x + 190, (600 - player_pos.y) + 30);
+         GUIButton(&context, mouse, RectPosSize(1100, 70, 100, 20), NULL, "Upload");
       }
       
-      DrawRectangle(&backbuffer, mouse.x, mouse.y, 10, 10, V4(mouse.x, mouse.y, 0.0f, 1.0f));
-      DrawBitmap(&backbuffer, &dinosaur, mouse.x, mouse.y);      
+      DrawRectangle(&backbuffer, mouse.pos.x, mouse.pos.y, 10, 10, V4(mouse.pos.x, mouse.pos.y, 0.0f, 1.0f));  
 
       BlitToScreen(&backbuffer, device_context);
    }

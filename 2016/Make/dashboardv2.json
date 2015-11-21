@@ -29,8 +29,8 @@
          ["||", "../Resources/home.bmp", "[OUTPUT_DIRECTORY]/home.bmp"],
          ["||", "../Resources/gear.bmp", "[OUTPUT_DIRECTORY]/gear.bmp"],
          ["||", "../Resources/arial.ttf", "[OUTPUT_DIRECTORY]/font.ttf"],
-         ["||", "../Resources/dinosaur.bmp", "[OUTPUT_DIRECTORY]/dinosaur.bmp"],
          ["||", "../Resources/eraser.bmp", "[OUTPUT_DIRECTORY]/eraser.bmp"],
+         ["||", "../Resources/competition.bmp", "[OUTPUT_DIRECTORY]/competition.bmp"],
          "build"
       ],
       "doesnt_work_dependencies":

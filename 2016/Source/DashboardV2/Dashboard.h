@@ -1,6 +1,8 @@
 #ifndef DASHBOARD_H_
 #define DASHBOARD_H_
 
+#include "stb_truetype.h"
+
 /**
 TODO:
    -memory arenas
@@ -10,7 +12,6 @@ TODO:
    -font
    -open file dialog
    -fullscreen/boarderless
-   -only trigger click on release
    -
    
 */
@@ -122,6 +123,11 @@ inline b32 Contains(rect2 rect, v2 vec)
    return result;
 }
 
+inline v2 RectGetSize(rect2 rect)
+{
+   return V2(rect.max.x - rect.min.x, rect.max.y - rect.min.y);
+}
+
 inline s32 RoundR32ToS32(r32 real)
 {
    s32 result = (s32)(real + 0.5f);
@@ -135,6 +141,12 @@ struct LoadedBitmap
    u32 *pixels;
 };
 
+struct RenderContext
+{
+   LoadedBitmap *target;
+   stbtt_fontinfo *font_info;
+};
+
 struct LoadedFont
 {
    LoadedBitmap bitmap;
@@ -146,13 +158,20 @@ enum PageType
    PageType_Home,
    PageType_Config,
    PageType_Auto,
-   PageType_Fun
+   PageType_Competition
 };
 
 struct EntireFile
 {
    void *contents;
    u64 length;
+};
+
+struct MouseState
+{
+   b32 left_down;
+   b32 left_up;
+   v2 pos;
 };
 
 #endif
