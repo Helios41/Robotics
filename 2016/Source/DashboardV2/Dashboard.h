@@ -3,9 +3,14 @@
 
 #include "stb_truetype.h"
 
+#define Kilobyte(BYTE) BYTE * 1024
+#define Megabyte(BYTE) Kilobyte(BYTE) * 1024
+#define Gigabyte(BYTE) Megabyte(BYTE) * 1024
+#define Terabyte(BYTE) Gigabyte(BYTE) * 1024
+#define Assert(condition) if(!(condition)){*(u8 *)0 = 0;}
+
 /**
 TODO:
-   -memory arenas
    -platform agnostic
    -properly clamp drawing area
    -transforms
@@ -172,6 +177,33 @@ struct MouseState
    b32 left_down;
    b32 left_up;
    v2 pos;
+};
+
+struct MemoryArena
+{
+   size_t size;
+   size_t used;
+   void *memory;
+};
+
+enum AutoBlockType
+{
+   AutoBlockType_Root,
+   AutoBlockType_Basic,
+   AutoBlockType_Conditional
+};
+
+struct AutoBlock
+{
+   AutoBlockType type;
+   char *name;
+   AutoBlock *next;
+   AutoBlock *prev;
+   
+   union
+   {
+      r32 value;
+   };
 };
 
 #endif

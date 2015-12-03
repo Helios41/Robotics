@@ -174,6 +174,14 @@ void DrawRectangle(LoadedBitmap *dest, r32 rx, r32 ry, r32 rwidth, r32 rheight, 
    s32 maxx = RoundR32ToS32(rx + rwidth);
    s32 maxy = RoundR32ToS32(ry + rheight);
    
+   {
+      s32 new_miny = dest->height - miny;
+      s32 new_maxy = dest->height - maxy;
+      
+      maxy = new_miny;
+      miny = new_maxy;
+   }
+   
    if(minx < 0)
    {
       minx = 0;
@@ -184,31 +192,23 @@ void DrawRectangle(LoadedBitmap *dest, r32 rx, r32 ry, r32 rwidth, r32 rheight, 
       miny = 0;
    }
    
-   if(maxx > dest->width)
+   if(maxx > (s32)dest->width)
    {
       maxx = dest->width;
    }
    
-   if(maxy > dest->height)
+   if(maxy > (s32)dest->height)
    {
       maxy = dest->height;
    }
    
-   {
-      s32 new_miny = dest->height - miny;
-      s32 new_maxy = dest->height - maxy;
-      
-      maxy = new_miny;
-      miny = new_maxy;
-   }
-   
    u32 *row = (dest->pixels + minx + (miny * dest->width)); 
    
-   for(u32 y = miny; y < maxy; ++y)
+   for(u32 y = miny; (s32)y < maxy; ++y)
    {
       u32 *pixel = row;
       
-      for(u32 x = minx; x < maxx; ++x)
+      for(u32 x = minx; (s32)x < maxx; ++x)
       {
          u32 color32 = *pixel;
          r32 oldr = ((r32)((color32 & 0x00FF0000) >> 16)) / 255.0f;
@@ -237,31 +237,6 @@ void DrawBitmap(LoadedBitmap *dest, LoadedBitmap *src, r32 rx, r32 ry)
    s32 maxx = RoundR32ToS32(rx) + src->width;
    s32 maxy = RoundR32ToS32(ry) + src->height;
    
-   u32 u = 0;
-   u32 v = 0;
-   
-   if(minx < 0)
-   {
-      u = -minx;
-      minx = 0;
-   }
-   
-   if(miny < 0)
-   {
-      //TODO: handle v
-      miny = 0;
-   }
-   
-   if(maxx > dest->width)
-   {
-      maxx = dest->width;
-   }
-   
-   if(maxy > dest->height)
-   {
-      maxy = dest->height;
-   }
-   
    {
       s32 new_miny = dest->height - miny;
       s32 new_maxy = dest->height - maxy;
@@ -269,16 +244,41 @@ void DrawBitmap(LoadedBitmap *dest, LoadedBitmap *src, r32 rx, r32 ry)
       maxy = new_miny;
       miny = new_maxy;
    }
+
+   u32 xoffset = 0;
+   u32 yoffset = 0;
    
-   u32 *dest_row = (dest->pixels + minx + (miny * dest->width)); 
-   u32 *src_row = src->pixels + src->width*v; 
+   if(minx < 0)
+   {
+      xoffset = -minx;
+      minx = 0;
+   }
    
-   for(u32 y = miny; y < maxy; ++y)
+   if(miny < 0)
+   {
+      yoffset = -miny;
+      miny = 0;
+   }
+   
+   if(maxx > (s32)dest->width)
+   {
+      maxx = dest->width;
+   }
+   
+   if(maxy > (s32)dest->height)
+   {
+      maxy = dest->height;
+   }
+   
+   u32 *dest_row = dest->pixels + minx + (miny * dest->width); 
+   u32 *src_row = src->pixels + xoffset + (yoffset * src->width); 
+   
+   for(u32 y = miny; (s32)y < maxy; ++y)
    {
       u32 *dest_pixel = dest_row;
-      u32 *src_pixel = src_row + u;
+      u32 *src_pixel = src_row;
       
-      for(u32 x = minx; x < maxx; ++x)
+      for(u32 x = minx; (s32)x < maxx; ++x)
       {
          u32 color32 = *dest_pixel;
          r32 oldr = ((r32)((color32 & 0x00FF0000) >> 16)) / 255.0f;
@@ -467,6 +467,36 @@ void UpdateMouseState(MouseState *mouse, HWND window)
    mouse->left_up = false;
 }
 
+void InitMemoryArena(MemoryArena *arena, void *memory, size_t size)
+{
+   arena->size = size;
+   arena->used = 0;
+   arena->memory = memory;
+}
+
+void *PushSize(MemoryArena *arena, size_t size)
+{
+   Assert((arena->used + size) < arena->size);
+   void *result = (u8 *)arena->memory + arena->used;
+   arena->used += size;
+   return result;
+}
+
+AutoBlock *NewAutoBlock(MemoryArena *arena, AutoBlockType type, char *name)
+{
+   AutoBlock *result = (AutoBlock *)PushSize(arena, sizeof(AutoBlock));
+   result->type = type;
+   result->name = name;
+   return result;
+}
+
+void AppendAutoBlock(AutoBlock *new_block, AutoBlock **newest_block)
+{
+   new_block->prev = *newest_block;
+   (*newest_block)->next = new_block;
+   *newest_block = new_block;
+}
+
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
    WNDCLASSEX window_class = {};
@@ -498,6 +528,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    b32 running = true;
    MouseState mouse = {};
    
+   MemoryArena generic_arena = {};
+   InitMemoryArena(&generic_arena, VirtualAlloc(0, Megabyte(64), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE), Megabyte(64));
+   
    RenderContext context = {};
    context.target = &backbuffer;
    context.font_info = &font;
@@ -506,6 +539,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    PageType page = PageType_Home;
    MSG msg = {};
    b32 auto_block_eraser = false;
+   
+   AutoBlock *newest_block = NewAutoBlock(&generic_arena, AutoBlockType_Root, "root");
+   
+   AppendAutoBlock(NewAutoBlock(&generic_arena, AutoBlockType_Root, "root"), &newest_block);
+   AppendAutoBlock(NewAutoBlock(&generic_arena, AutoBlockType_Root, "root"), &newest_block);
+   AppendAutoBlock(NewAutoBlock(&generic_arena, AutoBlockType_Root, "root"), &newest_block);
    
    u32 selected_block_id = 0;
    u32 auto_blocks[100];
@@ -612,6 +651,15 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          DrawRectangle(&backbuffer, 280, 20, 800, 675, V4(0.5f, 0.0f, 0.0f, 0.5f));
          DrawText(&backbuffer, &font, V2(600, 40), auto_file_name, 25);
          
+         u32 index = 0;
+         for(AutoBlock *block = newest_block;
+             block;
+             block = block->prev)
+         {
+            DrawAutoBuilderBlock(&backbuffer, 1, V2(sandbox_bounds.min.x + 10, sandbox_bounds.min.y + 10 + (30 * index)), V4(0.0f, 1.0f, 0.0f, 1.0f), &font);
+            index++;
+         }
+         
          if(GUIButton(&context, mouse, RectPosSize(160, 20, 40, 40), &eraser, NULL, auto_block_eraser))
          {
             auto_block_eraser = !auto_block_eraser;
@@ -683,7 +731,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       }
       
       DrawRectangle(&backbuffer, mouse.pos.x, mouse.pos.y, 10, 10, V4(mouse.pos.x, mouse.pos.y, 0.0f, 1.0f));  
-
+      DrawBitmap(&backbuffer, &home, mouse.pos.x, mouse.pos.y);
+      
       BlitToScreen(&backbuffer, device_context);
    }
    
