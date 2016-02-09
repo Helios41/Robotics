@@ -11,17 +11,6 @@
          "../Source/DashboardV2/",
          "../Source/BaseIncludes/"
       ],
-      "dependencies":
-      [
-         {
-            "if": "OS=Windows",
-            "then": "User32.lib"
-         },
-         {
-            "if": "OS=Windows",
-            "then": "Gdi32.lib"
-         }
-      ],
       "per-operations":
       [
          ["copy", "../Resources/logo.bmp", "[OUTPUT_DIRECTORY]/logo.bmp"],
@@ -33,14 +22,14 @@
          ["||", "../Resources/competition.bmp", "[OUTPUT_DIRECTORY]/competition.bmp"],
          "build"
       ],
-      "doesnt_work_dependencies":
+      "dependencies":
       [
          {
             "if": "OS=Windows",
-            "then": ["User32.lib", "Gdi32.lib"]
+            "then": ["User32.lib", "Gdi32.lib", "ws2_32.lib"]
          }
       ],
-      "DebugEnabled": "true",
+      "DebugEnabled": true,
       "optimized": false,
       "target": "all"
    }

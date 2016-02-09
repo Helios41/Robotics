@@ -7,8 +7,8 @@
       "build" : "../Build/Dashboard/",
       "source": 
       [
-         ["../Source/Dashboard/", ".java"],
-         ["../Source/NetworkTables/", ".java"]
+         "../Source/Dashboard/",
+         "../Source/NetworkTables/"
       ],
       "target": "all",
       "project": "Dashboard",

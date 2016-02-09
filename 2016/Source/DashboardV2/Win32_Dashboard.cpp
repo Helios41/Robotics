@@ -1,7 +1,8 @@
-#include <windows.h>
-#include <Shobjidl.h>
 #include "Definitions.h"
 #include "Dashboard.h"
+#include <stdio.h>
+#include <winsock2.h>
+#include <windows.h>
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
@@ -25,7 +26,7 @@ LRESULT CALLBACK WindowMessageEvent(HWND window, UINT message, WPARAM wParam, LP
          break;
 	}
 		
-	return DefWindowProc(window, message, wParam, lParam);;
+	return DefWindowProc(window, message, wParam, lParam);
 }
 
 EntireFile LoadEntireFile(const char* path)
@@ -38,6 +39,7 @@ EntireFile LoadEntireFile(const char* path)
    result.length = GetFileSize(file_handle, NULL);
    result.contents = VirtualAlloc(0, result.length, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
    ReadFile(file_handle, result.contents, result.length, NULL, NULL);
+   CloseHandle(file_handle);
    
    return result;
 }
@@ -328,11 +330,11 @@ void DrawText(LoadedBitmap *dest, stbtt_fontinfo *font, v2 pos, char *text, u32 
    }
 }
 
-b32 GUIButton(RenderContext *context, MouseState mouse, rect2 bounds, LoadedBitmap *icon, char *text)
+b32 GUIButton(RenderContext *context, InputState input, rect2 bounds, LoadedBitmap *icon, char *text)
 {
-   b32 hot = Contains(bounds, mouse.pos);
+   b32 hot = Contains(bounds, input.pos);
    
-   if(hot && mouse.left_down)
+   if(hot && (input.left_down || input.right_down))
    {
       DrawRectangle(context->target, bounds.min.x, bounds.min.y, bounds.max.x - bounds.min.x, bounds.max.y - bounds.min.y, V4(1.0f, 0.0f, 0.75f, 1.0f));
    }
@@ -358,13 +360,13 @@ b32 GUIButton(RenderContext *context, MouseState mouse, rect2 bounds, LoadedBitm
       DrawText(context->target, context->font_info, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
    }
    
-   return hot && mouse.left_up;
+   return hot && (input.left_up || input.right_up);
 }
 
-b32 GUIButton(RenderContext *context, MouseState mouse, rect2 bounds, LoadedBitmap *icon, char *text, b32 triggered)
+b32 GUIButton(RenderContext *context, InputState input, rect2 bounds, LoadedBitmap *icon, char *text, b32 triggered)
 {
    v2 bounds_size = RectGetSize(bounds);
-   b32 result = GUIButton(context, mouse, bounds, icon, text);
+   b32 result = GUIButton(context, input, bounds, icon, text);
    
    DrawRectangle(context->target, bounds.min.x, bounds.min.y, 5,
                  (bounds_size.x == bounds_size.y) ? 5 : bounds_size.y,
@@ -373,58 +375,23 @@ b32 GUIButton(RenderContext *context, MouseState mouse, rect2 bounds, LoadedBitm
    return result;
 }
 
-void DrawAutoBuilderBlock(LoadedBitmap *dest, u32 selected_block_id, v2 pos, v4 color, stbtt_fontinfo *font)
+b32 AutoBuilderBlock(RenderContext *context, AutoBlock block, v2 pos, InputState input)
 {
-   if(selected_block_id > 0)
-      DrawRectangle(dest, pos.x, pos.y, 100, 20, color);
-
-   switch(selected_block_id)
-   {
-      case 0:
-         break;
-         
-      case 1:
-         DrawText(dest, font, V2(pos.x, pos.y), "Test1", 20);
-         break;
-         
-      case 2:
-         DrawText(dest, font, V2(pos.x, pos.y), "Test2", 20);
-         break;
-         
-      case 3:
-         DrawText(dest, font, V2(pos.x, pos.y), "Test3", 20);
-         break;
-         
-      case 4:
-         DrawText(dest, font, V2(pos.x, pos.y), "Test4", 20);
-         break;
-         
-      case 5:
-         DrawText(dest, font, V2(pos.x, pos.y), "Test5", 20);
-         break;
-   }
-}
-
-b32 AutoBuilderButton(LoadedBitmap *dest, u32 selected_block_id, v2 pos, MouseState mouse, v4 color, stbtt_fontinfo *font)
-{
-   b32 hot = Contains(RectPosSize(pos.x, pos.y, 100, 20), mouse.pos);
+   b32 hot = Contains(RectPosSize(pos.x, pos.y, 100, 20), input.pos);
    
-   if(hot && mouse.left_down)
+   if(hot && (input.left_down || input.right_down))
    {
-      DrawRectangle(dest, pos.x - 2, pos.y - 2, 104, 24, V4(0.1f, 0.1f, 0.1f, 1.0f));
-      DrawAutoBuilderBlock(dest, selected_block_id, pos, color, font);
+      DrawRectangle(context->target, pos.x - 2, pos.y - 2, 104, 24, V4(0.1f, 0.1f, 0.1f, 1.0f));
    }
    else if(hot)
    {
-      DrawRectangle(dest, pos.x - 2, pos.y - 2, 104, 24, V4(0.25f, 0.25f, 0.25f, 1.0f));
-      DrawAutoBuilderBlock(dest, selected_block_id, pos, color, font);
-   }
-   else
-   {
-      DrawAutoBuilderBlock(dest, selected_block_id, pos, color, font);
+      DrawRectangle(context->target, pos.x - 2, pos.y - 2, 104, 24, V4(0.25f, 0.25f, 0.25f, 1.0f));
    }
    
-   return hot && mouse.left_up;
+   DrawRectangle(context->target, pos.x, pos.y, 100, 20, V4(0.5f, 0.0f, 0.0f, 1.0f));
+   DrawText(context->target, context->font_info, V2(pos.x, pos.y), block.name, 20);
+   
+   return hot && (input.left_up || input.right_up);
 }
 
 HDC SetupWindow(HINSTANCE hInstance, int nCmdShow, HWND *window, LoadedBitmap *backbuffer)
@@ -455,16 +422,100 @@ HDC SetupWindow(HINSTANCE hInstance, int nCmdShow, HWND *window, LoadedBitmap *b
    return GetDC(*window);
 }
 
-void UpdateMouseState(MouseState *mouse, HWND window)
+void UpdateInputState(InputState *input, HWND window)
 {
    POINT p;
    GetCursorPos(&p);
    ScreenToClient(window, &p);
    
-   mouse->pos.x = p.x;
-   mouse->pos.y = p.y;
+   input->pos.x = p.x;
+   input->pos.y = p.y;
    
-   mouse->left_up = false;
+   input->left_up = false;
+   input->right_up = false;
+   
+   input->char_key_up = false;
+   input->key_backspace = false;
+   input->key_up = false;
+   input->key_down = false;
+}
+
+u32 StringLength(char *str)
+{
+   u32 len = 0;
+   while(*str)
+   {
+      len++;
+      str++;
+   }
+   return len;
+}
+
+char *R32ToString(r32 value, char *str)
+{
+   sprintf(str, "%f", value);
+   return str;
+}
+
+char *U32ToString(u32 value, char *str)
+{
+   sprintf(str, "%u", value);
+   return str;
+}
+
+char *ConcatStrings(char *str1, char *str2, char *str)
+{
+   u32 i = 0;
+   while(*str1)
+   {
+      str[i++] = *str1;
+      str1++;
+   }
+   
+   while(*str2)
+   {
+      str[i++] = *str2;
+      str2++;
+   }
+
+   str[i] = '\0';
+   return str;
+}
+
+char *ConcatStrings(char *str1, char *str2, char *str3, char *str)
+{
+   u32 i = 0;
+   while(*str1)
+   {
+      str[i++] = *str1;
+      str1++;
+   }
+   
+   while(*str2)
+   {
+      str[i++] = *str2;
+      str2++;
+   }
+
+   while(*str3)
+   {
+      str[i++] = *str3;
+      str3++;
+   }
+   
+   str[i] = '\0';
+   return str;
+}
+
+void StringCopy(char *src, char *dest)
+{
+   while(*src)
+   {
+      *dest = *src;
+      dest++;
+      src++;
+   }
+   dest = '\0';
 }
 
 void InitMemoryArena(MemoryArena *arena, void *memory, size_t size)
@@ -482,19 +533,44 @@ void *PushSize(MemoryArena *arena, size_t size)
    return result;
 }
 
-AutoBlock *NewAutoBlock(MemoryArena *arena, AutoBlockType type, char *name)
+void PopSize(MemoryArena *arena, size_t size)
 {
-   AutoBlock *result = (AutoBlock *)PushSize(arena, sizeof(AutoBlock));
-   result->type = type;
-   result->name = name;
-   return result;
+   arena->used -= size;
 }
 
-void AppendAutoBlock(AutoBlock *new_block, AutoBlock **newest_block)
+AutoBlock *AddAutoBlock(AutoBlock *auto_blocks, u32 *auto_block_count, AutoBlockPreset preset)
 {
-   new_block->prev = *newest_block;
-   (*newest_block)->next = new_block;
-   *newest_block = new_block;
+   AutoBlock result = {};
+   StringCopy(preset.name, result.name);
+   result.hwid = preset.hwid;
+   result.type = preset.type;
+   
+   auto_blocks[*auto_block_count] = result;
+   (*auto_block_count)++;
+   
+   return &auto_blocks[*auto_block_count - 1];
+}
+
+RobotSubsystem *AddSubsystem(RobotSubsystem *subsystems, u32 *subsystem_count)
+{
+   RobotSubsystem result = {};
+   
+   subsystems[*subsystem_count] = result;
+   (*subsystem_count)++;
+   
+   return &subsystems[*subsystem_count - 1];
+}
+
+char *GetNameFromType(SubsystemType type)
+{
+   switch(type)
+   {
+      case SubsystemType_TankDrive2x2:
+         return "Tank Drive (2 x 2)";
+         
+      default:
+         return "default";
+   }
 }
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -526,7 +602,25 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    LoadedBitmap competition = LoadBitmapFromBMP("competition.bmp");
    
    b32 running = true;
-   MouseState mouse = {};
+   InputState input = {};
+   b32 fullscreen = false;
+   b32 connected = false;
+   PageType page = PageType_Home;
+   MSG msg = {};
+   
+   WSADATA winsock_data = {};
+   WSAStartup(MAKEWORD(2, 2), &winsock_data);
+   
+   SOCKET server_socket = socket(AF_INET, SOCK_STREAM, 0);
+   u32 is_nonblocking = true;
+   ioctlsocket(server_socket, FIONBIO, (u_long *)&is_nonblocking);
+   
+   struct sockaddr_in server;
+   server.sin_addr.s_addr = inet_addr("10.46.18.1");
+   server.sin_family = AF_INET;
+   server.sin_port = htons(8089);
+   
+   connected = (connect(server_socket, (struct sockaddr *)&server, sizeof(server)) == 0);
    
    MemoryArena generic_arena = {};
    InitMemoryArena(&generic_arena, VirtualAlloc(0, Megabyte(64), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE), Megabyte(64));
@@ -535,62 +629,78 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    context.target = &backbuffer;
    context.font_info = &font;
    
-   b32 connected = false;
-   PageType page = PageType_Home;
-   MSG msg = {};
-   b32 auto_block_eraser = false;
+   AutoBuilderState auto_builder_state = {};
+   StringCopy("unnamed", auto_builder_state.auto_file_name);
    
-   AutoBlock *newest_block = NewAutoBlock(&generic_arena, AutoBlockType_Root, "root");
+   RobotState robot_state = {};
+   robot_state.robot_page = RobotPageType_Hardware;
    
-   AppendAutoBlock(NewAutoBlock(&generic_arena, AutoBlockType_Root, "root"), &newest_block);
-   AppendAutoBlock(NewAutoBlock(&generic_arena, AutoBlockType_Root, "root"), &newest_block);
-   AppendAutoBlock(NewAutoBlock(&generic_arena, AutoBlockType_Root, "root"), &newest_block);
+   //
+   auto_builder_state.auto_block_preset_count = 4;
+   auto_builder_state.auto_block_presets[0] = {"Victor 1", 1, AutoBlockType_Motor};
+   auto_builder_state.auto_block_presets[1] = {"Victor 2", 2, AutoBlockType_Motor};
+   auto_builder_state.auto_block_presets[2] = {"Victor 3", 3, AutoBlockType_Motor};
+   auto_builder_state.auto_block_presets[3] = {"Solenoid 1", 1, AutoBlockType_Solenoid};
    
-   u32 selected_block_id = 0;
-   u32 auto_blocks[100];
-   u32 auto_block_count = 0;
-   v4 auto_block_colors[5] = 
-   {
-      {1.0f, 0.0f, 0.0f, 1.0f},
-      {0.0f, 1.0f, 0.0f, 1.0f},
-      {0.0f, 0.0f, 1.0f, 1.0f},
-      {1.0f, 1.0f, 0.0f, 1.0f},
-      {0.0f, 1.0f, 1.0f, 1.0f}
-   };
-   char *auto_file_name = "unnamed";
-   
-   v2 player_pos = V2(0.0f, 0.0f);
+   robot_state.robot_hardware_count = 4;
+   robot_state.robot_hardware[0] = {"Victor 1", 1, HardwareType_MotorController};
+   robot_state.robot_hardware[1] = {"Victor 2", 2, HardwareType_MotorController};
+   robot_state.robot_hardware[2] = {"Victor 3", 3, HardwareType_MotorController};
+   robot_state.robot_hardware[3] = {"Solenoid 1", 1, HardwareType_Solenoid};
+   //
    
    while(running)
    {
-      UpdateMouseState(&mouse, window);
+      UpdateInputState(&input, window);
       
       while(PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE))
       {
          switch(msg.message)
          {            
             case WM_LBUTTONUP:
-               mouse.left_down = false;
-               mouse.left_up = true;
+               input.left_down = false;
+               input.left_up = true;
                break;
          
             case WM_LBUTTONDOWN:
-               mouse.left_down = true;
-               mouse.left_up = false;
+               input.left_down = true;
+               input.left_up = false;
                break;
                
-            case WM_KEYDOWN:
+            case WM_RBUTTONUP:
+               input.right_down = false;
+               input.right_up = true;
+               break;
+         
+            case WM_RBUTTONDOWN:
+               input.right_down = true;
+               input.right_up = false;
+               break;   
+            
+            case WM_KEYUP:
             {
-               switch(msg.wParam)
+               if(msg.wParam == VK_BACK)
                {
+                  input.key_backspace = true;
+               }
+               else if(msg.wParam == VK_UP)
+               {
+                  input.key_up = true;
+               }
+               else if(msg.wParam == VK_DOWN)
+               {
+                  input.key_down = true;
                }
             }
             break;
             
-            case WM_KEYUP:
+            case WM_CHAR:
             {
-               switch(msg.wParam)
+               char c = msg.wParam;
+               if((c > 31) && (c < 127))
                {
+                  input.char_key_up = true;
+                  input.key_char = c;
                }
             }
             break;
@@ -608,133 +718,809 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       DrawBitmap(&backbuffer, &logo, (backbuffer.width / 2) - (logo.width / 2), (backbuffer.height / 2) - (logo.height / 2));
       
       DrawRectangle(&backbuffer, 0, 0, backbuffer.width, 15, V4(1.0f, 0.0f, 0.0f, 1.0f));
+
+      DrawRectangle(&backbuffer, 10, 3, 10, 10, connected ? V4(0.0f, 1.0f, 0.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f));
       
-      v4 connected_icon_color = connected ? V4(0.0f, 1.0f, 0.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f);
-      DrawRectangle(&backbuffer, 10, 3, 10, 10, connected_icon_color);
-      
-      if(GUIButton(&context, mouse, RectPosSize(10, 20, 40, 40), &home, NULL, (page == PageType_Home)))
+      if(GUIButton(&context, input, RectPosSize(10, 20, 40, 40), &home, NULL, (page == PageType_Home)))
       {
          page = PageType_Home;
       }
-      
-      if(GUIButton(&context, mouse, RectPosSize(60, 20, 40, 40), &gear, NULL, (page == PageType_Config)))
-      {
-         page = PageType_Config;
-      }
-      
-      if(GUIButton(&context, mouse, RectPosSize(10, 70, 120, 40), &competition, "Competition", (page == PageType_Competition)))
-      {
-         page = PageType_Competition;
-      }
-      
-      if(GUIButton(&context, mouse, RectPosSize(10, 120, 120, 40), NULL, "Autonomous Builder", (page == PageType_Auto)))
+      else if(GUIButton(&context, input, RectPosSize(10, 70, 120, 40), NULL, "Autonomous Builder", (page == PageType_Auto)))
       {
          page = PageType_Auto;
       }
+      else if(GUIButton(&context, input, RectPosSize(10, 120, 120, 40), NULL, "Robot", (page == PageType_Robot)))
+      {
+         page = PageType_Robot;
+      }
+      else if(GUIButton(&context, input, RectPosSize(10, 170, 120, 40), NULL, "---", false))
+      {
+         
+      }
       
-      GUIButton(&context, mouse, RectPosSize(10, 170, 120, 40), NULL, NULL, false);
+      if(GUIButton(&context, input, RectPosSize(60, 20, 40, 40), &gear, NULL, fullscreen))
+      {
+         fullscreen = !fullscreen;
+         
+         if(fullscreen)
+         {
+            DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
+            DWORD dwRemove = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME;
+            DWORD dwNewStyle = dwStyle & ~dwRemove;
+            
+            SetWindowLong(window, GWL_STYLE, dwNewStyle);
+            SetWindowPos(window, NULL, 0, 0, 0, 0,
+                         SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                       
+            SetWindowPos(window, NULL, 0, 0, 
+                         GetDeviceCaps(device_context, HORZRES), backbuffer.height, SWP_FRAMECHANGED);
+         }
+         else
+         {
+            SetWindowLong(window, GWL_STYLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE);
+            SetWindowPos(window, NULL, 0, 0, backbuffer.width, backbuffer.height, SWP_FRAMECHANGED);
+         }
+      }
       
       if(page == PageType_Home)
       {
          DrawRectangle(&backbuffer, 280, 20, 800, 85, V4(0.5f, 0.0f, 0.0f, 0.5f));
          DrawText(&backbuffer, &font, V2(600, 40), "CN Robotics", 40);
-      }
-      else if(page == PageType_Config)
-      {
          
+         DrawRectangle(&backbuffer, 160, 110, 400, 255, V4(0.5f, 0.0f, 0.0f, 0.5f));
+         
+         if(connected)
+         {
+            DrawText(&backbuffer, &font, V2(180, 130), "Connected To ", 20);
+         }
+         else
+         {
+            DrawText(&backbuffer, &font, V2(180, 130), "Not Connected", 20);
+         }
+         
+         if(GUIButton(&context, input, RectPosSize(180, 180, 100, 40), NULL, "Reconnect"))
+         {
+            connected = (connect(server_socket, (struct sockaddr *)&server, sizeof(server)) == 0);
+         }
       }
       else if(page == PageType_Auto)
       {
-         b32 button_clicked = false;
-         
          rect2 sandbox_bounds = RectPosSize(280, 20, 800, 675);
          DrawRectangle(&backbuffer, 280, 20, 800, 675, V4(0.5f, 0.0f, 0.0f, 0.5f));
-         DrawText(&backbuffer, &font, V2(600, 40), auto_file_name, 25);
-         
-         u32 index = 0;
-         for(AutoBlock *block = newest_block;
-             block;
-             block = block->prev)
+                  
+         for(u32 i = 0; i < auto_builder_state.auto_block_count; i++)
          {
-            DrawAutoBuilderBlock(&backbuffer, 1, V2(sandbox_bounds.min.x + 10, sandbox_bounds.min.y + 10 + (30 * index)), V4(0.0f, 1.0f, 0.0f, 1.0f), &font);
-            index++;
-         }
-         
-         if(GUIButton(&context, mouse, RectPosSize(160, 20, 40, 40), &eraser, NULL, auto_block_eraser))
-         {
-            auto_block_eraser = !auto_block_eraser;
-         }
-         
-         if(auto_block_eraser)
-         {
-            DrawRectangle(&backbuffer, 160, 20, 5, 5, V4(0.0f, 0.0f, 0.0f, 1.0f));
-         }
-         
-         for(u32 i = 1; i <= 5; ++i)
-         {
-            b32 hit = AutoBuilderButton(&backbuffer, i, V2(160, 70 + ((i - 1) * 25)), 
-                                        mouse, auto_block_colors[i - 1], &font);
-            
-            if(hit)
+            if(auto_builder_state.selected_block == &auto_builder_state.auto_blocks[i])
             {
-               selected_block_id = i;
-               button_clicked = true;
+               DrawRectangle(&backbuffer, (sandbox_bounds.min.x + 5), 
+                             (sandbox_bounds.min.y + 5 + (30 * i)), 110, 30, V4(0.5f, 0.0f, 0.0f, 0.5f));
+            }
+            
+            b32 hit = AutoBuilderBlock(&context, auto_builder_state.auto_blocks[i],
+                                       V2(sandbox_bounds.min.x + 10, sandbox_bounds.min.y + 10 + (30 * i)),
+                                       input);
+                         
+            if(hit && input.left_up)
+            {
+               auto_builder_state.selected_block = &auto_builder_state.auto_blocks[i];
+            }
+            else if(hit && input.right_up)
+            {
+               for(u32 j = i + 1; j < auto_builder_state.auto_block_count; j++)
+               {
+                  auto_builder_state.auto_blocks[j - 1] = auto_builder_state.auto_blocks[j];
+               }
+               auto_builder_state.auto_block_count--;
+               auto_builder_state.selected_block = NULL;
             }
          }
          
-         if(Contains(sandbox_bounds, mouse.pos) && mouse.left_up && selected_block_id)
+         for(u32 i = 0;
+             i < auto_builder_state.auto_block_preset_count;
+             ++i)
          {
-            auto_blocks[auto_block_count++] = selected_block_id;
-            selected_block_id = 0;
-         }
-         else if(!button_clicked && mouse.left_up)
-         {
-            selected_block_id = 0;
-         }
-         
-         if(selected_block_id > 0)
-            DrawAutoBuilderBlock(&backbuffer, selected_block_id, mouse.pos, auto_block_colors[selected_block_id - 1], &font);
-         
-         for(u32 i = 0; i < auto_block_count; ++i)
-         {
-            if(auto_blocks[i] > 0)
+            b32 hit = GUIButton(&context, input, RectPosSize(160, (20 + (i *25)), 100, 20), NULL, auto_builder_state.auto_block_presets[i].name);
+            if(hit)
             {
-               b32 hit = AutoBuilderButton(&backbuffer, auto_blocks[i], 
-                                           V2(sandbox_bounds.min.x + 10, sandbox_bounds.min.y + 10 + (30 * i)), 
-                                           mouse, auto_block_colors[auto_blocks[i] - 1], &font);
-               
-               if(hit && auto_block_eraser)
+               AddAutoBlock(auto_builder_state.auto_blocks, &auto_builder_state.auto_block_count, auto_builder_state.auto_block_presets[i]);
+            }
+         }
+         
+         if(GUIButton(&context, input, RectPosSize(1100, 20, 140, 40), NULL, auto_builder_state.auto_file_name, auto_builder_state.auto_file_name_selected))
+         {
+            auto_builder_state.auto_file_name_selected = !auto_builder_state.auto_file_name_selected;
+         }
+         
+         if(auto_builder_state.auto_file_name_selected)
+         {
+            u32 len = StringLength(auto_builder_state.auto_file_name);
+            
+            if(input.char_key_up && ((len + 1) < ArrayCount(auto_builder_state.auto_file_name)))
+            {
+               auto_builder_state.auto_file_name[len] = input.key_char;
+               auto_builder_state.auto_file_name[len + 1] = '\0';
+            }
+            else if(input.key_backspace && (len > 0))
+            {
+               auto_builder_state.auto_file_name[len - 1] = '\0';
+            }
+         }
+         
+         if(GUIButton(&context, input, RectPosSize(1245, 20, 20, 40), NULL, NULL, auto_builder_state.auto_file_selector_open))
+         {
+            auto_builder_state.auto_file_selector_open = !auto_builder_state.auto_file_selector_open;
+         }
+         
+         if(auto_builder_state.auto_file_selector_open)
+         {
+            rect2 block_info_bounds = RectPosSize(1100, 140, 200, 200);
+            DrawRectangle(&backbuffer, 1100, 140, 200, 200, V4(0.5f, 0.0f, 0.0f, 0.5f));
+            
+            HANDLE find_handle;
+            WIN32_FIND_DATA find_data;
+            u32 file_index = 0;
+            
+            find_handle = FindFirstFile("autos/*.abin", &find_data);
+            if(find_handle != INVALID_HANDLE_VALUE)
+            {
+               do
                {
-                  for(u32 i2 = i; i2 < auto_block_count; ++i2)
+                  if(GUIButton(&context, input, RectPosSize(1120, 160 + (file_index * 30), 100, 20), NULL, find_data.cFileName))
                   {
-                     if((i2 + 1) < auto_block_count)
+                     u32 i = 0;
+                     while(i < (StringLength(find_data.cFileName) - 5))
                      {
-                        auto_blocks[i2] = auto_blocks[i2 + 1];
+                        auto_builder_state.auto_file_name[i] = find_data.cFileName[i];
+                        i++;
+                     }
+                     auto_builder_state.auto_file_name[i] = '\0';
+                  }
+                  file_index++;
+               }
+               while(FindNextFile(find_handle, &find_data));
+            }
+         }
+         
+         if(GUIButton(&context, input, RectPosSize(1100, 65, 100, 20), NULL, "Save"))
+         {
+            DWORD autos_folder = GetFileAttributes("autos");
+            if((autos_folder == INVALID_FILE_ATTRIBUTES) &&
+               (autos_folder & FILE_ATTRIBUTE_DIRECTORY))
+            {
+               CreateDirectory("autos", NULL);
+            }
+            
+            u64 file_size = sizeof(AutoFileHeader) + (sizeof(AutoBlock) * auto_builder_state.auto_block_count);
+            void *file_data = PushSize(&generic_arena, file_size);
+            char path_buffer[128];
+            
+            AutoFileHeader *header = (AutoFileHeader *) file_data;
+            AutoBlock *blocks = (AutoBlock *) (header + 1);
+            
+            header->identifier = 0x44661188;
+            header->auto_block_count = auto_builder_state.auto_block_count;
+            
+            for(u32 i = 0; i < auto_builder_state.auto_block_count; i++)
+            {
+               *(blocks + i) = auto_builder_state.auto_blocks[i];
+            }
+            
+            HANDLE file_handle = CreateFileA(ConcatStrings("autos/", auto_builder_state.auto_file_name, ".abin", path_buffer),
+                                             GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if(file_handle == INVALID_HANDLE_VALUE) MessageBoxA(NULL, "Error", "invalid handle", MB_OK);
+            
+            if(WriteFile(file_handle, file_data, file_size, NULL, NULL) == false) MessageBoxA(NULL, "Error", "write error", MB_OK);
+            CloseHandle(file_handle);
+            PopSize(&generic_arena, file_size);
+         }
+         
+         if(GUIButton(&context, input, RectPosSize(1100, 90, 100, 20), NULL, "Open"))
+         {
+            char path_buffer[128];
+            HANDLE file_handle = CreateFileA(ConcatStrings("autos/",auto_builder_state.auto_file_name, ".abin", path_buffer),
+                                             GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+            
+            if(file_handle != INVALID_HANDLE_VALUE)
+            {
+               u64 file_size = GetFileSize(file_handle, NULL);
+               void *file_data = PushSize(&generic_arena, file_size);
+               
+               AutoFileHeader *header = (AutoFileHeader *) file_data;
+               AutoBlock *blocks = (AutoBlock *) (header + 1);
+               
+               ReadFile(file_handle, file_data, file_size, NULL, NULL);
+               
+               if(header->identifier == 0x44661188)
+               {
+                  auto_builder_state.auto_block_count = header->auto_block_count;
+                  
+                  for(u32 i = 0; i < auto_builder_state.auto_block_count; i++)
+                  {
+                     auto_builder_state.auto_blocks[i] = *(blocks + i);
+                  }
+               }
+               else
+               {
+                  MessageBoxA(NULL, "Invalid file", "Error", MB_OK);
+               }
+               
+               PopSize(&generic_arena, file_size);
+            }
+            
+            CloseHandle(file_handle);
+         }
+         
+         if(GUIButton(&context, input, RectPosSize(1100, 115, 100, 20), NULL, "Upload"))
+         {
+            //TODO
+         }
+         
+         if(auto_builder_state.selected_block)
+         {
+            rect2 block_info_bounds = RectPosSize(1100, 140, 200, 200);
+            DrawRectangle(&backbuffer, 1100, 140, 200, 200, V4(0.5f, 0.0f, 0.0f, 0.5f));
+            DrawText(&backbuffer, &font, V2(1120, 160), auto_builder_state.selected_block->name, 20);
+            
+            if(auto_builder_state.selected_block->type == AutoBlockType_Motor)
+            {
+               char number_buffer[10];
+               char string_buffer[30];
+               
+               DrawText(&backbuffer, &font, V2(1120, 180),
+                        ConcatStrings("Value: ", R32ToString(auto_builder_state.selected_block->motor.value, number_buffer), string_buffer), 20);
+               
+               r32 clipped_value = (auto_builder_state.selected_block->motor.value + 1.0f) / 2.0f;
+               DrawRectangle(&backbuffer, 1120, 200, 150, 20, V4(0.5f, 0.0f, 0.0f, 1.0f));
+               DrawRectangle(&backbuffer, 1115 + (clipped_value * 150), 195, 30, 30, V4(0.9f, 0.0f, 0.0f, 1.0f));
+               
+               if(Contains(RectPosSize(1115 + (clipped_value * 150), 195, 30, 30), input.pos) && input.left_down)
+               {
+                  DrawRectangle(&backbuffer, 1115 + (clipped_value * 150), 195, 30, 30, V4(1.0f, 0.0f, 0.0f, 1.0f));
+                  
+                  if(input.pos.x > (1130 + (clipped_value * 150)))
+                  {
+                     auto_builder_state.selected_block->motor.value += 0.1f;
+                  }
+                  else if(input.pos.x < (1130 + (clipped_value * 150)))
+                  {
+                     auto_builder_state.selected_block->motor.value -= 0.1f;
+                  }
+                  
+                  if(auto_builder_state.selected_block->motor.value > 1.0f)
+                  {
+                     auto_builder_state.selected_block->motor.value = 1.0f;
+                  }
+                  else if(auto_builder_state.selected_block->motor.value < -1.0f)
+                  {
+                     auto_builder_state.selected_block->motor.value = -1.0f;
+                  }
+               }
+               
+               DrawText(&backbuffer, &font, V2(1120, 240),
+                        ConcatStrings("Time: ", R32ToString(auto_builder_state.selected_block->motor.time, number_buffer), string_buffer), 20);
+               
+               if(GUIButton(&context, input, RectPosSize(1140, 280, 20, 20), NULL, "+"))
+               {
+                  auto_builder_state.selected_block->motor.time += 0.1f;
+               }
+               else if(GUIButton(&context, input, RectPosSize(1180, 280, 20, 20), NULL, "-"))
+               {
+                  auto_builder_state.selected_block->motor.time -= 0.1f;
+               }
+            }
+            else if(auto_builder_state.selected_block->type == AutoBlockType_Solenoid)
+            {
+               if(GUIButton(&context, input, RectPosSize(1120, 180, 80, 40), NULL, "Extend", auto_builder_state.selected_block->solenoid == SolenoidState_Extend))
+               {
+                  auto_builder_state.selected_block->solenoid = SolenoidState_Extend;
+               }
+               
+               if(GUIButton(&context, input, RectPosSize(1120, 225, 80, 40), NULL, "Retract", auto_builder_state.selected_block->solenoid == SolenoidState_Retract))
+               {
+                  auto_builder_state.selected_block->solenoid = SolenoidState_Retract;
+               }
+               
+               if(GUIButton(&context, input, RectPosSize(1120, 270, 80, 40), NULL, "Stop", auto_builder_state.selected_block->solenoid == SolenoidState_Stop))
+               {
+                  auto_builder_state.selected_block->solenoid = SolenoidState_Stop;
+               }
+            }
+            
+            u32 selected_block_index = 0;
+            
+            for(u32 i = 0; i < auto_builder_state.auto_block_count; i++)
+            {
+               if(auto_builder_state.selected_block == &auto_builder_state.auto_blocks[i])
+               {
+                  selected_block_index = i;
+               }
+            }
+            
+            if(input.key_up && (selected_block_index > 0))
+            {
+               AutoBlock temp = auto_builder_state.auto_blocks[selected_block_index - 1];
+               auto_builder_state.auto_blocks[selected_block_index - 1] = *auto_builder_state.selected_block;
+               auto_builder_state.auto_blocks[selected_block_index] = temp;
+               auto_builder_state.selected_block = &auto_builder_state.auto_blocks[selected_block_index - 1];
+            }
+            else if(input.key_down && ((selected_block_index + 1) < auto_builder_state.auto_block_count))
+            {
+               AutoBlock temp = auto_builder_state.auto_blocks[selected_block_index + 1];
+               auto_builder_state.auto_blocks[selected_block_index + 1] = *auto_builder_state.selected_block;
+               auto_builder_state.auto_blocks[selected_block_index] = temp;
+               auto_builder_state.selected_block = &auto_builder_state.auto_blocks[selected_block_index + 1];
+            }
+            
+            if(GUIButton(&context, input, RectPosSize(1100, 140, 10, 10), NULL, NULL))
+            {
+               auto_builder_state.selected_block = NULL;
+            }
+         }
+      }
+      else if(page == PageType_Robot)
+      {
+         DrawRectangle(&backbuffer, 280, 20, 800, 675, V4(0.5f, 0.0f, 0.0f, 0.5f));
+         
+         if(GUIButton(&context, input, RectPosSize(160, 20, 100, 20), NULL, "Hardware", robot_state.robot_page == RobotPageType_Hardware))
+         {
+            robot_state.robot_page = RobotPageType_Hardware;
+         }
+         
+         if(GUIButton(&context, input, RectPosSize(160, 45, 100, 20), NULL, "Subsystems", robot_state.robot_page == RobotPageType_Subsystems))
+         {
+            robot_state.robot_page = RobotPageType_Subsystems;
+         }
+         
+         if(robot_state.robot_page == RobotPageType_Hardware)
+         {
+            for(u32 i = 0; i < robot_state.robot_hardware_count; i++)
+            {
+               if(robot_state.selected_hardware == &robot_state.robot_hardware[i])
+               {
+                  DrawRectangle(&backbuffer, 285, 
+                                (25 + (30 * i)), 110, 30, V4(0.5f, 0.0f, 0.0f, 0.5f));
+               }
+               
+               if(GUIButton(&context, input, RectPosSize(290, (30 + (30 * i)), 100, 20), NULL, robot_state.robot_hardware[i].name))
+               {
+                  robot_state.selected_hardware = &robot_state.robot_hardware[i];
+               }
+            }
+            
+            if(robot_state.selected_hardware)
+            {
+               if(robot_state.selected_hardware->type == HardwareType_MotorController)
+               {
+                  DrawRectangle(&backbuffer, 1100, 20, 225, 400, V4(0.5f, 0.0f, 0.0f, 0.5f));
+                  DrawText(&backbuffer, &font, V2(1120, 40), robot_state.selected_hardware->name, 20);
+                  
+                  if(GUIButton(&context, input, RectPosSize(1105, 60, 100, 20), NULL, "Analog") &&
+                     (robot_state.selected_hardware->control_count < ArrayCount(robot_state.selected_hardware->motor)))
+                  {
+                     u32 index = robot_state.selected_hardware->control_count++;
+                     
+                     robot_state.selected_hardware->motor[index].type = MotorControllerControlType_Analog;
+                     robot_state.selected_hardware->motor[index].controller_index = 0;
+                     robot_state.selected_hardware->motor[index].button_axis_index = 0;
+                  }
+                  
+                  if(GUIButton(&context, input, RectPosSize(1210, 60, 100, 20), NULL, "Button") &&
+                     (robot_state.selected_hardware->control_count < ArrayCount(robot_state.selected_hardware->motor)))
+                  {
+                     u32 index = robot_state.selected_hardware->control_count++;
+                     
+                     robot_state.selected_hardware->motor[index].type = MotorControllerControlType_Button;
+                     robot_state.selected_hardware->motor[index].controller_index = 0;
+                     robot_state.selected_hardware->motor[index].button_axis_index = 1;
+                     robot_state.selected_hardware->motor[index].value = 0.0f;
+                  }
+                  
+                  u32 analog_index = 0;
+                  u32 button_index = 0;
+                  for(u32 i = 0; i < robot_state.selected_hardware->control_count; i++)
+                  {
+                     u32 x = (robot_state.selected_hardware->motor[i].type == MotorControllerControlType_Analog) ? 1105 : 1210;
+                     u32 y = (robot_state.selected_hardware->motor[i].type == MotorControllerControlType_Analog) ? (95 + (analog_index * 25)) : (95 + (button_index * 25));
+                     
+                     if(robot_state.hardware_control_selected &&
+                       (robot_state.selected_hardware_control == i))
+                     {
+                        DrawRectangle(&backbuffer, x - 5, y - 5, 110, 30, V4(0.5f, 0.0f, 0.0f, 0.5f));
+                     }
+                     
+                     char controller_index_buffer[64];
+                     char button_axis_index_buffer[64];
+                     char string_buffer[64];
+                     
+                     if(GUIButton(&context, input, RectPosSize(x, y, 100, 20), NULL,
+                                  ConcatStrings(U32ToString(robot_state.selected_hardware->motor[i].controller_index, controller_index_buffer),
+                                                " : ",
+                                                U32ToString(robot_state.selected_hardware->motor[i].button_axis_index, button_axis_index_buffer),
+                                                string_buffer)))
+                     {
+                        if(input.left_up)
+                        {
+                           robot_state.hardware_control_selected = true;
+                           robot_state.selected_hardware_control = i;
+                        }
+                        else if(input.right_up)
+                        {
+                           for(u32 j = i + 1; j < robot_state.selected_hardware->control_count; j++)
+                           {
+                              robot_state.selected_hardware->motor[j - 1] = robot_state.selected_hardware->motor[j];
+                           }
+                           robot_state.selected_hardware->control_count--;
+                           robot_state.hardware_control_selected = false;
+                        }
+                     }
+                     
+                     if(robot_state.selected_hardware->motor[i].type == MotorControllerControlType_Analog)
+                     {
+                        analog_index++;
+                     }
+                     else if(robot_state.selected_hardware->motor[i].type == MotorControllerControlType_Button)
+                     {
+                        button_index++;
                      }
                   }
-                  auto_block_count -= 1;
+                  
+                  if(robot_state.hardware_control_selected)
+                  {
+                     DrawRectangle(&backbuffer, 1100, 425, 225, 225, V4(0.5f, 0.0f, 0.0f, 0.5f));
+                     char index_buffer[32];
+                     char string_buffer[64];
+                     
+                     if(GUIButton(&context, input, RectPosSize(1105, 450, 100, 20), NULL,
+                        ConcatStrings("Controller: ",
+                                      U32ToString(robot_state.selected_hardware->motor[robot_state.selected_hardware_control].controller_index, index_buffer),
+                                      string_buffer)))
+                     {
+                        if(input.left_up && (robot_state.selected_hardware->motor[robot_state.selected_hardware_control].controller_index < 4))
+                        {
+                           robot_state.selected_hardware->motor[robot_state.selected_hardware_control].controller_index++;
+                        }
+                        else if(input.right_up && (robot_state.selected_hardware->motor[robot_state.selected_hardware_control].controller_index > 0))
+                        {
+                           robot_state.selected_hardware->motor[robot_state.selected_hardware_control].controller_index--;
+                        }
+                     }
+                     
+                     if(robot_state.selected_hardware->motor[robot_state.selected_hardware_control].type == MotorControllerControlType_Analog)
+                     {
+                        if(GUIButton(&context, input, RectPosSize(1105, 475, 100, 20), NULL,
+                        ConcatStrings("Axis: ",
+                                      U32ToString(robot_state.selected_hardware->motor[robot_state.selected_hardware_control].button_axis_index, index_buffer),
+                                      string_buffer)))
+                        {
+                           if(input.left_up && (robot_state.selected_hardware->motor[robot_state.selected_hardware_control].button_axis_index < 20))
+                           {
+                              robot_state.selected_hardware->motor[robot_state.selected_hardware_control].button_axis_index++;
+                           }
+                           else if(input.right_up && (robot_state.selected_hardware->motor[robot_state.selected_hardware_control].button_axis_index > 0))
+                           {
+                              robot_state.selected_hardware->motor[robot_state.selected_hardware_control].button_axis_index--;
+                           }
+                        }
+                     }
+                     else if(robot_state.selected_hardware->motor[robot_state.selected_hardware_control].type == MotorControllerControlType_Button)
+                     {
+                        if(GUIButton(&context, input, RectPosSize(1105, 475, 100, 20), NULL,
+                        ConcatStrings("Button: ",
+                                      U32ToString(robot_state.selected_hardware->motor[robot_state.selected_hardware_control].button_axis_index, index_buffer),
+                                      string_buffer)))
+                        {
+                           if(input.left_up && (robot_state.selected_hardware->motor[robot_state.selected_hardware_control].button_axis_index < 20))
+                           {
+                              robot_state.selected_hardware->motor[robot_state.selected_hardware_control].button_axis_index++;
+                           }
+                           else if(input.right_up && (robot_state.selected_hardware->motor[robot_state.selected_hardware_control].button_axis_index > 1))
+                           {
+                              robot_state.selected_hardware->motor[robot_state.selected_hardware_control].button_axis_index--;
+                           }
+                        }
+                        
+                        if(GUIButton(&context, input, RectPosSize(1105, 500, 100, 20), NULL,
+                        ConcatStrings("Value: ",
+                                      R32ToString(robot_state.selected_hardware->motor[robot_state.selected_hardware_control].value, index_buffer),
+                                      string_buffer)))
+                        {
+                           if(input.left_up && (robot_state.selected_hardware->motor[robot_state.selected_hardware_control].value < 1.0f))
+                           {
+                              robot_state.selected_hardware->motor[robot_state.selected_hardware_control].value += 0.01f;
+                           }
+                           else if(input.right_up && (robot_state.selected_hardware->motor[robot_state.selected_hardware_control].value > -1.0f))
+                           {
+                              robot_state.selected_hardware->motor[robot_state.selected_hardware_control].value -= 0.01f;
+                           }
+                        }
+                     }
+                     
+                     if(GUIButton(&context, input, RectPosSize(1100, 425, 10, 10), NULL, NULL))
+                     {
+                        robot_state.hardware_control_selected = false;
+                     }
+                  }
+               }
+               else if(robot_state.selected_hardware->type == HardwareType_Solenoid)
+               {
+                  DrawRectangle(&backbuffer, 1100, 20, 325, 400, V4(0.5f, 0.0f, 0.0f, 0.5f));
+                  DrawText(&backbuffer, &font, V2(1120, 40), robot_state.selected_hardware->name, 20);
+                  
+                  if(GUIButton(&context, input, RectPosSize(1105, 60, 100, 20), NULL, "Extend"))
+                  {
+                     u32 index = robot_state.selected_hardware->control_count++;
+                     
+                     robot_state.selected_hardware->solenoid[index].type = SolenoidControlType_Extend;
+                     robot_state.selected_hardware->solenoid[index].controller_index = 0;
+                     robot_state.selected_hardware->solenoid[index].button_index = 1;
+                  }
+                  
+                  if(GUIButton(&context, input, RectPosSize(1210, 60, 100, 20), NULL, "Retract"))
+                  {
+                     u32 index = robot_state.selected_hardware->control_count++;
+                     
+                     robot_state.selected_hardware->solenoid[index].type = SolenoidControlType_Retract;
+                     robot_state.selected_hardware->solenoid[index].controller_index = 0;
+                     robot_state.selected_hardware->solenoid[index].button_index = 1;
+                  }
+                  
+                  if(GUIButton(&context, input, RectPosSize(1315, 60, 100, 20), NULL, "Toggle"))
+                  {
+                     u32 index = robot_state.selected_hardware->control_count++;
+                     
+                     robot_state.selected_hardware->solenoid[index].type = SolenoidControlType_Toggle;
+                     robot_state.selected_hardware->solenoid[index].controller_index = 0;
+                     robot_state.selected_hardware->solenoid[index].button_index = 1;
+                  }
+                  
+                  u32 extend_index = 0;
+                  u32 retract_index = 0;
+                  u32 toggle_index = 0;
+                  for(u32 i = 0; i < robot_state.selected_hardware->control_count; i++)
+                  {
+                     u32 x = 0;
+                     u32 y = 0;
+                     
+                     if(robot_state.selected_hardware->solenoid[i].type == SolenoidControlType_Extend)
+                     {
+                        x = 1105;
+                        y = 95 + (extend_index++ * 25);
+                     }
+                     else if(robot_state.selected_hardware->solenoid[i].type == SolenoidControlType_Retract)
+                     {
+                        x = 1210;
+                        y = 95 + (retract_index++ * 25);
+                     }
+                     else if(robot_state.selected_hardware->solenoid[i].type == SolenoidControlType_Toggle)
+                     {
+                        x = 1315;
+                        y = 95 + (toggle_index++ * 25);
+                     }
+                     
+                     if(robot_state.hardware_control_selected &&
+                       (robot_state.selected_hardware_control == i))
+                     {
+                        DrawRectangle(&backbuffer, x - 5, y - 5, 110, 30, V4(0.5f, 0.0f, 0.0f, 0.5f));
+                     }
+                     
+                     char controller_index_buffer[64];
+                     char button_index_buffer[64];
+                     char string_buffer[64];
+                     
+                     if(GUIButton(&context, input, RectPosSize(x, y, 100, 20), NULL,
+                                  ConcatStrings(U32ToString(robot_state.selected_hardware->solenoid[i].controller_index, controller_index_buffer),
+                                                " : ",
+                                                U32ToString(robot_state.selected_hardware->solenoid[i].button_index, button_index_buffer),
+                                                string_buffer)))
+                     {
+                        if(input.left_up)
+                        {
+                           robot_state.hardware_control_selected = true;
+                           robot_state.selected_hardware_control = i;
+                        }
+                        else if(input.right_up)
+                        {
+                           for(u32 j = i + 1; j < robot_state.selected_hardware->control_count; j++)
+                           {
+                              robot_state.selected_hardware->solenoid[j - 1] = robot_state.selected_hardware->solenoid[j];
+                           }
+                           robot_state.selected_hardware->control_count--;
+                           robot_state.hardware_control_selected = false;
+                        }
+                     }
+                  }
+                  
+                  if(robot_state.hardware_control_selected)
+                  {
+                     DrawRectangle(&backbuffer, 1100, 425, 225, 225, V4(0.5f, 0.0f, 0.0f, 0.5f));
+                     char index_buffer[32];
+                     char string_buffer[64];
+                     
+                     if(GUIButton(&context, input, RectPosSize(1105, 450, 100, 20), NULL,
+                        ConcatStrings("Controller: ",
+                                      U32ToString(robot_state.selected_hardware->solenoid[robot_state.selected_hardware_control].controller_index, index_buffer),
+                                      string_buffer)))
+                     {
+                        if(input.left_up && (robot_state.selected_hardware->solenoid[robot_state.selected_hardware_control].controller_index < 4))
+                        {
+                           robot_state.selected_hardware->solenoid[robot_state.selected_hardware_control].controller_index++;
+                        }
+                        else if(input.right_up && (robot_state.selected_hardware->solenoid[robot_state.selected_hardware_control].controller_index > 0))
+                        {
+                           robot_state.selected_hardware->solenoid[robot_state.selected_hardware_control].controller_index--;
+                        }
+                     }
+                     
+                     if(GUIButton(&context, input, RectPosSize(1105, 475, 100, 20), NULL,
+                        ConcatStrings("Button: ",
+                                      U32ToString(robot_state.selected_hardware->solenoid[robot_state.selected_hardware_control].button_index, index_buffer),
+                                      string_buffer)))
+                     {
+                        if(input.left_up && (robot_state.selected_hardware->solenoid[robot_state.selected_hardware_control].button_index < 20))
+                        {
+                           robot_state.selected_hardware->solenoid[robot_state.selected_hardware_control].button_index++;
+                        }
+                        else if(input.right_up && (robot_state.selected_hardware->solenoid[robot_state.selected_hardware_control].button_index > 1))
+                        {
+                           robot_state.selected_hardware->solenoid[robot_state.selected_hardware_control].button_index--;
+                        }
+                     }
+                     
+                     if(GUIButton(&context, input, RectPosSize(1100, 425, 10, 10), NULL, NULL))
+                     {
+                        robot_state.hardware_control_selected = false;
+                     }
+                  }
+               }
+               
+               if(GUIButton(&context, input, RectPosSize(1100, 20, 10, 10), NULL, NULL))
+               {
+                  robot_state.selected_hardware = NULL;
+                  robot_state.hardware_control_selected = false;
                }
             }
          }
-         
-         if(GUIButton(&context, mouse, RectPosSize(1100, 20, 100, 20), NULL, "Save"))
+         else if(robot_state.robot_page == RobotPageType_Subsystems)
          {
-            //TODO: open file dialog
-         }
-         
-         if(GUIButton(&context, mouse, RectPosSize(1100, 45, 100, 20), NULL, "Open"))
-         {
+            for(u32 i = 0; i < robot_state.robot_subsystems_count; i++)
+            {
+               if(robot_state.selected_subsystem == &robot_state.robot_subsystems[i])
+               {
+                  DrawRectangle(&backbuffer, 285, 
+                                (25 + (30 * i)), 110, 30, V4(0.5f, 0.0f, 0.0f, 0.5f));
+               }
+               
+               b32 hit = GUIButton(&context, input, RectPosSize(290, (30 + (30 * i)), 100, 20), NULL, robot_state.robot_subsystems[i].name);
+               
+               if(hit && input.left_up)
+               {
+                  robot_state.selected_subsystem = &robot_state.robot_subsystems[i];
+               }
+               else if(hit && input.right_up)
+               {
+                  for(u32 j = i + 1; j < robot_state.robot_subsystems_count; j++)
+                  {
+                     robot_state.robot_subsystems[j - 1] = robot_state.robot_subsystems[j];
+                  }
+                  robot_state.robot_subsystems_count--;
+                  robot_state.selected_subsystem = NULL;
+                  robot_state.subsystem_name_selected = false;
+               }
+            }
             
+            if(GUIButton(&context, input, RectPosSize(1100, 20, 100, 20), NULL, "New Subsystem"))
+            {
+               robot_state.selected_subsystem = AddSubsystem((RobotSubsystem *)&robot_state.robot_subsystems, &robot_state.robot_subsystems_count);
+            }
+            
+            if(robot_state.selected_subsystem)
+            {
+               DrawRectangle(&backbuffer, 1100, 45, 200, 400, V4(0.5f, 0.0f, 0.0f, 0.5f));
+               
+               if(GUIButton(&context, input, RectPosSize(1105, 60, 100, 20),
+                            NULL, robot_state.selected_subsystem->name, robot_state.subsystem_name_selected))
+               {
+                  robot_state.subsystem_name_selected = !robot_state.subsystem_name_selected;
+               }
+               
+               if(robot_state.subsystem_name_selected)
+               {
+                  u32 len = StringLength(robot_state.selected_subsystem->name);
+                  
+                  if(input.char_key_up && ((len + 1) < ArrayCount(robot_state.selected_subsystem->name)))
+                  {
+                     robot_state.selected_subsystem->name[len] = input.key_char;
+                     robot_state.selected_subsystem->name[len + 1] = '\0';
+                  }
+                  else if(input.key_backspace && (len > 0))
+                  {
+                     robot_state.selected_subsystem->name[len - 1] = '\0';
+                  }
+               }
+               
+               if(GUIButton(&context, input, RectPosSize(1105, 95, 100, 20), NULL, GetNameFromType(robot_state.selected_subsystem->type)))
+               {
+                  robot_state.selected_subsystem->type = (SubsystemType)((u32)robot_state.selected_subsystem->type + 1);
+                  if((u32)robot_state.selected_subsystem->type >= (u32)SubsystemType_Count) robot_state.selected_subsystem->type = (SubsystemType)0;
+               }
+               
+               if(robot_state.selected_subsystem->type == SubsystemType_TankDrive2x2)
+               {
+                  char index_buffer[32];
+                  char string_buffer[64];
+                  
+                  if(GUIButton(&context, input, RectPosSize(1105, 120, 100, 20), NULL,
+                     ConcatStrings("Controller: ",
+                                   U32ToString(robot_state.selected_subsystem->tank_drive2x2.controller_index, index_buffer),
+                                   string_buffer)))
+                  {
+                     if(input.left_up && (robot_state.selected_subsystem->tank_drive2x2.controller_index < 4))
+                     {
+                        robot_state.selected_subsystem->tank_drive2x2.controller_index++;
+                     }
+                     else if(input.right_up && (robot_state.selected_subsystem->tank_drive2x2.controller_index > 0))
+                     {
+                        robot_state.selected_subsystem->tank_drive2x2.controller_index--;
+                     }
+                  }
+                  
+                  if(GUIButton(&context, input, RectPosSize(1210, 145, 10, 20), NULL, NULL,
+                               robot_state.selected_subsystem->tank_drive2x2.invert_drive_axis))
+                  {
+                     robot_state.selected_subsystem->tank_drive2x2.invert_drive_axis = !robot_state.selected_subsystem->tank_drive2x2.invert_drive_axis;
+                  }
+                  
+                  if(GUIButton(&context, input, RectPosSize(1105, 145, 100, 20), NULL,
+                     ConcatStrings("Drive Axis: ",
+                                   U32ToString(robot_state.selected_subsystem->tank_drive2x2.drive_axis_index, index_buffer),
+                                   string_buffer)))
+                  {
+                     if(input.left_up && (robot_state.selected_subsystem->tank_drive2x2.drive_axis_index < 20))
+                     {
+                        robot_state.selected_subsystem->tank_drive2x2.drive_axis_index++;
+                     }
+                     else if(input.right_up && (robot_state.selected_subsystem->tank_drive2x2.drive_axis_index > 0))
+                     {
+                        robot_state.selected_subsystem->tank_drive2x2.drive_axis_index--;
+                     }
+                  }
+                  
+                  if(GUIButton(&context, input, RectPosSize(1210, 170, 10, 20), NULL, NULL,
+                               robot_state.selected_subsystem->tank_drive2x2.invert_rotate_axis))
+                  {
+                     robot_state.selected_subsystem->tank_drive2x2.invert_rotate_axis = !robot_state.selected_subsystem->tank_drive2x2.invert_rotate_axis;
+                  }
+                  
+                  if(GUIButton(&context, input, RectPosSize(1105, 170, 100, 20), NULL,
+                     ConcatStrings("Rotate Axis: ",
+                                   U32ToString(robot_state.selected_subsystem->tank_drive2x2.rotate_axis_index, index_buffer),
+                                   string_buffer)))
+                  {
+                     if(input.left_up && (robot_state.selected_subsystem->tank_drive2x2.rotate_axis_index < 20))
+                     {
+                        robot_state.selected_subsystem->tank_drive2x2.rotate_axis_index++;
+                     }
+                     else if(input.right_up && (robot_state.selected_subsystem->tank_drive2x2.rotate_axis_index > 0))
+                     {
+                        robot_state.selected_subsystem->tank_drive2x2.rotate_axis_index--;
+                     }
+                  }
+               }
+               
+               if(GUIButton(&context, input, RectPosSize(1100, 45, 10, 10), NULL, NULL))
+               {
+                  robot_state.selected_subsystem = NULL;
+                  robot_state.subsystem_name_selected = false;
+               }
+            }
          }
-         
-         GUIButton(&context, mouse, RectPosSize(1100, 70, 100, 20), NULL, "Upload");
       }
-      
-      DrawRectangle(&backbuffer, mouse.pos.x, mouse.pos.y, 10, 10, V4(mouse.pos.x, mouse.pos.y, 0.0f, 1.0f));  
-      DrawBitmap(&backbuffer, &home, mouse.pos.x, mouse.pos.y);
       
       BlitToScreen(&backbuffer, device_context);
    }
+   
+   closesocket(server_socket);
+   WSACleanup();
    
    return 0;
 }
