@@ -135,6 +135,13 @@ inline s32 RoundR32ToS32(r32 real)
    return result;
 }
 
+struct MemoryArena
+{
+   size_t size;
+   size_t used;
+   void *memory;
+};
+
 struct LoadedBitmap
 {
    u32 width;
@@ -146,6 +153,7 @@ struct RenderContext
 {
    LoadedBitmap *target;
    stbtt_fontinfo *font_info;
+   MemoryArena *font_memory;
 };
 
 struct LoadedFont
@@ -179,13 +187,6 @@ struct InputState
    b32 key_backspace;
    b32 key_up;
    b32 key_down;
-};
-
-struct MemoryArena
-{
-   size_t size;
-   size_t used;
-   void *memory;
 };
 
 //TODO: conditionals for sensors

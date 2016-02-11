@@ -2,6 +2,7 @@
 #include "Dashboard.h"
 #include <stdio.h>
 #include <winsock2.h>
+#include <Ws2tcpip.h>
 #include <windows.h>
 
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -29,6 +30,26 @@ LRESULT CALLBACK WindowMessageEvent(HWND window, UINT message, WPARAM wParam, LP
 	return DefWindowProc(window, message, wParam, lParam);
 }
 
+void InitMemoryArena(MemoryArena *arena, void *memory, size_t size)
+{
+   arena->size = size;
+   arena->used = 0;
+   arena->memory = memory;
+}
+
+void *PushSize(MemoryArena *arena, size_t size)
+{
+   Assert((arena->used + size) < arena->size);
+   void *result = (u8 *)arena->memory + arena->used;
+   arena->used += size;
+   return result;
+}
+
+void PopSize(MemoryArena *arena, size_t size)
+{
+   arena->used -= size;
+}
+
 EntireFile LoadEntireFile(const char* path)
 {
    HANDLE file_handle = CreateFileA(path, GENERIC_READ, 0, NULL, OPEN_EXISTING,
@@ -36,9 +57,10 @@ EntireFile LoadEntireFile(const char* path)
                                     
    EntireFile result = {};
    
+   DWORD number_of_bytes_read;
    result.length = GetFileSize(file_handle, NULL);
    result.contents = VirtualAlloc(0, result.length, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-   ReadFile(file_handle, result.contents, result.length, NULL, NULL);
+   ReadFile(file_handle, result.contents, result.length, &number_of_bytes_read, NULL);
    CloseHandle(file_handle);
    
    return result;
@@ -86,7 +108,7 @@ LoadedBitmap LoadBitmapFromBMP(const char* path)
    return result;
 }
 
-LoadedFont GetCharBitmap(stbtt_fontinfo *font, char c, u32 height_scale)
+LoadedFont GetCharBitmap(stbtt_fontinfo *font, char c, u32 height_scale, MemoryArena *memory)
 {
    LoadedFont result = {};
    
@@ -100,7 +122,8 @@ LoadedFont GetCharBitmap(stbtt_fontinfo *font, char c, u32 height_scale)
    result.offset.y = (r32)yoffset;
    
    
-   result.bitmap.pixels = (u32 *)VirtualAlloc(0, (result.bitmap.width * result.bitmap.height * sizeof(u32)), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+   result.bitmap.pixels = (u32 *)PushSize(memory, (result.bitmap.width * result.bitmap.height * sizeof(u32)));
+   //(u32 *)VirtualAlloc(0, (result.bitmap.width * result.bitmap.height * sizeof(u32)), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
    
    u8 *source_row = mono_bitmap + width*height;
    u32 *dest_row = result.bitmap.pixels;
@@ -308,7 +331,7 @@ void DrawBitmap(LoadedBitmap *dest, LoadedBitmap *src, r32 rx, r32 ry)
    }
 }
 
-void DrawText(LoadedBitmap *dest, stbtt_fontinfo *font, v2 pos, char *text, u32 scale)
+void DrawText(LoadedBitmap *dest, stbtt_fontinfo *font, v2 pos, char *text, u32 scale, MemoryArena *memory)
 {
    if(!dest || !text)
       return;
@@ -322,8 +345,9 @@ void DrawText(LoadedBitmap *dest, stbtt_fontinfo *font, v2 pos, char *text, u32 
       }
       else
       {
-         LoadedFont char_bitmap = GetCharBitmap(font, *text, scale);
+         LoadedFont char_bitmap = GetCharBitmap(font, *text, scale, memory);
          DrawBitmap(dest, &char_bitmap.bitmap, pos.x + xoffset + char_bitmap.offset.x, pos.y + char_bitmap.offset.y + 10);
+         PopSize(memory, (char_bitmap.bitmap.width * char_bitmap.bitmap.height * sizeof(u32)));
          xoffset += char_bitmap.bitmap.width;
       }
       text++;
@@ -352,12 +376,12 @@ b32 GUIButton(RenderContext *context, InputState input, rect2 bounds, LoadedBitm
    if(bounds_size.x == bounds_size.y)
    {
       DrawBitmap(context->target, icon, bounds.min.x, bounds.min.y);
-      DrawText(context->target, context->font_info, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
+      DrawText(context->target, context->font_info, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20, context->font_memory);
    }
    else
    {
       DrawBitmap(context->target, icon, bounds.min.x + 5, bounds.min.y);
-      DrawText(context->target, context->font_info, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
+      DrawText(context->target, context->font_info, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20, context->font_memory);
    }
    
    return hot && (input.left_up || input.right_up);
@@ -389,7 +413,7 @@ b32 AutoBuilderBlock(RenderContext *context, AutoBlock block, v2 pos, InputState
    }
    
    DrawRectangle(context->target, pos.x, pos.y, 100, 20, V4(0.5f, 0.0f, 0.0f, 1.0f));
-   DrawText(context->target, context->font_info, V2(pos.x, pos.y), block.name, 20);
+   DrawText(context->target, context->font_info, V2(pos.x, pos.y), block.name, 20, context->font_memory);
    
    return hot && (input.left_up || input.right_up);
 }
@@ -398,7 +422,7 @@ HDC SetupWindow(HINSTANCE hInstance, int nCmdShow, HWND *window, LoadedBitmap *b
 {
    *window = CreateWindowExA(WS_EX_CLIENTEDGE, "WindowClass", "Dashboard V2",
                              WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                             CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL,
+                             1440, 759, NULL, NULL,
                              hInstance, NULL);
    
    HANDLE hIcon = LoadImageA(0, "icon.ico", IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
@@ -454,6 +478,12 @@ u32 StringLength(char *str)
 char *R32ToString(r32 value, char *str)
 {
    sprintf(str, "%f", value);
+   return str;
+}
+
+char *R64ToString(r64 value, char *str)
+{
+   sprintf(str, "%lf", value);
    return str;
 }
 
@@ -518,26 +548,6 @@ void StringCopy(char *src, char *dest)
    dest = '\0';
 }
 
-void InitMemoryArena(MemoryArena *arena, void *memory, size_t size)
-{
-   arena->size = size;
-   arena->used = 0;
-   arena->memory = memory;
-}
-
-void *PushSize(MemoryArena *arena, size_t size)
-{
-   Assert((arena->used + size) < arena->size);
-   void *result = (u8 *)arena->memory + arena->used;
-   arena->used += size;
-   return result;
-}
-
-void PopSize(MemoryArena *arena, size_t size)
-{
-   arena->used -= size;
-}
-
 AutoBlock *AddAutoBlock(AutoBlock *auto_blocks, u32 *auto_block_count, AutoBlockPreset preset)
 {
    AutoBlock result = {};
@@ -571,6 +581,23 @@ char *GetNameFromType(SubsystemType type)
       default:
          return "default";
    }
+}
+
+r64 GetCounterFrequency(void)
+{
+   LARGE_INTEGER frequency_value = {};
+   QueryPerformanceFrequency(&frequency_value);
+   r64 result = ((r64)frequency_value.QuadPart) / 1000.0;
+   return result;
+}
+
+r64 GetCounter(s64 *last_timer, r64 frequency)
+{
+   LARGE_INTEGER timer_value = {};
+   QueryPerformanceCounter(&timer_value);
+   r64 result = ((r64)(timer_value.QuadPart - *last_timer)) / frequency;
+   *last_timer = timer_value.QuadPart;
+   return result;
 }
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -607,6 +634,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    b32 connected = false;
    PageType page = PageType_Home;
    MSG msg = {};
+   r64 timer_freq = GetCounterFrequency();
+   s64 last_timer = 0;
+   r64 frame_length = 0.0;
    
    WSADATA winsock_data = {};
    WSAStartup(MAKEWORD(2, 2), &winsock_data);
@@ -615,8 +645,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    u32 is_nonblocking = true;
    ioctlsocket(server_socket, FIONBIO, (u_long *)&is_nonblocking);
    
+   char inet_buffer[64];
    struct sockaddr_in server;
-   server.sin_addr.s_addr = inet_addr("10.46.18.1");
+   server.sin_addr.s_addr = InetPton(AF_INET, "10.46.18.1", inet_buffer);
    server.sin_family = AF_INET;
    server.sin_port = htons(8089);
    
@@ -628,6 +659,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    RenderContext context = {};
    context.target = &backbuffer;
    context.font_info = &font;
+   context.font_memory = &generic_arena;
    
    AutoBuilderState auto_builder_state = {};
    StringCopy("unnamed", auto_builder_state.auto_file_name);
@@ -649,6 +681,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    robot_state.robot_hardware[3] = {"Solenoid 1", 1, HardwareType_Solenoid};
    //
    
+   GetCounter(&last_timer, timer_freq);
    while(running)
    {
       UpdateInputState(&input, window);
@@ -765,17 +798,17 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       if(page == PageType_Home)
       {
          DrawRectangle(&backbuffer, 280, 20, 800, 85, V4(0.5f, 0.0f, 0.0f, 0.5f));
-         DrawText(&backbuffer, &font, V2(600, 40), "CN Robotics", 40);
+         DrawText(&backbuffer, &font, V2(600, 40), "CN Robotics", 40, context.font_memory);
          
          DrawRectangle(&backbuffer, 160, 110, 400, 255, V4(0.5f, 0.0f, 0.0f, 0.5f));
          
          if(connected)
          {
-            DrawText(&backbuffer, &font, V2(180, 130), "Connected To ", 20);
+            DrawText(&backbuffer, &font, V2(180, 130), "Connected To ", 20, context.font_memory);
          }
          else
          {
-            DrawText(&backbuffer, &font, V2(180, 130), "Not Connected", 20);
+            DrawText(&backbuffer, &font, V2(180, 130), "Not Connected", 20, context.font_memory);
          }
          
          if(GUIButton(&context, input, RectPosSize(180, 180, 100, 40), NULL, "Reconnect"))
@@ -959,7 +992,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          {
             rect2 block_info_bounds = RectPosSize(1100, 140, 200, 200);
             DrawRectangle(&backbuffer, 1100, 140, 200, 200, V4(0.5f, 0.0f, 0.0f, 0.5f));
-            DrawText(&backbuffer, &font, V2(1120, 160), auto_builder_state.selected_block->name, 20);
+            DrawText(&backbuffer, &font, V2(1120, 160), auto_builder_state.selected_block->name, 20, context.font_memory);
             
             if(auto_builder_state.selected_block->type == AutoBlockType_Motor)
             {
@@ -967,7 +1000,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                char string_buffer[30];
                
                DrawText(&backbuffer, &font, V2(1120, 180),
-                        ConcatStrings("Value: ", R32ToString(auto_builder_state.selected_block->motor.value, number_buffer), string_buffer), 20);
+                        ConcatStrings("Value: ", R32ToString(auto_builder_state.selected_block->motor.value, number_buffer), string_buffer),
+                        20, context.font_memory);
                
                r32 clipped_value = (auto_builder_state.selected_block->motor.value + 1.0f) / 2.0f;
                DrawRectangle(&backbuffer, 1120, 200, 150, 20, V4(0.5f, 0.0f, 0.0f, 1.0f));
@@ -997,7 +1031,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                }
                
                DrawText(&backbuffer, &font, V2(1120, 240),
-                        ConcatStrings("Time: ", R32ToString(auto_builder_state.selected_block->motor.time, number_buffer), string_buffer), 20);
+                        ConcatStrings("Time: ", R32ToString(auto_builder_state.selected_block->motor.time, number_buffer), string_buffer),
+                        20, context.font_memory);
                
                if(GUIButton(&context, input, RectPosSize(1140, 280, 20, 20), NULL, "+"))
                {
@@ -1092,7 +1127,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                if(robot_state.selected_hardware->type == HardwareType_MotorController)
                {
                   DrawRectangle(&backbuffer, 1100, 20, 225, 400, V4(0.5f, 0.0f, 0.0f, 0.5f));
-                  DrawText(&backbuffer, &font, V2(1120, 40), robot_state.selected_hardware->name, 20);
+                  DrawText(&backbuffer, &font, V2(1120, 40), robot_state.selected_hardware->name, 20, context.font_memory);
                   
                   if(GUIButton(&context, input, RectPosSize(1105, 60, 100, 20), NULL, "Analog") &&
                      (robot_state.selected_hardware->control_count < ArrayCount(robot_state.selected_hardware->motor)))
@@ -1244,7 +1279,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                else if(robot_state.selected_hardware->type == HardwareType_Solenoid)
                {
                   DrawRectangle(&backbuffer, 1100, 20, 325, 400, V4(0.5f, 0.0f, 0.0f, 0.5f));
-                  DrawText(&backbuffer, &font, V2(1120, 40), robot_state.selected_hardware->name, 20);
+                  DrawText(&backbuffer, &font, V2(1120, 40), robot_state.selected_hardware->name, 20, context.font_memory);
                   
                   if(GUIButton(&context, input, RectPosSize(1105, 60, 100, 20), NULL, "Extend"))
                   {
@@ -1516,7 +1551,21 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          }
       }
       
+      //DEBUG
+      if(page == PageType_Home)
+      {
+         char frame_time_buffer[64];
+         DrawText(&backbuffer, &font, V2(600, 40), U32ToString(backbuffer.width, frame_time_buffer), 20, context.font_memory);
+         DrawText(&backbuffer, &font, V2(600, 100), U32ToString(backbuffer.height, frame_time_buffer), 20, context.font_memory);
+      }
+      
       BlitToScreen(&backbuffer, device_context);
+      
+      frame_length = GetCounter(&last_timer, timer_freq);
+      if(frame_length < 33.3)
+      {
+         Sleep(33.3 - frame_length);
+      }
    }
    
    closesocket(server_socket);
