@@ -172,7 +172,7 @@ void AllocateBitmapFromWindow(LoadedBitmap *bitmap, HWND window)
    AllocateBitmap(bitmap, client_rect.right, client_rect.bottom);
 }
 
-void BlitToScreen(LoadedBitmap *bitmap, HDC device_context)
+void BlitToScreen(LoadedBitmap *bitmap, HDC device_context, HWND window)
 {
    BITMAPINFO info = {};
    
@@ -183,8 +183,11 @@ void BlitToScreen(LoadedBitmap *bitmap, HDC device_context)
    info.bmiHeader.biBitCount = 32;
    info.bmiHeader.biCompression = BI_RGB;
    
+   RECT client_rect = {};
+   GetClientRect(window, &client_rect);
+   
    StretchDIBits(device_context,
-                 0, 0, bitmap->width, bitmap->height,
+                 0, 0, client_rect.right, client_rect.bottom,
                  0, 0, bitmap->width, bitmap->height,
                  bitmap->pixels,
                  &info,
@@ -600,6 +603,16 @@ r64 GetCounter(s64 *last_timer, r64 frequency)
    return result;
 }
 
+#define GOOGLE_NETWORK_TEST
+
+#ifdef GOOGLE_NETWORK_TEST
+#define SERVER_ADDR "216.58.218.195"
+#define SERVER_PORT 80
+#else   
+#define SERVER_ADDR "10.46.18.11"
+#define SERVER_PORT 8089
+#endif
+
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
    WNDCLASSEX window_class = {};
@@ -641,15 +654,17 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    WSADATA winsock_data = {};
    WSAStartup(MAKEWORD(2, 2), &winsock_data);
    
-   SOCKET server_socket = socket(AF_INET, SOCK_STREAM, 0);
-   u32 is_nonblocking = true;
-   ioctlsocket(server_socket, FIONBIO, (u_long *)&is_nonblocking);
+   SOCKET server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+   //b32 is_nonblocking = true;
+   //ioctlsocket(server_socket, FIONBIO, (u_long *)&is_nonblocking);
    
    char inet_buffer[64];
    struct sockaddr_in server;
-   server.sin_addr.s_addr = InetPton(AF_INET, "10.46.18.1", inet_buffer);
    server.sin_family = AF_INET;
-   server.sin_port = htons(8089);
+   
+   //server.sin_addr.s_addr = InetPton(AF_INET, SERVER_ADDR, inet_buffer);
+   server.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+   server.sin_port = htons(SERVER_PORT);
    
    connected = (connect(server_socket, (struct sockaddr *)&server, sizeof(server)) == 0);
    
@@ -752,7 +767,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       
       DrawRectangle(&backbuffer, 0, 0, backbuffer.width, 15, V4(1.0f, 0.0f, 0.0f, 1.0f));
 
-      DrawRectangle(&backbuffer, 10, 3, 10, 10, connected ? V4(0.0f, 1.0f, 0.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f));
+      DrawRectangle(&backbuffer, 10, 3, 10, 10, connected ? V4(1.0f, 1.0f, 1.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f));
       
       if(GUIButton(&context, input, RectPosSize(10, 20, 40, 40), &home, NULL, (page == PageType_Home)))
       {
@@ -768,7 +783,26 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       }
       else if(GUIButton(&context, input, RectPosSize(10, 170, 120, 40), NULL, "---", false))
       {
-         
+#ifdef GOOGLE_NETWORK_TEST
+         if(connected)
+         {
+            char test_message[] = "GET / HTTP/1.1\r\n\r\n";
+            if(send(server_socket, test_message, StringLength(test_message), 0) < 0)
+            {
+               MessageBoxA(NULL, "Send failed", "GNT Error", MB_OK);
+            }
+            
+            char server_reply[4000];
+            int recive_size = recv(server_socket, server_reply, 4000, 0);
+            if(recive_size == SOCKET_ERROR)
+            {
+                MessageBoxA(NULL, "Recive failed", "GNT Error", MB_OK);
+            }
+            
+            server_reply[recive_size] = '\0';
+            MessageBoxA(NULL, server_reply, "GNT", MB_OK);
+         }
+#endif
       }
       
       if(GUIButton(&context, input, RectPosSize(60, 20, 40, 40), &gear, NULL, fullscreen))
@@ -804,7 +838,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          
          if(connected)
          {
-            DrawText(&backbuffer, &font, V2(180, 130), "Connected To ", 20, context.font_memory);
+            char text_buffer[512];
+            DrawText(&backbuffer, &font, V2(180, 130),
+                     ConcatStrings("Connected To ", SERVER_ADDR, text_buffer),
+                     20, context.font_memory);
          }
          else
          {
@@ -813,6 +850,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          
          if(GUIButton(&context, input, RectPosSize(180, 180, 100, 40), NULL, "Reconnect"))
          {
+            shutdown(server_socket, SD_BOTH);
+            closesocket(server_socket);
+            server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+            
+            server.sin_family = AF_INET;
+            server.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+            server.sin_port = htons(SERVER_PORT);
+            
             connected = (connect(server_socket, (struct sockaddr *)&server, sizeof(server)) == 0);
          }
       }
@@ -942,7 +987,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                                              GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
             if(file_handle == INVALID_HANDLE_VALUE) MessageBoxA(NULL, "Error", "invalid handle", MB_OK);
             
-            if(WriteFile(file_handle, file_data, file_size, NULL, NULL) == false) MessageBoxA(NULL, "Error", "write error", MB_OK);
+            DWORD bytes_written = 0;
+            if(WriteFile(file_handle, file_data, file_size, &bytes_written, NULL) == false) MessageBoxA(NULL, "Error", "write error", MB_OK);
             CloseHandle(file_handle);
             PopSize(&generic_arena, file_size);
          }
@@ -961,7 +1007,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                AutoFileHeader *header = (AutoFileHeader *) file_data;
                AutoBlock *blocks = (AutoBlock *) (header + 1);
                
-               ReadFile(file_handle, file_data, file_size, NULL, NULL);
+               DWORD bytes_written = 0;
+               ReadFile(file_handle, file_data, file_size, &bytes_written, NULL);
                
                if(header->identifier == 0x44661188)
                {
@@ -1555,11 +1602,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       if(page == PageType_Home)
       {
          char frame_time_buffer[64];
-         DrawText(&backbuffer, &font, V2(600, 40), U32ToString(backbuffer.width, frame_time_buffer), 20, context.font_memory);
-         DrawText(&backbuffer, &font, V2(600, 100), U32ToString(backbuffer.height, frame_time_buffer), 20, context.font_memory);
+         DrawText(&backbuffer, &font, V2(600, 40), R64ToString(frame_length, frame_time_buffer), 20, context.font_memory);
       }
       
-      BlitToScreen(&backbuffer, device_context);
+      BlitToScreen(&backbuffer, device_context, window);
       
       frame_length = GetCounter(&last_timer, timer_freq);
       if(frame_length < 33.3)
@@ -1568,6 +1614,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       }
    }
    
+   shutdown(server_socket, SD_BOTH);
    closesocket(server_socket);
    WSACleanup();
    
