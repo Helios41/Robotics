@@ -1,0 +1,25 @@
+extends ./base.jade
+include ./include/utils.jade
+
+block vars
+   - var pageTitle = "Team 4618 - Team Entry Form"
+   - var navTitle = "Team Entry Form"
+   - var navColor = "red"
+   - var backgroundurl = "/assets/general_background.png"
+
+block content
+   p= "Team Entry for Team " + assigned_team + " Match " + match_number
+   each entry_element in entry_template
+      p= entry_element.name + ":"
+      if entry_element.type == "text_box"
+         input(type="text", autocomplete="off")
+      else if entry_element.type == "check_box"
+         input(type="checkbox")
+      
+block script
+   mixin scoutSearchScript("scout_search_button", "team_box")
+   script.
+      $(document).ready(function()
+      {
+         
+      });

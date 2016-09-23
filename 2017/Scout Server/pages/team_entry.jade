@@ -1,0 +1,128 @@
+extends ./base.jade
+include ./include/utils.jade
+
+block vars
+   - var pageTitle = "Team 4618 - Team Entry"
+   - var navTitle = "Team Entry"
+   - var navColor = "red"
+   - var backgroundurl = "/assets/general_background.png"
+   - var event_data = {}
+      
+block content
+   #search_div.bar
+      span Search: 
+      input(id="search_box" autocomplete="off")
+      button(id="search_button") Search
+      if SuperUser
+         button(id="delete_button") Delete
+   if teamid
+      #submitteddata_block
+         if submitted
+            each post in submitted
+               .block
+                  p By #{post.user} 
+                  p(class="submit_text", id=post.index)= post.value
+                  - for(var event_attribs in post.attribs)
+                     p(class="submit_text")= event_attribs
+                     each attrib in post.attribs[event_attribs]
+                        p(class="submit_text")= attrib.name + ": " + attrib.value 
+   else
+      p Search for a team
+block script
+   mixin scoutSearchScript("search_button", "search_box")
+   if loggedIn && teamid
+      script.
+         function submitScoutData()
+         {
+            var event_data_values = !{JSON.stringify(event_data)}
+            var event_attributes = {};
+            
+            for(var event_name in event_data_values)
+            {
+               var event_data = event_data_values[event_name];
+               for(var i = 0; i < event_data.length; ++i)
+               {
+                  var event_attribute_value = $(('#' + event_name + "_" + event_data[i]).replace(/ /g, "_")).val();
+                  
+                  if(event_attribute_value.match(/\S/))
+                  {
+                     if(event_attributes[event_name] == undefined)
+                        event_attributes[event_name] = [];
+                     
+                     $(('#' + event_name + "_" + event_data[i]).replace(/ /g, "_")).val('');
+                     event_attributes[event_name].push({name: event_data[i], value: event_attribute_value});
+                  }
+               }
+            }
+            
+            var scout_data =
+            {
+               team: "#{teamid}",
+               value: $('#scout_box').val(),
+               event_attribs: event_attributes
+            };
+            socket.emit('submit_scout_data', scout_data);
+            $('#scout_box').val('');
+         }
+      
+         function filterScoutingData()
+         {
+            Cookies.set('scout_search_keyword', $('#scouting_filter_box').val());
+            var filter_scouting_data = 
+            {
+               team: #{teamid},
+               cookie: Cookies.get('scout_search_keyword')
+            };
+            socket.emit('filter_scouting_data', filter_scouting_data);
+            $('#scouting_filter_box').val('');
+         }
+      
+         $(document).ready(function()
+         {
+            registerEnterKey('scouting_filter_box');
+            
+            $('#scouting_filter_box').on('enterKey', filterScoutingData);
+            $('#scouting_filter_button').on('click', filterScoutingData);
+            
+            $('#submit_scout_button').on('click', submitScoutData);
+         });
+   if SuperUser && loggedIn && teamid
+      script.
+         var is_delete_mode = false;
+         
+         function toggleDeleteMode()
+         {
+            is_delete_mode = !is_delete_mode;
+            $('#delete_button').text("Delete" + (is_delete_mode ? " ON" : ""));
+         }
+      
+         function submitOnClick()
+         {
+            if(is_delete_mode)
+            {
+               var submit_index = $(this).prop('id');
+               var delete_scout_submit_data = 
+               {
+                  team: #{teamid},
+                  index: submit_index
+               };
+               socket.emit('delete_scout_submit', delete_scout_submit_data);
+            }
+         }
+         
+         $(document).ready(function()
+         {
+            $('#delete_button').on('click', toggleDeleteMode);
+            $('body').on("click", ".submit_text", submitOnClick);
+         });
+   if teamid
+      script.
+         $(document).ready(function()
+         {
+            socket.emit('request_scout_data', #{teamid});
+         
+            socket.on('recive_scout_data', function(msg)
+            {
+               updateDiv("bluealliancedata_block", msg.value);
+            });
+         });

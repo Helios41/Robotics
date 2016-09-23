@@ -1,0 +1,31 @@
+extends ./base.jade
+include ./include/utils.jade
+
+block vars
+   - var pageTitle = "Team 4618 - Home"
+   - var navTitle = "Home"
+   - var navColor = "red"
+   - var backgroundurl = "/assets/general_background.png"
+
+block content
+   p Welcome #{name}! This is the Team 4618 Server
+   #scout.block
+      p(style="font-size: 2em; margin-top: 0px; margin-bottom: 5px;") Scouting DB
+      p Team ID: #[input(type="text", id="team_box", autocomplete="off")]
+      button(id="scout_search_button") Search
+   #schedule.block
+      p(style="font-size: 2em; margin-top: 0px; margin-bottom: 5px;") Schedule
+      each match_data in user_data.matches
+         div(style="border: white solid thin")
+            p(style="margin-top: 0; margin-bottom: 0")= "Match Number " + match_data.number
+            p(style="margin-top: 0; margin-bottom: 0")= "Red Alliance Teams are " + match_data.red_alliance[0] + ", " + match_data.red_alliance[1] + " and " + match_data.red_alliance[2]
+            p(style="margin-top: 0; margin-bottom: 0")= "Blue Alliance Teams are " + match_data.blue_alliance[0] + ", " + match_data.blue_alliance[1] + " and " + match_data.blue_alliance[2]
+            p(style="margin-top: 0; margin-bottom: 0")= "You'll be watching " + match_data.assigned_team
+            
+block script
+   mixin scoutSearchScript("scout_search_button", "team_box")
+   script.
+      $(document).ready(function()
+      {
+         
+      });

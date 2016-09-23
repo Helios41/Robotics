@@ -1,0 +1,11 @@
+{
+  "name": "4618_scout_server",
+  "version": "0.0.1",
+  "description": "Server for FRC team 4618",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "Jonathan Casella (Helios41)",
+  "license": "ISC"
+}

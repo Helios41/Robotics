@@ -1,0 +1,120 @@
+doctype html
+html(lang="en")
+   block vars
+   head
+      title= pageTitle
+      style.
+         body {
+            margin: 0;
+            background-image: url(#{backgroundurl});
+            background-size: cover;
+         }
+         p {
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 1em;
+            color: white;
+         }
+         span {
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 1em;
+            color: white;
+         }
+         button {
+            background: #{navColor};
+            border: solid white;
+            color: white;
+            font-family: "Arial", "Helvectia", sans-serif;
+            outline: solid black thin;
+         }
+         .portal_button {
+            background: none;
+            border: none;
+            color: white;
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 1em;
+            outline: none;
+         }
+         .block {
+            width: 80%;
+            background-color: #{navColor};
+            margin-left: 5%;
+            margin-top: 25px;
+            margin-bottom: 25px;
+            border: white solid thick;
+            outline: black solid thin;
+         }
+         .bar {
+            width: 100%;
+            background-color: #{navColor};
+            padding-top: 5px;
+            padding-bottom: 5px;
+            margin-top: 15px;
+         }
+         .consttextarea {
+            resize: none;
+         }
+         #home_link {
+            background: none;
+            border: none;
+            color: white;
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 2em;
+            outline: none;
+         }
+         #nav_title {
+            font-family: "Arial", "Helvectia", sans-serif;
+            font-size: 2em;
+         }
+         #nav_name {
+            margin-left: 20px;
+            text-decoration: underline;
+            font-size: 1.5em;
+         }
+         #logout_button {
+            margin-left: 25px;
+            margin-top: 5px;
+            position: absolute;
+         }
+      block style
+   body
+      #nav_bar.bar(style="padding-top: 15px; height: 50px; margin-top: 0px")
+         span(id="nav_text") #[button(id="home_link") Team 4618] - #[span(id="nav_title")= navTitle] 
+         if loggedIn
+            |#[span(id="nav_name")= username] #[button(id="logout_button") Logout]
+      if navPortals
+         #portal_bar.bar
+            each portal in navPortals
+               button(id="portal_" + portal.link, class="portal_button")= portal.name
+      block content
+      script(src="http://code.jquery.com/jquery-1.11.1.js")
+      script(src="/assets/js.cookie.js")
+      script.
+         function registerEnterKey(id)
+         {
+            var enterHookHandler = function(e)
+            {
+               if(e.keyCode == 13)
+               {
+                  $(this).trigger("enterKey");
+               }
+            }
+            
+            $('#' + id).keyup(enterHookHandler);
+         }
+      
+         $(document).ready(function()
+         {
+            #{nav_portal_events}
+         
+            $('#home_link').bind("click", function()
+            {
+               window.location.href = "/";
+            });
+            
+            $('#logout_button').bind('click', function()
+            {
+               Cookies.remove("name");
+               window.location.href = "/login";
+            });
+         });
+      block script

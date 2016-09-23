@@ -1,0 +1,25 @@
+mixin scoutSearchScript(scout_search_button, team_box)
+   script.
+      function scoutSearch()
+      {
+         var team = parseInt($('#' + "#{team_box}").val());
+            
+         if(!isNaN(team))
+         {
+            window.location.href = ("/team_entry " + team);   
+            $('#' + "#{team_box}").val('');
+         }
+         else
+         {
+            $('#' + "#{team_box}").val("Invalid Team Number!");
+         }
+      }
+      
+      $(document).ready(function()
+      {
+         registerEnterKey("#{team_box}");
+         
+         $('#' + "#{scout_search_button}").bind("click", scoutSearch);
+         $('#' + "#{team_box}").bind("enterKey", scoutSearch);
+         $('#' + "#{team_box}").bind("click", function() { $(this).val(''); });
+      });

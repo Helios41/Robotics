@@ -1,0 +1,40 @@
+extends ./base.jade
+include ./include/utils.jade
+
+block vars
+   - var pageTitle = "Team 4618 - Login"
+   - var navTitle = "Login"
+   - var navColor = "red"
+   - var backgroundurl = "/assets/general_background.png"
+      
+block content
+   p Welcome! This is the Team 4618 Server
+   #scout.block
+      p Team ID: #[input(type="text", id="team_box", autocomplete="off")]
+      button(id="scout_search_button") Search
+   #login.block
+      p
+      select(id="user_select", style="width: 268px")
+         - for(var user_index in users)
+            option(value=users[user_index])= users[user_index]
+      p
+      button(id="login_button") Login
+      
+block script
+   mixin scoutSearchScript("scout_search_button", "team_box")
+   script.
+      function tryLogin()
+      {
+         Cookies.set("name", $('#user_select').find(":selected").text());
+         window.location.href = "/home";
+      }
+      
+      $(document).ready(function()
+      {
+         registerEnterKey('username_box');
+         registerEnterKey('password_box');
+         
+         $('#login_button').bind("click", tryLogin);
+         $('#username_box').bind("enterKey", tryLogin);
+         $('#password_box').bind("enterKey", tryLogin);
+      });
