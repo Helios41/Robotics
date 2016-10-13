@@ -21,8 +21,9 @@ typedef uint32_t b32;
 #define Terabyte(BYTE) Gigabyte(BYTE) * 1024
 #define Assert(condition) if(!(condition)){*(u8 *)0 = 0;}
 #define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
-#define MIN(a, b) (((a) > (b)) ? (b) : (a))
-#define MAX(a, b) (((a) < (b)) ? (b) : (a))
+#define Min(a, b) (((a) > (b)) ? (b) : (a))
+#define Max(a, b) (((a) < (b)) ? (b) : (a))
+#define FLTMAX 3.402823e+38
 
 union v4
 {
@@ -134,6 +135,18 @@ inline rect2 RectPosSize(r32 x, r32 y, r32 width, r32 height)
    return result;
 }
 
+inline rect2 RectPosSize(v2 pos, v2 size)
+{
+   rect2 result = {};
+   
+   result.min.x = pos.x;
+   result.min.y = pos.y;
+   result.max.x = pos.x + size.x;
+   result.max.y = pos.y + size.y;
+   
+   return result;
+}
+
 inline rect2 RectMinSize(v2 min, r32 width, r32 height)
 {
    rect2 result = {};
@@ -142,6 +155,11 @@ inline rect2 RectMinSize(v2 min, r32 width, r32 height)
    result.max = min + V2(width, height);
    
    return result;
+}
+
+inline rect2 RectMinSize(v2 min, v2 size)
+{
+   return RectMinSize(min, size.x, size.y);
 }
 
 inline rect2 RectMinMax(r32 minx, r32 miny, r32 maxx, r32 maxy)
@@ -158,17 +176,28 @@ inline rect2 RectMinMax(r32 minx, r32 miny, r32 maxx, r32 maxy)
 
 inline b32 Contains(rect2 rect, v2 vec)
 {
-   b32 result = (vec.x > rect.min.x) && 
-                (vec.x < rect.max.x) &&
-                (vec.y > rect.min.y) &&
-                (vec.y < rect.max.y);
+   b32 result = (vec.x >= rect.min.x) && 
+                (vec.x <= rect.max.x) &&
+                (vec.y >= rect.min.y) &&
+                (vec.y <= rect.max.y);
                 
    return result;
 }
 
-inline v2 RectGetSize(rect2 rect)
+inline b32 IsInside(rect2 a, rect2 b)
+{
+   return Contains(b, a.min) && Contains(b, a.max);
+}
+
+inline v2 GetSize(rect2 rect)
 {
    return V2(rect.max.x - rect.min.x, rect.max.y - rect.min.y);
+}
+
+inline v2 GetCenter(rect2 rect)
+{
+   return V2(rect.min.x + GetSize(rect).x / 2,
+             rect.min.y + GetSize(rect).y / 2);
 }
 
 inline s32 RoundR32ToS32(r32 real)
@@ -212,6 +241,7 @@ struct EntireFile
 };
 
 EntireFile LoadEntireFile(const char* path);
+void SetFullscreen(b32 state);
 
 u32 StringLength(char *str)
 {

@@ -4,7 +4,7 @@
 #include <windows.h>
 
 #include "packet_definitions.h"
-#include "ui_renderer.cpp"
+#include "dashboard.cpp"
 
 enum PageType
 {
@@ -242,7 +242,7 @@ b32 GUIButton(RenderContext *context, InputState input, rect2 bounds, LoadedBitm
 	  Rectangle(context, bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
    }
    
-   v2 bounds_size = RectGetSize(bounds);
+   v2 bounds_size = GetSize(bounds);
    
    if(bounds_size.x == bounds_size.y)
    {
@@ -260,7 +260,7 @@ b32 GUIButton(RenderContext *context, InputState input, rect2 bounds, LoadedBitm
 
 b32 GUIButton(RenderContext *context, InputState input, rect2 bounds, LoadedBitmap *icon, char *text, b32 triggered)
 {
-   v2 bounds_size = RectGetSize(bounds);
+   v2 bounds_size = GetSize(bounds);
    b32 result = GUIButton(context, input, bounds, icon, text);
    
    Rectangle(context, RectPosSize(bounds.min.x, bounds.min.y, 5,
@@ -352,7 +352,7 @@ void TextBox(RenderContext *context, InputState input, rect2 bounds, char *text_
 		}
 	}
 
-	v2 bounds_size = RectGetSize(bounds);
+	v2 bounds_size = GetSize(bounds);
 	if (GUIButton(context, input, bounds, NULL, text_buffer))
 	{
 		*active = !(*active);
@@ -732,6 +732,31 @@ b32 HandleNetwork(SOCKET socket_id, AutoBuilderState *auto_builder_state, RobotS
 	return connected;
 }
 
+void SetFullscreen(b32 state)
+{
+   //TODO: fix this
+   /*
+   if(state)
+   {
+      DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
+      DWORD dwRemove = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME;
+      DWORD dwNewStyle = dwStyle & ~dwRemove;
+      
+      SetWindowLong(window, GWL_STYLE, dwNewStyle);
+      SetWindowPos(window, NULL, 0, 0, 0, 0,
+                   SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                 
+      SetWindowPos(window, NULL, 0, 0, 
+                   GetDeviceCaps(device_context, HORZRES), window_size.y, SWP_FRAMECHANGED);
+   }
+   else
+   {
+      SetWindowLong(window, GWL_STYLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE);
+      SetWindowPos(window, NULL, 0, 0, window_size.x, window_size.y, SWP_FRAMECHANGED);
+   }
+   */
+}
+
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
    WNDCLASSEX window_class = {};
@@ -769,11 +794,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    HGLRC gl_context = wglCreateContext(device_context);
    wglMakeCurrent(device_context, gl_context);
    
-   LoadedBitmap logo = LoadImage("logo.bmp");
-   LoadedBitmap home = LoadImage("home.bmp");
-   LoadedBitmap gear = LoadImage("gear.bmp");
-   LoadedBitmap eraser = LoadImage("eraser.bmp");
-   LoadedBitmap competition = LoadImage("competition.bmp");
+   UIAssets ui_assets = {};
+   ui_assets.logo = LoadImage("logo.bmp");
+   ui_assets.home = LoadImage("home.bmp");
+   ui_assets.gear = LoadImage("gear.bmp");
+   ui_assets.eraser = LoadImage("eraser.bmp");
+   ui_assets.competition = LoadImage("competition.bmp");
    
    InputState input = {};
    b32 fullscreen = false;
@@ -810,6 +836,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    RobotState robot_state = {};
    ConsoleState console_state = {};
+   
+   UIContext ui_context = {};
+   ui_context.render_context = &context;
+   ui_context.assets = &ui_assets;
    
    connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
    GetCounter(&last_timer, timer_freq);
@@ -886,22 +916,36 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       GetClientRect(window, &client_rect);
       v2 window_size = V2(client_rect.right, client_rect.bottom);
       
+      ui_context.window_size = window_size;
+      ui_context.input_state = input;
+      
+      DrawDashboardUI(&ui_context);
+      
+      /*
       //NOTE: background & icon
       Rectangle(&context, RectPosSize(0, 0, window_size.x, window_size.y), V4(1.0f, 1.0f, 1.0f, 1.0f));
       Bitmap(&context, &logo, V2((window_size.x / 2) - (logo.width / 2), (window_size.y / 2) - (logo.height / 2)));
       
+      layout root_layout = Layout(V2(0, 0));
+      layout top_bar_layout = Section(&root_layout);
+      
       //NOTE: top bar
-      Rectangle(&context, RectPosSize(0, 0, window_size.x, 15), V4(1.0f, 0.0f, 0.0f, 1.0f));
+      Rectangle(&context, Element(&top_bar_layout, V2(window_size.x, 15)), V4(1.0f, 0.0f, 0.0f, 1.0f));
+      //TODO: make this an element 
       Rectangle(&context, RectPosSize(10, 3, 10, 10), connected ? V4(1.0f, 1.0f, 1.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f));
       
-      layout ui_layout = Layout(V2(0, 15), true);
+      NextLine(&root_layout);
+      */
       
-      if(Button(&context, input, Element(&ui_layout, V2(40, 40), V2(5, 5)), &home, NULL))
+      layout sidebar_layout = Layout(RectPosSize(0, 0, 0, 0), NULL);
+      
+      /*
+      if(GUIButton(&context, input, Element(&sidebar_layout, V2(40, 40), V2(5, 5)), &home, NULL, (page == PageType_Home)))
       {
          page = PageType_Home;
       }
       
-      if(Button(&context, input, Element(&ui_layout, V2(40, 40), V2(5, 5)), &gear, NULL/*, fullscreen*/))
+      if(GUIButton(&context, input, Element(&sidebar_layout, V2(40, 40), V2(5, 5)), &gear, NULL, fullscreen))
       {
          fullscreen = !fullscreen;
          
@@ -925,37 +969,25 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          }
       }
       
-      layout side_buttons = Layout(V2(0, ui_layout.max.y), false);
-      
-      if(Button(&context, input, Element(&side_buttons, V2(120, 40)), NULL, "Autonomous Builder"))
-      {
-         page = PageType_Auto;
-      }
-      
-      if(Button(&context, input, Element(&side_buttons, V2(120, 40)), NULL, "Robot"))
-      {
-         page = PageType_Robot;
-      }
-      
-      if(GUIButton(&context, input, Element(&side_buttons, V2(120, 40)), NULL, "Console"))
-      {
-		  page = PageType_Console;
-      }
+      NextLine(&sidebar_layout);
+      */
       
       /*
-      if(GUIButton(&context, input, RectPosSize(10, 20, 40, 40), &home, NULL, (page == PageType_Home)))
-      {
-         page = PageType_Home;
-      }
-      else if(GUIButton(&context, input, RectPosSize(10, 70, 120, 40), NULL, "Autonomous Builder", (page == PageType_Auto)))
+      if(GUIButton(&context, input, Element(&sidebar_layout, V2(120, 40), V2(5, 5)), NULL, "Autonomous Builder", (page == PageType_Auto)))
       {
          page = PageType_Auto;
       }
-      else if(GUIButton(&context, input, RectPosSize(10, 120, 120, 40), NULL, "Robot", (page == PageType_Robot)))
+      
+      NextLine(&sidebar_layout);
+      
+      if(GUIButton(&context, input, Element(&sidebar_layout, V2(120, 40), V2(5, 5)), NULL, "Robot", (page == PageType_Robot)))
       {
          page = PageType_Robot;
       }
-      else if(GUIButton(&context, input, RectPosSize(10, 170, 120, 40), NULL, "Console", (page == PageType_Console)))
+      
+      NextLine(&sidebar_layout);
+      
+      if(GUIButton(&context, input, Element(&sidebar_layout, V2(120, 40), V2(5, 5)), NULL, "Console", (page == PageType_Console)))
       {
 		  page = PageType_Console;
       }
@@ -963,27 +995,40 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       
       if(page == PageType_Home)
       {
+         /*
+         layout page_layout = Layout(RectPosSize(sidebar_layout.bounds.max.x, sidebar_layout.bounds.min.y, 0, 0), NULL);
+         
+         Rectangle(&context, Element(&page_layout, V2(800, 85), V2(5, 5)), V4(0.5f, 0.0f, 0.0f, 0.5f));
+         Text(&context, V2(600, 40), "CN Robotics", 40);
+         
+         NextLine(&page_layout);
+         Rectangle(&context, Element(&page_layout, V2(400, 255), V2(5, 5)), V4(0.5f, 0.0f, 0.0f, 0.5f));
+         */
+         
+         /*
          Rectangle(&context, RectPosSize(280, 20, 800, 85), V4(0.5f, 0.0f, 0.0f, 0.5f));
          Text(&context, V2(600, 40), "CN Robotics", 40);
          
          Rectangle(&context, RectPosSize(160, 110, 400, 255), V4(0.5f, 0.0f, 0.0f, 0.5f));
+         */
          
+         /*
          if(connected)
          {
-			char text_buffer[512];
+            char text_buffer[512];
 
-			if(robot_state.connected)
-			{	
-				Text(&context, V2(180, 130),
-					ConcatStrings("Connected To ", robot_state.name, text_buffer),
-					20);
-			}
-			else
-			{
-				Text(&context, V2(180, 130),
-					ConcatStrings("Connected To ", SERVER_ADDR, text_buffer),
-					20);
-			}
+            if(robot_state.connected)
+            {	
+               Text(&context, V2(180, 130),
+                  ConcatStrings("Connected To ", robot_state.name, text_buffer),
+                  20);
+            }
+            else
+            {
+               Text(&context, V2(180, 130),
+                  ConcatStrings("Connected To ", SERVER_ADDR, text_buffer),
+                  20);
+            }
          }
          else
          {
@@ -1002,6 +1047,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
             
             connected = (connect(server_socket, (struct sockaddr *)&server, sizeof(server)) == 0);
          }
+         */
       }
       else if(page == PageType_Auto)
       {
