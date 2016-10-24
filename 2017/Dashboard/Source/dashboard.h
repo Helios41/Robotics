@@ -25,6 +25,17 @@ typedef uint32_t b32;
 #define Max(a, b) (((a) < (b)) ? (b) : (a))
 #define FLTMAX 3.402823e+38
 
+/**
+TODO:
+	-camera
+	-connect over field
+	-autonomous recording times
+	-vision tracking
+   -opengl 3 & shaders
+   -animations for ui
+   -
+*/
+
 union v4
 {
    struct
@@ -123,28 +134,19 @@ struct rect2
    v2 max;
 };
 
-inline rect2 RectPosSize(r32 x, r32 y, r32 width, r32 height)
-{
-   rect2 result = {};
-   
-   result.min.x = x;
-   result.min.y = y;
-   result.max.x = x + width;
-   result.max.y = y + height;
-   
-   return result;
-}
-
 inline rect2 RectPosSize(v2 pos, v2 size)
 {
    rect2 result = {};
    
-   result.min.x = pos.x;
-   result.min.y = pos.y;
-   result.max.x = pos.x + size.x;
-   result.max.y = pos.y + size.y;
+   result.min = pos - size * 0.5f;
+   result.max = pos + size * 0.5f;
    
    return result;
+}
+
+inline rect2 RectPosSize(r32 x, r32 y, r32 width, r32 height)
+{
+   return RectPosSize(V2(x, y), V2(width, height));
 }
 
 inline rect2 RectMinSize(v2 min, r32 width, r32 height)
@@ -174,12 +176,29 @@ inline rect2 RectMinMax(r32 minx, r32 miny, r32 maxx, r32 maxy)
    return result;
 }
 
+inline b32 Equal(r32 a, r32 b)
+{
+   r32 difference = (a - b);
+   difference = (difference < 0) ? -difference : difference;
+   return difference < 0.1f;
+}
+
+inline b32 GreaterOrEqual(r32 a, r32 b)
+{
+   return (a > b) || Equal(a, b);
+}
+
+inline b32 LessOrEqual(r32 a, r32 b)
+{
+   return (a < b) || Equal(a, b);
+}
+
 inline b32 Contains(rect2 rect, v2 vec)
 {
-   b32 result = (vec.x >= rect.min.x) && 
-                (vec.x <= rect.max.x) &&
-                (vec.y >= rect.min.y) &&
-                (vec.y <= rect.max.y);
+   b32 result = GreaterOrEqual(vec.x, rect.min.x) && 
+                LessOrEqual(vec.x, rect.max.x) &&
+                GreaterOrEqual(vec.y, rect.min.y) &&
+                LessOrEqual(vec.y, rect.max.y);
                 
    return result;
 }
@@ -245,6 +264,8 @@ void SetFullscreen(b32 state);
 
 u32 StringLength(char *str)
 {
+   if(!str) return 0;
+   
    u32 len = 0;
    while(*str)
    {
@@ -289,6 +310,115 @@ void StringCopy(char *src, char *dest)
 		src++;
 	}
 	*dest = '\0';
+}
+
+struct string
+{
+   char *text;
+   u32 length;
+};
+
+string Literal(char *text)
+{
+   string result = {text, StringLength(text)};
+   return result;
+}
+
+string String(char *text, u32 length)
+{
+   string result = {text, length};
+   return result;
+}
+
+b32 IsEmpty(string text)
+{
+   return (text.length == 0) || (text.text == NULL);
+}
+
+string EmptyString()
+{
+   string result = {NULL, 0};
+   return result;
+}
+
+//TODO: make this more robust
+string *Split(string input, char split_char, u32 *array_length)
+{
+   *array_length = 1;
+   
+   for(u32 i = 0;
+       i < input.length;
+       i++)
+   {
+      if(input.text[i] == split_char)
+         (*array_length)++;
+   }
+   
+   string *result = (string *) malloc(sizeof(string) * (*array_length));
+   
+   u32 index = 0;
+   for(u32 i = 0;
+       i < input.length;
+       i++)
+   {
+      if(input.text[i] == split_char)
+      {
+         if(index == 0)
+         {
+            result[index] = String(input.text, i);
+         }
+         else
+         {
+            string last_segment = result[index - 1];
+            result[index] = String(last_segment.text + last_segment.length + 1, i - (last_segment.length + 1));
+         }
+         
+         index++;
+      }
+   }
+   
+   string last_segment = result[index - 1];
+   result[index] = String(last_segment.text + last_segment.length + 1, (u32)((input.text + input.length - 1) - (last_segment.text + last_segment.length)));
+   
+   return result;
+}
+
+string Concat(string *strings, u32 count, char concat_char)
+{
+   u32 result_size = count - 1;
+   
+   for(u32 i = 0;
+       i < count;
+       i++)
+   {
+      result_size += strings[i].length;
+   }
+   
+   string result = String((char *) malloc(result_size * sizeof(char)), result_size);
+   
+   u32 index = 0;
+   for(u32 i = 0;
+       i < count;
+       i++)
+   {
+      string *curr_string = strings + i;
+      
+      for(u32 c = 0;
+          c < curr_string->length;
+          c++)
+      {
+         result.text[index] = curr_string->text[c];
+         index++;
+      }
+      
+      if(i != (count - 1))
+      {
+         result.text[index] = concat_char;
+         index++;
+      }
+   }
+   
+   return result;
 }
 
 char *ConcatStrings(char *str1, char *str2, char *str)

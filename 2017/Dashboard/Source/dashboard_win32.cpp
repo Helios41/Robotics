@@ -178,14 +178,6 @@ struct AutoFileHeader
 //#define SERVER_ADDR "169.254.71.73"
 #define SERVER_PORT 8089
 
-/**
-TODO:
-	-camera
-	-connect over field
-	-autonomous recording times
-	-vision tracking
-*/
-
 LRESULT CALLBACK WindowMessageEvent(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {	
 	switch(message)
@@ -247,12 +239,12 @@ b32 GUIButton(RenderContext *context, InputState input, rect2 bounds, LoadedBitm
    if(bounds_size.x == bounds_size.y)
    {
 	  Bitmap(context, icon, bounds.min);
-      Text(context,V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
+      //Text(context,V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
    }
    else
    {
 	  Bitmap(context, icon, V2(bounds.min.x + 5, bounds.min.y));
-      Text(context, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
+      //Text(context, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
    }
    
    return hot && (input.left_up || input.right_up);
@@ -284,7 +276,7 @@ b32 AutoBuilderBlock(RenderContext *context, AutoBlock block, v2 pos, InputState
    }
    
    Rectangle(context, RectPosSize(pos.x, pos.y, 100, 20), V4(0.5f, 0.0f, 0.0f, 1.0f));
-   Text(context, V2(pos.x, pos.y), block.name, 20);
+   //Text(context, V2(pos.x, pos.y), block.name, 20);
    
    return hot && (input.left_up || input.right_up);
 }
@@ -758,7 +750,7 @@ void SetFullscreen(b32 state)
 }
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
-{
+{  
    WNDCLASSEX window_class = {};
    
    window_class.cbSize = sizeof(window_class);
@@ -766,7 +758,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    window_class.lpfnWndProc = WindowMessageEvent;
    window_class.hInstance = hInstance;
    window_class.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-   window_class.hCursor = LoadCursor(NULL, IDC_CROSS);
+   window_class.hCursor = LoadCursor(NULL, IDC_ARROW);
    window_class.lpszClassName = "WindowClass";
    
    RegisterClassExA(&window_class);
@@ -840,6 +832,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    UIContext ui_context = {};
    ui_context.render_context = &context;
    ui_context.assets = &ui_assets;
+   
+   DashboardState dashstate = {};
    
    connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
    GetCounter(&last_timer, timer_freq);
@@ -919,141 +913,20 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       ui_context.window_size = window_size;
       ui_context.input_state = input;
       
-      DrawDashboardUI(&ui_context);
+      //ui_context.hot_element = NULL_UI_ID;
+      //ui_context.active_element = NULL_UI_ID;
       
-      /*
-      //NOTE: background & icon
-      Rectangle(&context, RectPosSize(0, 0, window_size.x, window_size.y), V4(1.0f, 1.0f, 1.0f, 1.0f));
-      Bitmap(&context, &logo, V2((window_size.x / 2) - (logo.width / 2), (window_size.y / 2) - (logo.height / 2)));
-      
-      layout root_layout = Layout(V2(0, 0));
-      layout top_bar_layout = Section(&root_layout);
-      
-      //NOTE: top bar
-      Rectangle(&context, Element(&top_bar_layout, V2(window_size.x, 15)), V4(1.0f, 0.0f, 0.0f, 1.0f));
-      //TODO: make this an element 
-      Rectangle(&context, RectPosSize(10, 3, 10, 10), connected ? V4(1.0f, 1.0f, 1.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f));
-      
-      NextLine(&root_layout);
-      */
-      
-      layout sidebar_layout = Layout(RectPosSize(0, 0, 0, 0), NULL);
-      
-      /*
-      if(GUIButton(&context, input, Element(&sidebar_layout, V2(40, 40), V2(5, 5)), &home, NULL, (page == PageType_Home)))
-      {
-         page = PageType_Home;
-      }
-      
-      if(GUIButton(&context, input, Element(&sidebar_layout, V2(40, 40), V2(5, 5)), &gear, NULL, fullscreen))
-      {
-         fullscreen = !fullscreen;
-         
-         if(fullscreen)
-         {
-            DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
-            DWORD dwRemove = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_THICKFRAME;
-            DWORD dwNewStyle = dwStyle & ~dwRemove;
-            
-            SetWindowLong(window, GWL_STYLE, dwNewStyle);
-            SetWindowPos(window, NULL, 0, 0, 0, 0,
-                         SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-                       
-            SetWindowPos(window, NULL, 0, 0, 
-                         GetDeviceCaps(device_context, HORZRES), window_size.y, SWP_FRAMECHANGED);
-         }
-         else
-         {
-            SetWindowLong(window, GWL_STYLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE);
-            SetWindowPos(window, NULL, 0, 0, window_size.x, window_size.y, SWP_FRAMECHANGED);
-         }
-      }
-      
-      NextLine(&sidebar_layout);
-      */
-      
-      /*
-      if(GUIButton(&context, input, Element(&sidebar_layout, V2(120, 40), V2(5, 5)), NULL, "Autonomous Builder", (page == PageType_Auto)))
-      {
-         page = PageType_Auto;
-      }
-      
-      NextLine(&sidebar_layout);
-      
-      if(GUIButton(&context, input, Element(&sidebar_layout, V2(120, 40), V2(5, 5)), NULL, "Robot", (page == PageType_Robot)))
-      {
-         page = PageType_Robot;
-      }
-      
-      NextLine(&sidebar_layout);
-      
-      if(GUIButton(&context, input, Element(&sidebar_layout, V2(120, 40), V2(5, 5)), NULL, "Console", (page == PageType_Console)))
-      {
-		  page = PageType_Console;
-      }
-      */
+      DrawDashboardUI(&ui_context, &dashstate);
       
       if(page == PageType_Home)
       {
-         /*
-         layout page_layout = Layout(RectPosSize(sidebar_layout.bounds.max.x, sidebar_layout.bounds.min.y, 0, 0), NULL);
          
-         Rectangle(&context, Element(&page_layout, V2(800, 85), V2(5, 5)), V4(0.5f, 0.0f, 0.0f, 0.5f));
-         Text(&context, V2(600, 40), "CN Robotics", 40);
-         
-         NextLine(&page_layout);
-         Rectangle(&context, Element(&page_layout, V2(400, 255), V2(5, 5)), V4(0.5f, 0.0f, 0.0f, 0.5f));
-         */
-         
-         /*
-         Rectangle(&context, RectPosSize(280, 20, 800, 85), V4(0.5f, 0.0f, 0.0f, 0.5f));
-         Text(&context, V2(600, 40), "CN Robotics", 40);
-         
-         Rectangle(&context, RectPosSize(160, 110, 400, 255), V4(0.5f, 0.0f, 0.0f, 0.5f));
-         */
-         
-         /*
-         if(connected)
-         {
-            char text_buffer[512];
-
-            if(robot_state.connected)
-            {	
-               Text(&context, V2(180, 130),
-                  ConcatStrings("Connected To ", robot_state.name, text_buffer),
-                  20);
-            }
-            else
-            {
-               Text(&context, V2(180, 130),
-                  ConcatStrings("Connected To ", SERVER_ADDR, text_buffer),
-                  20);
-            }
-         }
-         else
-         {
-            Text(&context, V2(180, 130), "Not Connected", 20);
-         }
-         
-         if(GUIButton(&context, input, RectPosSize(180, 180, 100, 40), NULL, "Reconnect"))
-         {
-            shutdown(server_socket, SD_BOTH);
-            closesocket(server_socket);
-            server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-            
-            server.sin_family = AF_INET;
-            server.sin_addr.s_addr = inet_addr(SERVER_ADDR);
-            server.sin_port = htons(SERVER_PORT);
-            
-            connected = (connect(server_socket, (struct sockaddr *)&server, sizeof(server)) == 0);
-         }
-         */
       }
       else if(page == PageType_Auto)
       {
          rect2 sandbox_bounds = RectPosSize(280, 20, 800, 675);
          Rectangle(&context, sandbox_bounds, V4(0.5f, 0.0f, 0.0f, 0.5f));
-		 r32 total_time = 0.0f;
+         r32 total_time = 0.0f;
 
          for(u32 i = 0; i < auto_builder_state.auto_block_count; i++)
          {
@@ -1092,7 +965,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          }
 
 		 Rectangle(&context, RectPosSize(240, 20, 20, 20), (robot_state.has_autonomous ? V4(0.0f, 1.0f, 0.0f, 1.0f) : V4(1.0f, 0.0f, 0.0f, 1.0f)));
-		 Text(&context, V2(280, 30), robot_state.robot_auto_name, 20);
+		 //Text(&context, V2(280, 30), robot_state.robot_auto_name, 20);
 
 		 char total_time_buffer[32];
 		 GUIButton(&context, input, RectPosSize(160, 20, 70, 20), NULL, R32ToString(total_time, total_time_buffer));
@@ -1253,16 +1126,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          {
             rect2 block_info_bounds = RectPosSize(1100, 140, 200, 200);
             Rectangle(&context, RectPosSize(1100, 140, 200, 250), V4(0.5f, 0.0f, 0.0f, 0.5f));
-            Text(&context, V2(1120, 160), auto_builder_state.selected_block->name, 20);
+            //Text(&context, V2(1120, 160), auto_builder_state.selected_block->name, 20);
             
             if(auto_builder_state.selected_block->type == AutoBlockType_Motor)
             {
                char number_buffer[10];
                char string_buffer[30];
                
+               /*
                Text(&context, V2(1120, 180),
                         ConcatStrings("Value: ", R32ToString(auto_builder_state.selected_block->motor.value, number_buffer), string_buffer),
                         20);
+               */
                
 			   TextBox(&context, input, RectPosSize(1120, 205, 100, 20), auto_builder_state.text_box1_buffer,
 				       ArrayCount(auto_builder_state.text_box1_buffer), &auto_builder_state.text_box1_selected);
@@ -1281,9 +1156,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				   auto_builder_state.selected_block->motor.value = -1.0f;
 			   }
 
+               /*
                Text(&context, V2(1120, 240),
                         ConcatStrings("Time: ", R32ToString(auto_builder_state.selected_block->motor.time, number_buffer), string_buffer),
                         20);
+               */
                
 			   TextBox(&context, input, RectPosSize(1120, 265, 100, 20), auto_builder_state.text_box2_buffer,
 					   ArrayCount(auto_builder_state.text_box2_buffer), &auto_builder_state.text_box2_selected);
@@ -1320,10 +1197,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				char number_buffer[10];
 				char string_buffer[30];
 
+            /*
 				Text(&context, V2(1120, 180),
 					ConcatStrings("Forward: ", R32ToString(auto_builder_state.selected_block->drive.forward_value, number_buffer), string_buffer),
 					20);
-
+            */
+            
 				TextBox(&context, input, RectPosSize(1120, 205, 100, 20), auto_builder_state.text_box1_buffer,
 					ArrayCount(auto_builder_state.text_box1_buffer), &auto_builder_state.text_box1_selected);
 
@@ -1341,9 +1220,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					auto_builder_state.selected_block->drive.forward_value = -1.0f;
 				}
 
+            /*
 				Text(&context, V2(1120, 240),
 					ConcatStrings("Rotate: ", R32ToString(auto_builder_state.selected_block->drive.rotate_value, number_buffer), string_buffer),
 					20);
+            */
 
 				TextBox(&context, input, RectPosSize(1120, 265, 100, 20), auto_builder_state.text_box2_buffer,
 					ArrayCount(auto_builder_state.text_box2_buffer), &auto_builder_state.text_box2_selected);
@@ -1362,9 +1243,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					auto_builder_state.selected_block->drive.rotate_value = -1.0f;
 				}
 
+            /*
 				Text(&context, V2(1120, 320),
 					ConcatStrings("Time: ", R32ToString(auto_builder_state.selected_block->drive.time, number_buffer), string_buffer),
 					20);
+            */
 
 				TextBox(&context, input, RectPosSize(1120, 345, 100, 20), auto_builder_state.text_box3_buffer,
 					ArrayCount(auto_builder_state.text_box3_buffer), &auto_builder_state.text_box3_selected);
@@ -1484,7 +1367,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          if(robot_state.selected_hardware)
          {
 			Rectangle(&context, RectPosSize(900, 20, 450, 400), V4(0.5f, 0.0f, 0.0f, 0.5f));
-			Text(&context, V2(920, 40), robot_state.selected_hardware->name, 20);
+			//Text(&context, V2(920, 40), robot_state.selected_hardware->name, 20);
 
             if(robot_state.selected_hardware->type == HardwareType_MotorController)
             {
@@ -1560,7 +1443,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 				  char message_buffer[128];
 				  ConcatStrings("[", message_type_string, "]:", console_state.messages[i].message, message_buffer);
-				  Text(&context, V2(300, 40 + (i * 25)), message_buffer, 22);
+				  //Text(&context, V2(300, 40 + (i * 25)), message_buffer, 22);
 			  }
 		  }
 	  }

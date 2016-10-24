@@ -229,6 +229,7 @@ DrawRectangleOutlineCommand *RectangleOutline(RenderContext *context, rect2 area
    return NULL;
 }
 
+//TODO: shader support (eg. guassian blured tiles), Opengl 3 & a layer based sort (radix sort)
 void RenderUI(RenderContext *context, v2 window_size)
 {
 	r32 window_width = window_size.x;
@@ -246,9 +247,13 @@ void RenderUI(RenderContext *context, v2 window_size)
 	glLoadIdentity();
 	glOrtho(0.0f, window_width, window_height, 0.0f, -10.0f, 10.0f);
 
+   //TODO: radix sort 
+   
 	RenderCommandHeader *render_command = (RenderCommandHeader *) context->render_commands;
 	while((u8 *)render_command != context->render_commands_at)
 	{  
+      //TODO: setup glScissor region
+
 		switch (render_command->type)
 		{
 			case RenderCommandType_DrawRectangle:
@@ -270,7 +275,7 @@ void RenderUI(RenderContext *context, v2 window_size)
 			case RenderCommandType_DrawBitmap:
 			{
 				DrawBitmapCommand *draw_bitmap = (DrawBitmapCommand *) render_command;
-				rect2 area = RectPosSize(draw_bitmap->pos.x, draw_bitmap->pos.y, draw_bitmap->bitmap->width, draw_bitmap->bitmap->height);
+				rect2 area = RectMinSize(draw_bitmap->pos, V2(draw_bitmap->bitmap->width, draw_bitmap->bitmap->height));
 
 				glBindTexture(GL_TEXTURE_2D, draw_bitmap->bitmap->gl_texture);
 
@@ -360,24 +365,82 @@ struct UIAssets
    LoadedBitmap competition;
 };
 
-//TODO: remove this, just revert to a root_layout
+struct ui_id
+{
+   u64 a;
+   u64 b;
+};
+
+b32 operator== (ui_id a, ui_id b)
+{
+   return (a.a == b.a) && (a.b == b.b);
+}
+
+ui_id UIID(u64 a, u64 b)
+{
+   ui_id result = {a, b};
+   return result;
+}
+
+#define GEN_UI_ID UIID((u64) __FILE__, (u64) __LINE__)
+#define POINTER_UI_ID(pointer) UIID((u64) pointer, (u64) __LINE__)
+#define NULL_UI_ID UIID((u64) 0, (u64) 0)
+
 struct UIContext
 {
    v2 window_size;
    
-   r32 top_bar_height;
-   r32 left_bar_width;
-   r32 right_bar_width;
+   ui_id hot_element;
+   ui_id active_element;
+   //ui_interaction curr_interaction;
    
    RenderContext *render_context;
    InputState input_state;
    UIAssets *assets;
 };
 
+b32 ClickInteraction(UIContext *context, ui_id id, b32 trigger_cond, b32 active_cond, b32 hot_cond)
+{
+   b32 result = false;
+   
+   if(context->active_element == id)
+   {
+      if(trigger_cond)
+      {
+         if(context->hot_element == id)
+         {
+            result = true;
+         }
+         
+         context->active_element = NULL_UI_ID;
+      }
+   }
+   
+   if(context->hot_element == id)
+   {
+      if(active_cond)
+      {
+         context->active_element = id;
+      }
+      
+      if(!hot_cond)
+         context->hot_element = NULL_UI_ID;
+   }
+
+   if(((context->active_element == NULL_UI_ID) || (context->active_element == id)) && hot_cond) 
+      context->hot_element = id;
+   
+   return result;
+}
+
 struct layout
 {
+   u32 ui_layer;
+   u32 stack_layer;
+   
    UIContext *context;
    rect2 bounds; 
+   //v2 offset; //NOTE: for use in scroll bars
    v2 at;
    
    r32 row_effective_height; // = size.y + topleft_margin.y, accumulate the max, not just the latest element
@@ -392,113 +455,22 @@ struct layout
    b32 new_line_issued;
 };
 
-layout Layout(rect2 bounds, UIContext *context)
+layout Layout(rect2 bounds, UIContext *context, u32 stack_layer)
 {
    layout result = {};
    
    result.context = context;
    result.bounds = bounds;
    result.at = bounds.min;
+   result.ui_layer = 0;
+   result.stack_layer = stack_layer;
    
    return result;
 }
-
-//TODO: remove these
-layout TopBar(UIContext *context, r32 height)
-{
-   layout result = Layout(RectMinMax(0, 0, context->window_size.x, height), context);
-   context->top_bar_height = height;
-   return result;
-}
-
-layout LeftBar(UIContext *context, r32 width)
-{
-   layout result = Layout(RectMinMax(0, context->top_bar_height,
-                                     width, context->window_size.y),
-                                     context);
-   context->left_bar_width = width;
-   return result;
-}
-
-layout RightBar(UIContext *context, r32 width)
-{
-   layout result = Layout(RectMinMax(context->window_size.x - width, context->top_bar_height,
-                                     context->window_size.x, context->window_size.y),
-                                     context);
-   context->right_bar_width = width;
-   return result;
-}
-
-layout CenterArea(UIContext *context)
-{
-   layout result = Layout(RectMinMax(context->left_bar_width, context->top_bar_height,
-                                     context->window_size.x - context->right_bar_width, context->window_size.y),
-                                     context);
-   return result;
-}
-//end remove
 
 v2 v2Max(v2 a, v2 b)
 {
    return V2(Max(a.x, b.x), Max(a.y, b.y));
-}
-
-//TODO: non uniform margins, one side bigger than the other
-//TODO: minimum clamps, not just maximum
-struct element_size
-{
-   v2 clamp; 
-   v2 percent;
-};
-
-element_size ElementSizePixel(v2 pixel_size)
-{
-   element_size result = {};
-   result.percent = V2(1.0f, 1.0f);
-   result.clamp = pixel_size;
-   return result;
-}
-
-element_size ElementSizePercent(v2 percent_size)
-{
-   element_size result = {};
-   result.percent = percent_size / 100.0f;
-   result.clamp = V2(FLTMAX, FLTMAX);
-   return result;
-}
-
-element_size ElementSize(v2 percent_size, v2 pixel_clamp)
-{
-   element_size result = {};
-   result.percent = percent_size / 100.0f;
-   result.clamp = pixel_clamp;
-   return result;
-}
-
-v2 ToSize(v2 layout_size, element_size spec)
-{
-   v2 size = V2(layout_size.x * spec.percent.x, layout_size.y * spec.percent.y);
-   size = V2((size.x > spec.clamp.x) ? spec.clamp.x : size.x,
-             (size.y > spec.clamp.y) ? spec.clamp.y : size.y);
-   return size;
-}
-
-struct element_definition
-{
-   element_size element_spec;
-   element_size padding_spec;
-   element_size margin_spec;
-};
-
-element_definition ElementDefPixel(v2 margin, v2 padding, v2 element)
-{
-   element_definition result = {};
-   
-   result.margin_spec = ElementSizePixel((margin * 2.0f) + (padding * 2.0f) + element);
-   result.padding_spec = ElementSizePixel((padding * 2.0f) + element);
-   result.element_spec = ElementSizePixel(element);
-   
-   return result;
 }
 
 void NextLine(layout *ui_layout)
@@ -513,171 +485,270 @@ void NextLine(layout *ui_layout)
    ui_layout->abs_row_bottom_margin = 0.0f;
 }
 
-//TODO: scroll bars for layouts that are too big (vertical scroll bars only!!!)
-rect2 Element(layout *ui_layout, element_size element_spec, element_size padding_spec, element_size margin_spec)
-{  
-   b32 is_first_element = !ui_layout->has_elements;
-   
-   rect2 margin_bounds = RectMinSize(ui_layout->at, ToSize(GetSize(ui_layout->bounds), margin_spec));
-   v2 padding_size = ToSize(GetSize(margin_bounds), padding_spec);
-   rect2 padding_bounds = RectMinSize(margin_bounds.min + (GetSize(margin_bounds) - padding_size) * 0.5f, padding_size);
-   v2 element_size = ToSize(GetSize(padding_bounds), element_spec);
-   rect2 element_bounds = RectMinSize(padding_bounds.min + (padding_size - element_size) * 0.5f, element_size);
-   
-   v2 margin = (GetSize(margin_bounds) - padding_size) / 2.0f;
-   v2 padding_offset = V2(margin.x, Max(margin.y, ui_layout->last_row_bottom_margin));
-   
-   if(!is_first_element && !ui_layout->new_line_issued)
-   {
-      padding_offset.x = Max(margin.x, ui_layout->last_element_right_margin);
-   }
-   
-   v2 padding_min = ui_layout->at + padding_offset;
-   rect2 padding_rect = RectMinSize(padding_min, padding_size.x, padding_size.y);
-   
-   if((padding_size.x > GetSize(ui_layout->bounds).x) ||
-      (padding_size.y > GetSize(ui_layout->bounds).y))
-   {
-      Assert(false);
-      //TODO: do something
-      
-      //NOTE: this could break if the element is just too big to possibly fit
-      //      we should check for that case & do something about it, like 
-      //      maybe shrink the element
-   }
-   
-   if(IsInside(padding_rect, ui_layout->bounds))
-   {
-      ui_layout->at = ui_layout->at + V2(padding_offset.x, 0) + V2(padding_size.x, 0);
-      ui_layout->new_line_issued = false;
-      ui_layout->has_elements = true;
-      
-      ui_layout->last_element_right_margin = margin.x;
-      ui_layout->row_effective_height = Max(padding_offset.y + padding_size.y, ui_layout->row_effective_height);
-      ui_layout->abs_row_bottom_margin = Max(padding_offset.y + padding_size.y + margin.x, ui_layout->abs_row_bottom_margin);
-      
-      return RectMinSize(padding_rect.min + (padding_size - element_size) * 0.5f, element_size);
-   }
-   else
-   {
-      NextLine(ui_layout);
-      return Element(ui_layout, element_spec, padding_spec, margin_spec);
-   }
-}
-
-layout Panel(layout *parent_layout, element_size element_spec, element_size padding_spec, element_size margin_spec)
+struct get_padding_rect_result
 {
-   rect2 bounds = Element(parent_layout, element_spec, padding_spec, margin_spec);
-   layout result = Layout(bounds, parent_layout->context);
+   rect2 padding_rect;
+   v2 padding_offset;
+};
+
+get_padding_rect_result GetPaddingRect(layout ui_layout, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   b32 is_first_element = !ui_layout.has_elements;
+   rect2 margin_bounds = RectMinSize(ui_layout.at, (margin_size * 2.0f) + (padding_size * 2.0f) + element_size);
+   v2 padding_offset = V2(margin_size.x, Max(margin_size.y, ui_layout.last_row_bottom_margin));
+   
+   if(!is_first_element && !ui_layout.new_line_issued)
+   {
+      padding_offset.x = Max(margin_size.x, ui_layout.last_element_right_margin);
+   }
+   
+   v2 padding_min = ui_layout.at + padding_offset;
+   rect2 padding_rect = RectMinSize(padding_min, padding_size.x * 2.0f + element_size.x,
+                                                 padding_size.y * 2.0f + element_size.y);
+   
+   get_padding_rect_result result = {};
+   result.padding_rect = padding_rect;
+   result.padding_offset = padding_offset;
    return result;
 }
 
-void Text(RenderContext *context, v2 pos, char *text, u32 scale)
+struct element
 {
-	if (!text) return;
+   rect2 bounds;
+   b32 fit;
+};
+
+element Element(layout *ui_layout, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   get_padding_rect_result padding_rect_result = GetPaddingRect(*ui_layout, element_size, padding_size, margin_size);
+   
+   v2 padding_offset = padding_rect_result.padding_offset;
+   rect2 padding_rect = padding_rect_result.padding_rect;
+   v2 padding_rect_size = GetSize(padding_rect);
+   
+   element result = {};
+   result.fit = true;
+   
+   if(!IsInside(padding_rect, ui_layout->bounds))
+   {
+      layout temp_layout = *ui_layout;
+      NextLine(&temp_layout);
+      
+      rect2 temp_rect = GetPaddingRect(temp_layout, element_size, padding_size, margin_size).padding_rect;
+      
+      if(IsInside(temp_rect, ui_layout->bounds))
+      {
+         *ui_layout = temp_layout;
+         
+         padding_rect_result = GetPaddingRect(*ui_layout, element_size, padding_size, margin_size);
+   
+         padding_offset = padding_rect_result.padding_offset;
+         padding_rect = padding_rect_result.padding_rect;
+         padding_rect_size = GetSize(padding_rect);
+      }
+      else
+      {
+         result.fit = false;
+      }
+   }
+   
+   ui_layout->at = V2(padding_rect.max.x, ui_layout->at.y);
+   ui_layout->new_line_issued = false;
+   ui_layout->has_elements = true;
+   
+   ui_layout->last_element_right_margin = margin_size.x;
+   ui_layout->row_effective_height = Max(padding_offset.y + padding_rect_size.y, ui_layout->row_effective_height);
+   ui_layout->abs_row_bottom_margin = Max(padding_offset.y + padding_rect_size.y + margin_size.y, ui_layout->abs_row_bottom_margin);
+   
+   result.bounds = RectMinSize(padding_rect.min + padding_size, element_size);
+   
+   return result;
+}
+
+struct panel
+{
+   layout lout;
+   element elem;
+};
+
+panel Panel(layout *parent_layout, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   panel result = {};
+   
+   result.elem = Element(parent_layout, element_size, padding_size, margin_size);
+   result.lout = Layout(result.elem.bounds, parent_layout->context, parent_layout->stack_layer);
+   result.lout.ui_layer = parent_layout->ui_layer + 1;
+   
+   return result;
+}
+
+void Text(RenderContext *context, v2 pos, string text, u32 scale)
+{
+	if (IsEmpty(text)) return;
    
 	u32 xoffset = 0;
-	while (*text)
+	for(u32 i = 0;
+       i < text.length;
+       i++)
 	{
-		if (*text == ' ')
+      char c = text.text[i];
+      
+		if (c == ' ')
 		{
 			xoffset += 10;
 		}
 		else
 		{
-			CharacterBitmap *char_bitmap = context->characters + ((u32)(*text) - 33);
+			CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
 			Bitmap(context, &char_bitmap->bitmap, V2(pos.x + xoffset + char_bitmap->offset.x, pos.y + char_bitmap->offset.y + 10));
 			xoffset += char_bitmap->bitmap.width;
 		}
-      
-		text++;
 	}
 }
 
-v2 TextSize(RenderContext *context, char *text, u32 scale)
+v2 TextSize(RenderContext *context, string text, u32 scale)
 {
-	if (!text) return V2(0, 0);
+	if (IsEmpty(text)) return V2(0, 0);
    
 	r32 width = 0.0f;
    r32 highest = -FLTMAX;
    r32 lowest = FLTMAX;
-	while (*text)
+	for(u32 i = 0;
+       i < text.length;
+       i++)
 	{
-		if (*text == ' ')
+      char c = text.text[i];
+      
+		if (c == ' ')
 		{
 			width += 10;
 		}
 		else
 		{
-			CharacterBitmap *char_bitmap = context->characters + ((u32)(*text) - 33);
+			CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
 			width += char_bitmap->bitmap.width;
          highest = Max(highest, char_bitmap->bitmap.height + char_bitmap->offset.y);
          lowest = Min(lowest, char_bitmap->offset.y);
 		}
-      
-		text++;
 	}
    
    return V2(width, highest - lowest);
 }
 
-void Rectangle(layout *ui_layout, v4 color, element_size element_spec, element_size padding_spec, element_size margin_spec)
+element Rectangle(layout *ui_layout, v4 color, v2 element_size, v2 padding_size, v2 margin_size)
 {
    RenderContext *render_context = ui_layout->context->render_context;
-   rect2 bounds = Element(ui_layout, element_spec, padding_spec, margin_spec);
+   element rect_element = Element(ui_layout, element_size, padding_size, margin_size);
    
-   Rectangle(render_context, bounds, color);
+   Rectangle(render_context, rect_element.bounds, color);
+   return rect_element;
 }
 
-void Bitmap(layout *ui_layout, LoadedBitmap *bitmap, element_size element_spec, element_size padding_spec, element_size margin_spec)
+element Bitmap(layout *ui_layout, LoadedBitmap *bitmap, v2 element_size, v2 padding_size, v2 margin_size)
 {
-   /*
    RenderContext *render_context = ui_layout->context->render_context;
-   rect2 bounds = Element(ui_layout, size, margin, ui_flags);
+   element bmp_element = Element(ui_layout, element_size, padding_size, margin_size);
    
-   Bitmap(render_context, bitmap, bounds.min);
-   */
+   Bitmap(render_context, bitmap, bmp_element.bounds.min);
+   return bmp_element;
 }
 
-void Text(layout *ui_layout, char *text, u32 scale)
+element Text(layout *ui_layout, string text, u32 scale, v2 margin)
 {
-   /*
    RenderContext *render_context = ui_layout->context->render_context;
-   rect2 bounds = Element(ui_layout, TextSize(render_context, text, scale), margin, ui_flags);
-   Rectangle(render_context, bounds, V4(0, 0, 0, 0.2f));
+
+   element text_element = Element(ui_layout, TextSize(render_context, text, scale), V2(0, 0), margin);
+   Rectangle(render_context, text_element.bounds, V4(0, 0, 0, 0.2f));
    
-   Text(render_context, V2(bounds.min.x, bounds.min.y + 5), text, scale);
-   */
+   Text(render_context, V2(text_element.bounds.min.x, text_element.bounds.min.y + 5), text, scale);
+   return text_element;
 }
 
-//TODO: text wrap
-b32 Button(layout *ui_layout, LoadedBitmap *icon, char *text, element_size element_spec, element_size padding_spec, element_size margin_spec)
+struct button
 {
-   RenderContext *render_context = ui_layout->context->render_context;
+   b32 state;
+   element elem;
+};
+
+//TODO: clean up text wrap
+button _Button(ui_id id, layout *ui_layout, LoadedBitmap *icon, string text, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   UIContext *context = ui_layout->context;
+   RenderContext *render_context = context->render_context;
    InputState input = ui_layout->context->input_state;
-   rect2 bounds = Element(ui_layout, element_spec, padding_spec, margin_spec);
+   element button_element = Element(ui_layout, element_size, padding_size, margin_size);
    
-   b32 hot = Contains(bounds, input.pos);
+   b32 state = ClickInteraction(context, id, context->input_state.left_up,
+                                context->input_state.left_down, Contains(button_element.bounds, context->input_state.pos));
    
-   if(hot && (input.left_down || input.right_down))
+   if(context->active_element == id)
    {
-	  Rectangle(render_context, bounds, V4(1.0f, 0.0f, 0.75f, 1.0f));
+	  Rectangle(render_context, button_element.bounds, V4(1.0f, 0.0f, 0.75f, 1.0f));
    }
-   else if(hot)
+   else if(context->hot_element == id)
    {
-	  Rectangle(render_context, bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
+	  Rectangle(render_context, button_element.bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
    }
    else
    {
-	  Rectangle(render_context, bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
+	  Rectangle(render_context, button_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
    }
    
-   v2 bounds_size = GetSize(bounds);
+   Bitmap(render_context, icon, button_element.bounds.min);
    
-   Bitmap(render_context, icon, bounds.min);
-   
-   if(text && (TextSize(render_context, text, 20).x > GetSize(bounds).x))
+   //TODO: optimize this by caching the text wrapping & segments?
+   if(!IsEmpty(text) && (TextSize(render_context, text, 20).x > GetSize(button_element.bounds).x))
    {
+      u32 segment_count;
+      string *segments = Split(text, ' ', &segment_count);
+      
+      if((segment_count > 1) &&
+         TextSize(render_context, segments[0], 20).x < GetSize(button_element.bounds).x)
+      {
+         u32 line_count = 0;
+         u32 index = 0;
+         for(u32 i = 1;
+             i < segment_count;
+             i++)
+         {
+            string curr_segment = segments[i];
+            
+            string curr_line = Concat(segments + index, i - index + 1, ' ');
+            
+            if(TextSize(render_context, curr_line, 20).x > GetSize(button_element.bounds).x)
+            {
+               string out_line = Concat(segments + index, (i - 1) - index + 1, ' ');
+               Text(render_context, V2(button_element.bounds.min.x + 10, button_element.bounds.min.y + 10 + line_count * 12),
+                    out_line, 20);
+               index = i;
+               line_count++;
+            }
+            
+            free(curr_line.text);
+         }
+         
+         if(((segment_count - 1) - index + 1) != 0)
+         {
+            string final_line = Concat(segments + index, (segment_count - 1) - index + 1, ' ');
+            
+            if(TextSize(render_context, final_line, 20).x < GetSize(button_element.bounds).x)
+            {
+               Text(render_context, V2(button_element.bounds.min.x + 10, button_element.bounds.min.y + 10 + line_count * 12),
+                    final_line, 20);
+            }
+            else
+            {
+               Text(render_context, V2(button_element.bounds.min.x + 10, button_element.bounds.min.y + 10),
+                    Literal("..."), 20);
+            }
+         }
+      }
+      else
+      {
+         Text(render_context, V2(button_element.bounds.min.x + 10, button_element.bounds.min.y + 10),
+              Literal("..."), 20);
+      }
+      
       //TODO: finish this
       /*
       char *text_at = text;
@@ -711,23 +782,25 @@ b32 Button(layout *ui_layout, LoadedBitmap *icon, char *text, element_size eleme
    }
    else
    {
-      Text(render_context, V2(bounds.min.x + 10, bounds.min.y + 10), text, 20);
+      Text(render_context, V2(button_element.bounds.min.x + 10, button_element.bounds.min.y + 10), text, 20);
    }
    
-   return hot && (input.left_up || input.right_up);
+   button result = {};
+   result.state = state;
+   result.elem = button_element;
+   return result;
 }
 
-b32 Button(layout *ui_layout, LoadedBitmap *icon, char *text, b32 triggered, element_size element_spec, element_size padding_spec, element_size margin_spec)
+button _Button(ui_id id, layout *ui_layout, LoadedBitmap *icon, string text, b32 triggered, v2 element_size, v2 padding_size, v2 margin_size)
 {
-   b32 result = Button(ui_layout, icon, text, element_spec, padding_spec, margin_spec);
+   button result = _Button(id, ui_layout, icon, text, element_size, padding_size, margin_size);
    
-   //TODO: reimplement this
-   /*
-   v2 bounds_size = RectGetSize(bounds);
-   Rectangle(context->render_context, RectPosSize(bounds.min.x, bounds.min.y, 5,
-	         (bounds_size.x == bounds_size.y) ? 5 : bounds_size.y),
+   v2 bounds_size = GetSize(result.elem.bounds);
+   Rectangle(ui_layout->context->render_context, RectMinSize(result.elem.bounds.min, V2(5,
+	         (bounds_size.x == bounds_size.y) ? 5 : bounds_size.y)),
 	         triggered ? V4(0.0f, 0.0f, 0.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 0.0f));
-   */
 
    return result;
 }
+
+#define Button(...) _Button(GEN_UI_ID, __VA_ARGS__)

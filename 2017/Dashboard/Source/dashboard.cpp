@@ -1,39 +1,97 @@
 #include "ui_renderer.cpp"
 
-void DrawTopBar(UIContext *context)
+enum ui_window_type
 {
-   layout top_bar = TopBar(context, 15);
-   Rectangle(context->render_context, top_bar.bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
+   WindowType_DisplaySettings,
+   WindowType_NetworkSettings,
+   WindowType_VideoStream,
+   WindowType_FileSelector
+};
+
+struct ui_window
+{
+   ui_window_type type;
+   v2 pos;
+   v2 size;
+   struct ui_window *next;
+};
+
+enum DashboardPage
+{
+   Page_Home,
+   Page_AutonomousEditor
+};
+
+struct DashboardState
+{
+   DashboardPage page;
+   ui_window *first_window;
+   b32 connected;
+};
+
+ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type type)
+{
+   ui_window *new_window = (ui_window *) malloc(sizeof(ui_window));
+   *new_window = {};
+   new_window->size = size;
+   new_window->pos = pos;
+   new_window->type = type;      
+   new_window->next = dashstate->first_window;
+   dashstate->first_window = new_window;
    
-   //TODO: store this in some state/context
-   b32 connected = false;
-   
-   element_definition top_bar_element_def = ElementDefPixel(V2(2.5f, 2.5f), V2(0, 0), V2(10, 10));
-   
-   Rectangle(&top_bar, connected ? V4(1.0f, 1.0f, 1.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f), top_bar_element_def.element_spec,
-             top_bar_element_def.padding_spec, top_bar_element_def.margin_spec);
-             
-   Rectangle(&top_bar, V4(0.2f, 0.2f, 0.2f, 1.0f), top_bar_element_def.element_spec,
-             top_bar_element_def.padding_spec, top_bar_element_def.margin_spec);
+   return new_window;
 }
 
-void DrawLeftBar(UIContext *context)
-{
-   layout left_bar = LeftBar(context, 140);
-   Rectangle(context->render_context, left_bar.bounds, V4(0.2f, 0.2f, 0.2f, 0.7f));
-   
-   element_definition left_bar_small_button_def = ElementDefPixel(V2(5, 5), V2(0, 0), V2(40, 40));
+#include "autonomous_editor.cpp"
 
-   if(Button(&left_bar, &context->assets->home, NULL/*, (page == PageType_Home)*/,
-             left_bar_small_button_def.element_spec, left_bar_small_button_def.padding_spec, 
-             left_bar_small_button_def.margin_spec))
+void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
+{
+   Rectangle(context->render_context, top_bar->bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
+   v2 top_bar_size = GetSize(top_bar->bounds);
+   
+   v2 top_bar_element_size = V2((top_bar_size.y * 2.0f) / 3.0f, (top_bar_size.y * 2.0f) / 3.0f);
+   v2 top_bar_element_margin = V2(top_bar_size.y / 6.0f, top_bar_size.y / 6.0f);
+   
+   r32 settings_bar_width = top_bar_element_size.x * 2 + top_bar_element_margin.x * 3;
+   
+   layout notification_bar = Panel(top_bar, V2(top_bar_size.x - settings_bar_width, top_bar_size.y), V2(0, 0), V2(0, 0)).lout;
+   layout settings_bar = Panel(top_bar, V2(settings_bar_width, top_bar_size.y), V2(0, 0), V2(0, 0)).lout;
+   RectangleOutline(context->render_context, settings_bar.bounds, V4(0.0f, 0.0f, 0.0f, 1.0f), 3);
+   
+   Rectangle(&notification_bar, dashstate->connected ? V4(1.0f, 1.0f, 1.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f),
+             top_bar_element_size, V2(0, 0), top_bar_element_margin);
+             
+   Rectangle(&notification_bar, V4(0.2f, 0.2f, 0.2f, 1.0f),
+             top_bar_element_size, V2(0, 0), top_bar_element_margin);
+             
+   if(Button(&settings_bar, NULL, EmptyString(), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
    {
-      //page = PageType_Home;
+      AddWindow(dashstate, V2(100, 100), V2(100, 100), WindowType_DisplaySettings);      
    }
    
-   if(Button(&left_bar, &context->assets->gear, NULL/*, fullscreen*/,
-             left_bar_small_button_def.element_spec, left_bar_small_button_def.padding_spec, 
-             left_bar_small_button_def.margin_spec))
+   if(Button(&settings_bar, NULL, EmptyString(), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
+   {
+      AddWindow(dashstate, V2(100, 100), V2(250, 100), WindowType_NetworkSettings);
+   }
+}
+
+void DrawLeftBar(layout *left_bar, UIContext *context, DashboardState *dashstate)
+{
+   Rectangle(context->render_context, left_bar->bounds, V4(0.2f, 0.2f, 0.2f, 0.7f));
+
+   v2 left_bar_size = GetSize(left_bar->bounds);
+   
+   v2 small_button_size = V2(Min(left_bar_size.x * 0.8f, 40), Min(left_bar_size.x * 0.8f, 40));
+   v2 small_button_margin = V2(Min(left_bar_size.x * 0.1f, 5), Min(left_bar_size.x * 0.1f, 5));
+   
+   if(Button(left_bar, &context->assets->home, EmptyString(), (dashstate->page == Page_Home),
+             small_button_size, V2(0, 0), small_button_margin).state)
+   {
+      dashstate->page = Page_Home;
+   }
+   
+   if(Button(left_bar, &context->assets->gear, EmptyString()/*, fullscreen*/,
+             small_button_size, V2(0, 0), small_button_margin).state)
    {
       /*
       fullscreen = !fullscreen;
@@ -41,123 +99,204 @@ void DrawLeftBar(UIContext *context)
       */
    }
    
-   Button(&left_bar, NULL, NULL,
-          left_bar_small_button_def.element_spec, left_bar_small_button_def.padding_spec, 
-          left_bar_small_button_def.margin_spec);
-   Button(&left_bar, NULL, NULL,
-          left_bar_small_button_def.element_spec, left_bar_small_button_def.padding_spec, 
-          left_bar_small_button_def.margin_spec);
-   Button(&left_bar, NULL, NULL,
-          left_bar_small_button_def.element_spec, left_bar_small_button_def.padding_spec, 
-          left_bar_small_button_def.margin_spec);
+   Button(left_bar, NULL, EmptyString(), small_button_size, V2(0, 0), small_button_margin);
+   Button(left_bar, NULL, EmptyString(), small_button_size, V2(0, 0), small_button_margin);
+   Button(left_bar, NULL, EmptyString(), small_button_size, V2(0, 0), small_button_margin);
    
-   element_definition left_bar_large_button_def = ElementDefPixel(V2(5, 5), V2(0, 0), V2(120, 40));
-
-   if(Button(&left_bar, NULL, "Autonomous Builder"/*, (page == PageType_Auto)*/,
-             left_bar_large_button_def.element_spec, left_bar_large_button_def.padding_spec, 
-             left_bar_large_button_def.margin_spec))
+   if(Button(left_bar, NULL, Literal("Autonomous Builder"), (dashstate->page == Page_AutonomousEditor),
+             V2(120, 40), V2(0, 0), V2(5, 5)).state)
    {
-      //page = PageType_Auto;
+      dashstate->page = Page_AutonomousEditor;
    }
    
-   if(Button(&left_bar, NULL, "Robot"/*, (page == PageType_Robot)*/,
-             left_bar_large_button_def.element_spec, left_bar_large_button_def.padding_spec, 
-             left_bar_large_button_def.margin_spec))
+   if(Button(left_bar, NULL, Literal("Robot")/*, (dashstate->page == Page_Robot)*/,
+             V2(120, 40), V2(0, 0), V2(5, 5)).state)
    {
       //page = PageType_Robot;
    }
    
-   if(Button(&left_bar, NULL, "Console"/*, (page == PageType_Console)*/,
-             left_bar_large_button_def.element_spec, left_bar_large_button_def.padding_spec, 
-             left_bar_large_button_def.margin_spec))
+   if(Button(left_bar, NULL, Literal("Console")/*, (page == PageType_Console)*/,
+             V2(120, 40), V2(0, 0), V2(5, 5)).state)
    {
       //page = PageType_Console;
    }
 }
 
-void DrawRightBar(UIContext *context)
+void DrawRightBar(layout *right_bar, UIContext *context, DashboardState *dashstate)
 {
-   layout right_bar = RightBar(context, 40);
-   Rectangle(context->render_context, right_bar.bounds, V4(0.2f, 0.2f, 0.2f, 0.7f));
-}
-
-void DrawCenterArea(UIContext *context)
-{
-   layout center_area = CenterArea(context);
-   Rectangle(context->render_context, center_area.bounds, V4(0.1f, 0.3f, 0.3f, 0.5f));
+   Rectangle(context->render_context, right_bar->bounds, V4(0.2f, 0.2f, 0.2f, 0.7f));
    
-   //if(page == PageType_Home)
+   for(ui_window *curr_window = dashstate->first_window;
+       curr_window;
+       curr_window = curr_window->next)
    {
-      //size = V2(800, 85)
-      //margin = V2(0, 10)
-      layout banner_panel = Panel(&center_area, ElementSizePercent(V2(80, 100)), ElementSizePercent(V2(100, 100)), ElementSizePercent(V2(100, 20)));
-      Rectangle(context->render_context, banner_panel.bounds, V4(0.5f, 0.0f, 0.0f, 0.5f));
-      Text(&banner_panel, "CN Robotics", 40); //margin = V2(0, 5)
-      
-      //size = V2(400, 255)
-      //margin = V2(10, 10)
-      layout connect_panel = Panel(&center_area, ElementSizePercent(V2(100, 100)), ElementSizePercent(V2(100, 100)), ElementSizePercent(V2(40, 30)));
-      Rectangle(context->render_context, connect_panel.bounds, V4(0.5f, 0.0f, 0.0f, 0.5f));
-      RectangleOutline(context->render_context, connect_panel.bounds, V4(0.0f, 0.0f, 0.0f, 1.0f), 3);
-      Text(&connect_panel, "Connection", 20); //margin = V2(0, 5)
-      
-      //TODO: store this in some state/context
-      b32 connected = false;
-      
-      if(connected)
+      //TODO: make this cleaner
+      if(_Button(POINTER_UI_ID(curr_window), right_bar, NULL, EmptyString(), V2(40, 40), V2(0, 0), V2(5, 5)).state)
       {
-         /*
-         char text_buffer[512];
-
-         if(robot_state.connected)
-         {	
-            Text(&context, V2(180, 130),
-               ConcatStrings("Connected To ", robot_state.name, text_buffer),
-               20);
-         }
-         else
-         {
-            Text(&context, V2(180, 130),
-               ConcatStrings("Connected To ", SERVER_ADDR, text_buffer),
-               20);
-         }
-         */
-      }
-      else
-      {
-         Text(&connect_panel, "Not Connected", 20); //margin = V2(5, 5)
-      }
-      
-      NextLine(&connect_panel);
-      
-      //size = V2(100, 40)
-      //margin = V2(5, 5)
-      if(Button(&connect_panel, NULL, "Reconnect", ElementSizePercent(V2(100, 100)), ElementSizePercent(V2(100, 100)), ElementSizePixel(V2(100, 40))))
-      {
-         /*
-         shutdown(server_socket, SD_BOTH);
-         closesocket(server_socket);
-         server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-         
-         server.sin_family = AF_INET;
-         server.sin_addr.s_addr = inet_addr(SERVER_ADDR);
-         server.sin_port = htons(SERVER_PORT);
-         
-         connected = (connect(server_socket, (struct sockaddr *)&server, sizeof(server)) == 0);
-         */
+         curr_window->pos = curr_window->pos + V2(0, 10);
       }
    }
 }
 
-void DrawDashboardUI(UIContext *context)
+void DrawHome(layout *center_area, UIContext *context, DashboardState *dashstate)
 {
-   Rectangle(context->render_context, RectPosSize(V2(0, 0), context->window_size), V4(1.0f, 1.0f, 1.0f, 1.0f));
+   v2 center_area_size = GetSize(center_area->bounds);
+   
+   //size = V2(800, 85)
+   //margin = V2(0, 10)
+   layout banner_panel = Panel(center_area, V2(center_area_size.x * 0.8f, center_area_size.y * 0.2f), V2(0, 0), V2(center_area_size.x * 0.1f, 0)).lout;
+   Rectangle(context->render_context, banner_panel.bounds, V4(0.5f, 0.0f, 0.0f, 0.5f));
+   Text(&banner_panel, Literal("CN Robotics"), 40, V2(0, 5));
+   
+   //size = V2(400, 255)
+   //margin = V2(10, 10)
+   layout connect_panel = Panel(center_area, V2(center_area_size.x * 0.4f, center_area_size.y * 0.3f), V2(0, 0), V2(0, 0)).lout;
+   Rectangle(context->render_context, connect_panel.bounds, V4(0.5f, 0.0f, 0.0f, 0.5f));
+   RectangleOutline(context->render_context, connect_panel.bounds, V4(0.0f, 0.0f, 0.0f, 1.0f), 3);
+   Text(&connect_panel, Literal("Connection"), 20, V2(0, 5));
+   
+   if(dashstate->connected)
+   {
+      /*
+      char text_buffer[512];
+
+      if(robot_state.connected)
+      {	
+         Text(&context, V2(180, 130),
+            ConcatStrings("Connected To ", robot_state.name, text_buffer),
+            20);
+      }
+      else
+      {
+         Text(&context, V2(180, 130),
+            ConcatStrings("Connected To ", SERVER_ADDR, text_buffer),
+            20);
+      }
+      */
+   }
+   else
+   {
+      Text(&connect_panel, Literal("Not Connected"), 20, V2(5, 5));
+   }
+   
+   NextLine(&connect_panel);
+   
+   //size = V2(100, 40)
+   //margin = V2(5, 5)
+   if(Button(&connect_panel, NULL, Literal("Reconnect"), V2(100, 40), V2(0, 0), V2(0, 0)).state)
+   {
+      /*
+      shutdown(server_socket, SD_BOTH);
+      closesocket(server_socket);
+      server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+      
+      server.sin_family = AF_INET;
+      server.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+      server.sin_port = htons(SERVER_PORT);
+      
+      connected = (connect(server_socket, (struct sockaddr *)&server, sizeof(server)) == 0);
+      */
+   }
+}
+
+void DrawCenterArea(layout *center_area, UIContext *context, DashboardState *dashstate)
+{  
+   if(dashstate->page == Page_Home)
+   {
+      DrawHome(center_area, context, dashstate);
+   }
+   else if(dashstate->page == Page_AutonomousEditor)
+   {
+      DrawAutonomousEditor(center_area, context, dashstate);
+   }
+}
+
+void DrawBackground(UIContext *context)
+{
+   Rectangle(context->render_context, RectMinSize(V2(0, 0), context->window_size), V4(1.0f, 1.0f, 1.0f, 1.0f));
    //TODO: replace this with 3d spinning gear logo 
    Bitmap(context->render_context, &context->assets->logo, 
           V2((context->window_size.x / 2) - (context->assets->logo.width / 2), (context->window_size.y / 2) - (context->assets->logo.height / 2)));
-    
-   DrawTopBar(context);
-   DrawLeftBar(context);
-   DrawRightBar(context);
-   DrawCenterArea(context);
+}
+
+void DrawDisplaySettings(layout *window_layout)
+{
+   Text(window_layout, Literal("Display Settings"), 20, V2(0, 0));
+}
+
+void DrawNetworkSettings(layout *window_layout)
+{
+   Text(window_layout, Literal("Network Settings"), 20, V2(0, 0));
+}
+
+void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
+{
+   rect2 window_bounds = RectMinSize(window->pos, window->size);
+   Rectangle(context->render_context, window_bounds, V4(0.7f, 0.7f, 0.7f, 1.0f));
+   
+   rect2 tab_bounds = RectPosSize(window->pos, V2(10, 10));
+   rect2 extended_tab_bounds = RectMinSize(tab_bounds.min - V2(2, 2), V2(34, 14));
+   ui_id tab_id = POINTER_UI_ID(window);
+   ClickInteraction(context, tab_id, context->input_state.left_up,
+                    context->input_state.left_down, Contains(tab_bounds, context->input_state.pos));
+   
+   Rectangle(context->render_context,
+             ((context->hot_element == tab_id) || (context->active_element == tab_id)) ? extended_tab_bounds : tab_bounds,
+             (context->active_element == tab_id) ?  V4(0.3f, 0.3f, 0.3f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f));
+             
+   if(context->active_element == tab_id)
+   {
+      window->pos = context->input_state.pos;
+   }
+   
+   layout window_layout = Layout(window_bounds, context, stack_layer);
+   
+   if(window->type == WindowType_DisplaySettings)
+   {
+      DrawDisplaySettings(&window_layout);
+   }
+   else if(window->type == WindowType_NetworkSettings)
+   {
+      DrawNetworkSettings(&window_layout);
+   }
+   else if(window->type == WindowType_VideoStream)
+   {
+      
+   }
+   else if(window->type == WindowType_FileSelector)
+   {
+      
+   }
+}
+
+//TODO: stop passing UIContext to everything
+void DrawDashboardUI(UIContext *context, DashboardState *dashstate)
+{
+   layout root_layout = Layout(RectMinSize(V2(0, 0), context->window_size), context, 0);
+   v2 layout_size = GetSize(root_layout.bounds);
+   
+   v2 top_bar_size = V2(layout_size.x, Min(layout_size.y * 0.025f, 15));
+   v2 left_bar_size = V2(Min(layout_size.x * 0.2f, 140), layout_size.y - top_bar_size.y);
+   v2 right_bar_size = V2(layout_size.x * 0.05f, layout_size.y - top_bar_size.y);
+   v2 center_area_size = V2(layout_size.x - left_bar_size.x - right_bar_size.x, layout_size.y - top_bar_size.y);
+   
+   layout top_bar = Panel(&root_layout, top_bar_size, V2(0, 0), V2(0, 0)).lout;
+   layout left_bar = Panel(&root_layout, left_bar_size, V2(0, 0), V2(0, 0)).lout;
+   layout center_area = Panel(&root_layout, center_area_size, V2(0, 0), V2(0, 0)).lout;
+   layout right_bar = Panel(&root_layout, right_bar_size, V2(0, 0), V2(0, 0)).lout;
+   
+   DrawBackground(context);
+   DrawTopBar(&top_bar, context, dashstate);
+   DrawLeftBar(&left_bar, context, dashstate);
+   DrawCenterArea(&center_area, context, dashstate);
+   DrawRightBar(&right_bar, context, dashstate);
+   
+   u32 stack_layer = 1;
+   for(ui_window *curr_window = dashstate->first_window;
+       curr_window;
+       curr_window = curr_window->next)
+   {
+      DrawWindow(curr_window, context, stack_layer);
+      stack_layer++;
+   }
 }
