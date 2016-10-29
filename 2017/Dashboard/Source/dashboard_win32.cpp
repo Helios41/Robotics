@@ -217,6 +217,7 @@ EntireFile LoadEntireFile(const char* path)
    return result;
 }
 
+/*
 b32 GUIButton(RenderContext *context, InputState input, rect2 bounds, LoadedBitmap *icon, char *text)
 {
    b32 hot = Contains(bounds, input.pos);
@@ -261,6 +262,7 @@ b32 GUIButton(RenderContext *context, InputState input, rect2 bounds, LoadedBitm
 
    return result;
 }
+*/
 
 b32 AutoBuilderBlock(RenderContext *context, AutoBlock block, v2 pos, InputState input)
 {
@@ -327,6 +329,7 @@ void UpdateInputState(InputState *input, HWND window)
    input->key_down = false;
 }
 
+/*
 void TextBox(RenderContext *context, InputState input, rect2 bounds, char *text_buffer, u32 buffer_size, b32 *active)
 {
 	if (*active)
@@ -355,6 +358,7 @@ void TextBox(RenderContext *context, InputState input, rect2 bounds, char *text_
 		      (*active) ? V4(0.0f, 0.0f, 0.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 0.0f));
 
 }
+*/
 
 AutoBlock *AddAutoBlock(AutoBlock *auto_blocks, u32 *auto_block_count, AutoBlockPreset preset)
 {
@@ -918,6 +922,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       
       DrawDashboardUI(&ui_context, &dashstate);
       
+      /*
       if(page == PageType_Home)
       {
          
@@ -1133,11 +1138,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                char number_buffer[10];
                char string_buffer[30];
                
-               /*
                Text(&context, V2(1120, 180),
                         ConcatStrings("Value: ", R32ToString(auto_builder_state.selected_block->motor.value, number_buffer), string_buffer),
                         20);
-               */
                
 			   TextBox(&context, input, RectPosSize(1120, 205, 100, 20), auto_builder_state.text_box1_buffer,
 				       ArrayCount(auto_builder_state.text_box1_buffer), &auto_builder_state.text_box1_selected);
@@ -1156,11 +1159,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				   auto_builder_state.selected_block->motor.value = -1.0f;
 			   }
 
-               /*
                Text(&context, V2(1120, 240),
                         ConcatStrings("Time: ", R32ToString(auto_builder_state.selected_block->motor.time, number_buffer), string_buffer),
                         20);
-               */
                
 			   TextBox(&context, input, RectPosSize(1120, 265, 100, 20), auto_builder_state.text_box2_buffer,
 					   ArrayCount(auto_builder_state.text_box2_buffer), &auto_builder_state.text_box2_selected);
@@ -1197,11 +1198,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				char number_buffer[10];
 				char string_buffer[30];
 
-            /*
 				Text(&context, V2(1120, 180),
 					ConcatStrings("Forward: ", R32ToString(auto_builder_state.selected_block->drive.forward_value, number_buffer), string_buffer),
 					20);
-            */
             
 				TextBox(&context, input, RectPosSize(1120, 205, 100, 20), auto_builder_state.text_box1_buffer,
 					ArrayCount(auto_builder_state.text_box1_buffer), &auto_builder_state.text_box1_selected);
@@ -1220,11 +1219,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					auto_builder_state.selected_block->drive.forward_value = -1.0f;
 				}
 
-            /*
 				Text(&context, V2(1120, 240),
 					ConcatStrings("Rotate: ", R32ToString(auto_builder_state.selected_block->drive.rotate_value, number_buffer), string_buffer),
 					20);
-            */
 
 				TextBox(&context, input, RectPosSize(1120, 265, 100, 20), auto_builder_state.text_box2_buffer,
 					ArrayCount(auto_builder_state.text_box2_buffer), &auto_builder_state.text_box2_selected);
@@ -1243,11 +1240,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					auto_builder_state.selected_block->drive.rotate_value = -1.0f;
 				}
 
-            /*
 				Text(&context, V2(1120, 320),
 					ConcatStrings("Time: ", R32ToString(auto_builder_state.selected_block->drive.time, number_buffer), string_buffer),
 					20);
-            */
 
 				TextBox(&context, input, RectPosSize(1120, 345, 100, 20), auto_builder_state.text_box3_buffer,
 					ArrayCount(auto_builder_state.text_box3_buffer), &auto_builder_state.text_box3_selected);
@@ -1447,6 +1442,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			  }
 		  }
 	  }
+     */
       
 #if 0
       char frame_time_buffer[64];

@@ -8,12 +8,22 @@ enum ui_window_type
    WindowType_FileSelector
 };
 
+struct network_settings
+{
+   string connect_to;
+};
+
 struct ui_window
 {
    ui_window_type type;
    v2 pos;
    v2 size;
    struct ui_window *next;
+   
+   union
+   {
+      network_settings net_settings;
+   };
 };
 
 enum DashboardPage
@@ -39,7 +49,47 @@ ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type 
    new_window->next = dashstate->first_window;
    dashstate->first_window = new_window;
    
+   if(new_window->type == WindowType_DisplaySettings)
+   {
+      
+   }
+   else if(new_window->type == WindowType_NetworkSettings)
+   {
+      new_window->net_settings.connect_to = Literal("chimera.local"); //String((char *) malloc(sizeof(char) * 20), 20);
+   }
+   else if(new_window->type == WindowType_VideoStream)
+   {
+      
+   }
+   else if(new_window->type == WindowType_FileSelector)
+   {
+      
+   }
+   
    return new_window;
+}
+
+void RemoveWindow(DashboardState *dashstate, ui_window *window)
+{
+   if(window == dashstate->first_window)
+   {
+      dashstate->first_window = window->next;
+   }
+   else
+   {   
+      for(ui_window *curr_window = dashstate->first_window;
+          curr_window;
+          curr_window = curr_window->next)
+      {
+         if(curr_window->next == window)
+         {
+            curr_window->next = window->next;
+            break;
+         }
+      }
+   }
+   
+   free(window);
 }
 
 #include "autonomous_editor.cpp"
@@ -66,12 +116,12 @@ void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
              
    if(Button(&settings_bar, NULL, EmptyString(), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
    {
-      AddWindow(dashstate, V2(100, 100), V2(100, 100), WindowType_DisplaySettings);      
+      AddWindow(dashstate, V2(200, 100), V2(100, 100), WindowType_DisplaySettings);      
    }
    
    if(Button(&settings_bar, NULL, EmptyString(), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
    {
-      AddWindow(dashstate, V2(100, 100), V2(250, 100), WindowType_NetworkSettings);
+      AddWindow(dashstate, V2(200, 100), V2(250, 100), WindowType_NetworkSettings);
    }
 }
 
@@ -103,23 +153,25 @@ void DrawLeftBar(layout *left_bar, UIContext *context, DashboardState *dashstate
    Button(left_bar, NULL, EmptyString(), small_button_size, V2(0, 0), small_button_margin);
    Button(left_bar, NULL, EmptyString(), small_button_size, V2(0, 0), small_button_margin);
    
-   if(Button(left_bar, NULL, Literal("Autonomous Builder"), (dashstate->page == Page_AutonomousEditor),
+   if(Button(left_bar, NULL, Literal("Autonomous Builder Of Autonomous Autonomousness"), (dashstate->page == Page_AutonomousEditor),
              V2(120, 40), V2(0, 0), V2(5, 5)).state)
    {
       dashstate->page = Page_AutonomousEditor;
    }
    
-   if(Button(left_bar, NULL, Literal("Robot")/*, (dashstate->page == Page_Robot)*/,
+   /*
+   if(Button(left_bar, NULL, Literal("Robot"), (dashstate->page == Page_Robot),
              V2(120, 40), V2(0, 0), V2(5, 5)).state)
    {
       //page = PageType_Robot;
    }
    
-   if(Button(left_bar, NULL, Literal("Console")/*, (page == PageType_Console)*/,
+   if(Button(left_bar, NULL, Literal("Console"), (page == PageType_Console),
              V2(120, 40), V2(0, 0), V2(5, 5)).state)
    {
       //page = PageType_Console;
    }
+   */
 }
 
 void DrawRightBar(layout *right_bar, UIContext *context, DashboardState *dashstate)
@@ -127,13 +179,36 @@ void DrawRightBar(layout *right_bar, UIContext *context, DashboardState *dashsta
    Rectangle(context->render_context, right_bar->bounds, V4(0.2f, 0.2f, 0.2f, 0.7f));
    
    for(ui_window *curr_window = dashstate->first_window;
-       curr_window;
-       curr_window = curr_window->next)
+       curr_window;)
    {
-      //TODO: make this cleaner
-      if(_Button(POINTER_UI_ID(curr_window), right_bar, NULL, EmptyString(), V2(40, 40), V2(0, 0), V2(5, 5)).state)
+      ui_window *op_window = curr_window;
+      curr_window = curr_window->next;
+      
+      string window_name = EmptyString();
+      
+      switch(op_window->type)
       {
-         curr_window->pos = curr_window->pos + V2(0, 10);
+         case WindowType_DisplaySettings:
+            window_name = Literal("Display Settings");
+            break;
+            
+         case WindowType_NetworkSettings:
+            window_name = Literal("Network Settings");
+            break;
+            
+         case WindowType_VideoStream:
+            window_name = Literal("Video");
+            break;
+            
+         case WindowType_FileSelector:
+            window_name = Literal("File Selector");
+            break;
+      }
+      
+      //TODO: make this cleaner
+      if(_Button(POINTER_UI_ID(op_window), right_bar, NULL, window_name, V2(40, 40), V2(0, 0), V2(5, 5)).state)
+      {
+         RemoveWindow(dashstate, op_window);
       }
    }
 }
@@ -224,9 +299,10 @@ void DrawDisplaySettings(layout *window_layout)
    Text(window_layout, Literal("Display Settings"), 20, V2(0, 0));
 }
 
-void DrawNetworkSettings(layout *window_layout)
+void DrawNetworkSettings(layout *window_layout, network_settings *net_settings)
 {
    Text(window_layout, Literal("Network Settings"), 20, V2(0, 0));
+   TextBox(window_layout, &net_settings->connect_to, V2(GetSize(window_layout->bounds).x * 0.9, 40), V2(0, 0), V2(0, 0));
 }
 
 void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
@@ -257,7 +333,7 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
    }
    else if(window->type == WindowType_NetworkSettings)
    {
-      DrawNetworkSettings(&window_layout);
+      DrawNetworkSettings(&window_layout, &window->net_settings);
    }
    else if(window->type == WindowType_VideoStream)
    {

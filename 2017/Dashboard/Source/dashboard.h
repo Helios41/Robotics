@@ -33,6 +33,8 @@ TODO:
 	-vision tracking
    -opengl 3 & shaders
    -animations for ui
+   -only draw ui frame when nessisary (animation, input, other event, etc...) & only
+    redraw the required section of the screen
    -
 */
 
@@ -370,19 +372,28 @@ string *Split(string input, char split_char, u32 *array_length)
          else
          {
             string last_segment = result[index - 1];
-            result[index] = String(last_segment.text + last_segment.length + 1, i - (last_segment.length + 1));
+            result[index] = String(last_segment.text + last_segment.length + 1,
+                                   i - (u32)((last_segment.text + last_segment.length) - input.text) - 1);
          }
          
          index++;
       }
    }
    
-   string last_segment = result[index - 1];
-   result[index] = String(last_segment.text + last_segment.length + 1, (u32)((input.text + input.length - 1) - (last_segment.text + last_segment.length)));
+   if((index == 0) && (*array_length == 1))
+   {
+      result[0] = input;
+   }
+   else
+   {
+      string last_segment = result[index - 1];
+      result[index] = String(last_segment.text + last_segment.length + 1, (u32)((input.text + input.length - 1) - (last_segment.text + last_segment.length)));
+   }
    
    return result;
 }
 
+/*
 string Concat(string *strings, u32 count, char concat_char)
 {
    u32 result_size = count - 1;
@@ -420,6 +431,7 @@ string Concat(string *strings, u32 count, char concat_char)
    
    return result;
 }
+*/
 
 char *ConcatStrings(char *str1, char *str2, char *str)
 {

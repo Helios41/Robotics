@@ -635,6 +635,68 @@ v2 TextSize(RenderContext *context, string text, u32 scale)
    return V2(width, highest - lowest);
 }
 
+//TODO: optimize this by caching the text wrapping & segments?
+void TextWrapRect(RenderContext *render_context, rect2 bounds, string text)
+{
+   if(!IsEmpty(text))
+   {
+      u32 segment_count;
+      string *segments = Split(text, ' ', &segment_count);
+      
+      v2 at = V2(0.0f, 0.0f);
+      r32 row_height = 0.0f;
+      
+      for(u32 i = 0;
+          i < segment_count;
+          i++)
+      {
+         string curr_segment = segments[i];
+         v2 word_size = TextSize(render_context, curr_segment, 20);
+         
+         if((bounds.min.x + at.x + word_size.x) > bounds.max.x)
+         {
+            if((at.y + row_height + word_size.y) > GetSize(bounds).y)
+            {
+               Rectangle(render_context, RectPosSize(bounds.min + at + V2(5, 5), V2(3, 3)),
+                         V4(0.0f, 0.0f, 0.0f, 1.0f));
+               Text(render_context, bounds.min + at + V2(5, 5),
+                    Literal("..."), 20);
+            }
+            else
+            {
+               if(word_size.x > GetSize(bounds).x)
+               {
+                  Rectangle(render_context, RectPosSize(bounds.min + at + V2(5, 5), V2(3, 3)),
+                         V4(0.0f, 0.0f, 0.0f, 1.0f));
+                  Text(render_context, bounds.min + at + V2(5, 5),
+                       Literal("..."), 20);
+               }
+               else
+               {
+                  i--;
+               }
+               
+               at.x = 0.0f;
+               at.y += row_height;
+               row_height = 0.0f;
+            }
+         }
+         else
+         {
+            Rectangle(render_context, RectPosSize(bounds.min + at + V2(5, 5), V2(3, 3)),
+                      V4(0.0f, 0.0f, 0.0f, 1.0f));
+            Text(render_context, bounds.min + at + V2(5, 5),
+                 curr_segment, 20);
+                 
+            row_height = Max(row_height, word_size.y);
+            at.x += word_size.x + 10;
+         }
+      }
+      
+      free(segments);
+   }
+}
+
 element Rectangle(layout *ui_layout, v4 color, v2 element_size, v2 padding_size, v2 margin_size)
 {
    RenderContext *render_context = ui_layout->context->render_context;
@@ -683,107 +745,20 @@ button _Button(ui_id id, layout *ui_layout, LoadedBitmap *icon, string text, v2 
    
    if(context->active_element == id)
    {
-	  Rectangle(render_context, button_element.bounds, V4(1.0f, 0.0f, 0.75f, 1.0f));
+      Rectangle(render_context, button_element.bounds, V4(1.0f, 0.0f, 0.75f, 1.0f));
    }
    else if(context->hot_element == id)
    {
-	  Rectangle(render_context, button_element.bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
+      Rectangle(render_context, button_element.bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
+      //TODO: set tooltip to text
    }
    else
    {
-	  Rectangle(render_context, button_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
+      Rectangle(render_context, button_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
    }
    
    Bitmap(render_context, icon, button_element.bounds.min);
-   
-   //TODO: optimize this by caching the text wrapping & segments?
-   if(!IsEmpty(text) && (TextSize(render_context, text, 20).x > GetSize(button_element.bounds).x))
-   {
-      u32 segment_count;
-      string *segments = Split(text, ' ', &segment_count);
-      
-      if((segment_count > 1) &&
-         TextSize(render_context, segments[0], 20).x < GetSize(button_element.bounds).x)
-      {
-         u32 line_count = 0;
-         u32 index = 0;
-         for(u32 i = 1;
-             i < segment_count;
-             i++)
-         {
-            string curr_segment = segments[i];
-            
-            string curr_line = Concat(segments + index, i - index + 1, ' ');
-            
-            if(TextSize(render_context, curr_line, 20).x > GetSize(button_element.bounds).x)
-            {
-               string out_line = Concat(segments + index, (i - 1) - index + 1, ' ');
-               Text(render_context, V2(button_element.bounds.min.x + 10, button_element.bounds.min.y + 10 + line_count * 12),
-                    out_line, 20);
-               index = i;
-               line_count++;
-            }
-            
-            free(curr_line.text);
-         }
-         
-         if(((segment_count - 1) - index + 1) != 0)
-         {
-            string final_line = Concat(segments + index, (segment_count - 1) - index + 1, ' ');
-            
-            if(TextSize(render_context, final_line, 20).x < GetSize(button_element.bounds).x)
-            {
-               Text(render_context, V2(button_element.bounds.min.x + 10, button_element.bounds.min.y + 10 + line_count * 12),
-                    final_line, 20);
-            }
-            else
-            {
-               Text(render_context, V2(button_element.bounds.min.x + 10, button_element.bounds.min.y + 10),
-                    Literal("..."), 20);
-            }
-         }
-      }
-      else
-      {
-         Text(render_context, V2(button_element.bounds.min.x + 10, button_element.bounds.min.y + 10),
-              Literal("..."), 20);
-      }
-      
-      //TODO: finish this
-      /*
-      char *text_at = text;
-      char *last_pass = NULL;
-      
-      while(*text_at)
-      {
-         if(*text_at == ' ')
-         {
-            *text_at = '\0';
-            
-            if(TextSize(render_context, text, 20).x < GetSize(bounds).x)
-            {
-               last_pass = text_at;
-            }
-            else
-            {
-               if(last_pass)
-               {
-                  
-               }
-               //TODO: if the word is just too big this will fail
-            }
-            
-            *text_at = ' ';
-         }
-         
-         text_at++;
-      }
-      */
-   }
-   else
-   {
-      Text(render_context, V2(button_element.bounds.min.x + 10, button_element.bounds.min.y + 10), text, 20);
-   }
+   TextWrapRect(render_context, button_element.bounds, text);
    
    button result = {};
    result.state = state;
@@ -804,3 +779,17 @@ button _Button(ui_id id, layout *ui_layout, LoadedBitmap *icon, string text, b32
 }
 
 #define Button(...) _Button(GEN_UI_ID, __VA_ARGS__)
+
+void _TextBox(ui_id id, layout *ui_layout, string *buffer, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   UIContext *context = ui_layout->context;
+   RenderContext *render_context = context->render_context;
+   element textbox_element = Element(ui_layout, element_size, padding_size, margin_size);
+  
+   Rectangle(render_context, textbox_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
+   RectangleOutline(render_context, textbox_element.bounds, V4(0.0f, 0.0f, 0.f, 1.0f));
+   
+   TextWrapRect(render_context, textbox_element.bounds, *buffer);
+}
+
+#define TextBox(...) _TextBox(GEN_UI_ID, __VA_ARGS__)
