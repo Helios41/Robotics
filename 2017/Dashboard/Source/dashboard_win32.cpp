@@ -283,52 +283,6 @@ b32 AutoBuilderBlock(RenderContext *context, AutoBlock block, v2 pos, InputState
    return hot && (input.left_up || input.right_up);
 }
 
-HDC SetupWindow(HINSTANCE hInstance, int nCmdShow, HWND *window)
-{
-   *window = CreateWindowExA(WS_EX_CLIENTEDGE, "WindowClass", "Dashboard V2",
-                             WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
-                             1440, 759, NULL, NULL,
-                             hInstance, NULL);
-   
-   HANDLE hIcon = LoadImageA(0, "icon.ico", IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
-   if(hIcon)
-   {
-       SendMessageA(*window, WM_SETICON, ICON_SMALL, (LPARAM) hIcon);
-       SendMessageA(*window, WM_SETICON, ICON_BIG, (LPARAM) hIcon);
-
-       SendMessageA(GetWindow(*window, GW_OWNER), WM_SETICON, ICON_SMALL, (LPARAM) hIcon);
-       SendMessageA(GetWindow(*window, GW_OWNER), WM_SETICON, ICON_BIG, (LPARAM) hIcon);
-   }
-   else
-   {
-      MessageBox(*window, "Error", "Icon Not Found", 0);
-   }
-   
-   ShowWindow(*window, nCmdShow);
-   UpdateWindow(*window);
-   
-   return GetDC(*window);
-}
-
-void UpdateInputState(InputState *input, HWND window)
-{
-   POINT p;
-   GetCursorPos(&p);
-   ScreenToClient(window, &p);
-   
-   input->pos.x = p.x;
-   input->pos.y = p.y;
-   
-   input->left_up = false;
-   input->right_up = false;
-   
-   input->char_key_up = false;
-   input->key_backspace = false;
-   input->key_enter = false;
-   input->key_up = false;
-   input->key_down = false;
-}
-
 /*
 void TextBox(RenderContext *context, InputState input, rect2 bounds, char *text_buffer, u32 buffer_size, b32 *active)
 {
@@ -753,6 +707,57 @@ void SetFullscreen(b32 state)
    */
 }
 
+HDC SetupWindow(HINSTANCE hInstance, int nCmdShow, HWND *window)
+{
+   *window = CreateWindowExA(WS_EX_CLIENTEDGE, "WindowClass", "Dashboard V2",
+                             WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+                             1440, 759, NULL, NULL,
+                             hInstance, NULL);
+   
+   HANDLE hIcon = LoadImageA(0, "icon.ico", IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_LOADFROMFILE);
+   if(hIcon)
+   {
+       SendMessageA(*window, WM_SETICON, ICON_SMALL, (LPARAM) hIcon);
+       SendMessageA(*window, WM_SETICON, ICON_BIG, (LPARAM) hIcon);
+
+       SendMessageA(GetWindow(*window, GW_OWNER), WM_SETICON, ICON_SMALL, (LPARAM) hIcon);
+       SendMessageA(GetWindow(*window, GW_OWNER), WM_SETICON, ICON_BIG, (LPARAM) hIcon);
+   }
+   else
+   {
+      MessageBox(*window, "Error", "Icon Not Found", 0);
+   }
+   
+   ShowWindow(*window, nCmdShow);
+   UpdateWindow(*window);
+   
+   return GetDC(*window);
+}
+
+void UpdateInputState(InputState *input, HWND window, b32 update_mouse)
+{
+   if(update_mouse)
+   {
+      POINT p;
+      GetCursorPos(&p);
+      ScreenToClient(window, &p);
+   
+      input->pos.x = p.x;
+      input->pos.y = p.y;
+   }
+   
+   input->left_up = false;
+   input->right_up = false;
+   
+   input->char_key_up = false;
+   input->key_backspace = false;
+   input->key_enter = false;
+   input->key_up = false;
+   input->key_down = false;
+   input->key_left = false;
+   input->key_right = false;
+}
+
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {  
    WNDCLASSEX window_class = {};
@@ -837,13 +842,23 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    ui_context.render_context = &context;
    ui_context.assets = &ui_assets;
    
+   AutonomousBlock test_blocks[] = 
+   {
+      {Literal("Test1")},
+      {Literal("Test2")}
+   };
+   
    DashboardState dashstate = {};
+   dashstate.auto_editor.selector_blocks = test_blocks;
+   dashstate.auto_editor.selector_block_count = ArrayCount(test_blocks);
+   
+   b32 update_mouse = true;
    
    connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
    GetCounter(&last_timer, timer_freq);
    while(running)
    {
-      UpdateInputState(&input, window);
+      UpdateInputState(&input, window, update_mouse);
       
       while(PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE))
       {
@@ -875,10 +890,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                {
                   input.key_backspace = true;
                }
-			   else if (msg.wParam == VK_RETURN)
-			   {
-				   input.key_enter = true;
-			   }
+               else if (msg.wParam == VK_RETURN)
+               {
+                  input.key_enter = true;
+               }
                else if(msg.wParam == VK_UP)
                {
                   input.key_up = true;
@@ -886,6 +901,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                else if(msg.wParam == VK_DOWN)
                {
                   input.key_down = true;
+               }
+               else if(msg.wParam == VK_LEFT)
+               {
+                  input.key_left = true;
+               }
+               else if(msg.wParam == VK_RIGHT)
+               {
+                  input.key_right = true;
                }
             }
             break;
@@ -897,6 +920,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                {
                   input.char_key_up = true;
                   input.key_char = c;
+                  
+                  if(c == 'm')
+                  {
+                     update_mouse = !update_mouse;
+                  }
                }
             }
             break;

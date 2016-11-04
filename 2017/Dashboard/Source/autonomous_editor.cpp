@@ -1,5 +1,181 @@
-void DrawAutonomousEditor(layout *top_bar, UIContext *context, DashboardState *dashstate)
+void DrawBlockSelector(layout *block_selector, AutonomousEditor *auto_editor)
 {
+   RenderContext *render_context = block_selector->context->render_context;
+   
+   Rectangle(render_context, block_selector->bounds, V4(0.3, 0.3, 0.3, 0.6));
+   RectangleOutline(render_context, block_selector->bounds, V4(0, 0, 0, 1));
+   
+   v2 block_size = V2(GetSize(block_selector->bounds).x * 0.8, 40);
+   v2 block_margin = V2(GetSize(block_selector->bounds).x * 0.1, 10);
+   
+   for(u32 i = 0;
+       auto_editor->selector_block_count > i;
+       i++)
+   {
+      AutonomousBlock *block = auto_editor->selector_blocks + i;
+      
+      //TODO: make this cleaner
+      if(_Button(POINTER_UI_ID(block), block_selector, NULL, block->text, block_size, V2(0, 0), block_margin).state)
+      {
+         auto_editor->grabbed_block = *block;
+      }
+   }
+}
+
+void DrawEditorMenu(layout *editor_menu, AutonomousEditor *auto_editor)
+{
+   RenderContext *render_context = editor_menu->context->render_context;
+   
+   Rectangle(render_context, editor_menu->bounds, V4(0.3, 0.3, 0.3, 0.6));
+   RectangleOutline(render_context, editor_menu->bounds, V4(0, 0, 0, 1));
+   
+   v2 button_size = V2(GetSize(editor_menu->bounds).x * 0.9, 40);
+   v2 button_margin = V2(GetSize(editor_menu->bounds).x * 0.05, 5);
+   
+   Button(editor_menu, NULL, Literal("Select File"), button_size, V2(0, 0), button_margin);
+   Button(editor_menu, NULL, Literal("Load"), button_size, V2(0, 0), button_margin);
+   Button(editor_menu, NULL, Literal("Save"), button_size, V2(0, 0), button_margin);
+   Button(editor_menu, NULL, Literal("Upload"), button_size, V2(0, 0), button_margin);
+}
+
+void DrawGraphView(layout *graph_view, AutonomousEditor *auto_editor)
+{
+   RenderContext *render_context = graph_view->context->render_context;
+   rect2 bounds = graph_view->bounds;
+   
+   Rectangle(render_context, bounds, V4(0.3, 0.3, 0.3, 0.6));
+   RectangleOutline(render_context, bounds, V4(0, 0, 0, 1));
+   
+   Line(render_context, V2(bounds.min.x, bounds.min.y), V2(bounds.min.x, bounds.max.y), V4(0, 0, 0, 1), 3);
+   Line(render_context, V2(bounds.min.x, bounds.max.y), V2(bounds.max.x, bounds.max.y), V4(0, 0, 0, 1), 3);
+   
+   //NOTE: draw y axis
+   for(u32 i = 0;
+       i < 4;
+       i++)
+   {
+      r32 y = bounds.min.y + (GetSize(bounds).y / 4.0f) * i;
+      
+      Line(render_context, V2(bounds.min.x, y), V2(bounds.max.x, y), V4(0, 0, 0, 1), 1);
+   }
+   
+   //NOTE: draw x axis
+   for(u32 i = 0;
+       i < 8;
+       i++)
+   {
+      r32 x = bounds.min.x + (GetSize(bounds).x / 8.0f) * i;
+      
+      Line(render_context, V2(x, bounds.min.y), V2(x, bounds.max.y), V4(0, 0, 0, 1), 1);
+   }
+}
+
+void DrawEditorBar(layout *editor_bar, AutonomousEditor *auto_editor)
+{
+   RenderContext *render_context = editor_bar->context->render_context;
+   
+   Rectangle(render_context, editor_bar->bounds, V4(0.3, 0.3, 0.3, 0.6));
+   RectangleOutline(render_context, editor_bar->bounds, V4(0, 0, 0, 1));
+   
+   v2 button_size = V2(GetSize(editor_bar->bounds).y, GetSize(editor_bar->bounds).y);
+   ToggleSlider(editor_bar, &auto_editor->is_lua_editor, Literal("Lua"), Literal("Block"), V2(120, GetSize(editor_bar->bounds).y), V2(0, 0), V2(0, 0));
+   
+   Button(editor_bar, NULL, EmptyString(), button_size, V2(0, 0), V2(0, 0));
+   Button(editor_bar, NULL, EmptyString(), button_size, V2(0, 0), V2(0, 0));
+}
+
+void DrawLuaEditor(layout *editor_panel, AutonomousEditor *auto_editor)
+{
+   RenderContext *render_context = editor_panel->context->render_context;
+   Text(editor_panel, Literal("Lua Editor"), 20,
+        V2((GetSize(editor_panel->bounds).x - GetTextWidth(render_context, Literal("Lua Editor"), 20)) / 2.0f, 0), V2(0, 5)); 
+}
+
+void DrawBlockEditor(layout *editor_panel, AutonomousEditor *auto_editor)
+{
+   UIContext *context = editor_panel->context;
+   RenderContext *render_context = context->render_context;
+   
+   Text(editor_panel, Literal("Block Editor"), 20,
+        V2((GetSize(editor_panel->bounds).x - GetTextWidth(render_context, Literal("Block Editor"), 20)) / 2.0f, 0), V2(0, 5)); 
+    
+   ui_id tab_id = POINTER_UI_ID(auto_editor);
+   interaction_state block_editor_interact =
+      ClickInteraction(context, Interaction(tab_id, editor_panel), context->input_state.left_up,
+                       context->input_state.left_down, Contains(editor_panel->bounds, context->input_state.pos));
+   
+   if(block_editor_interact.hot)
+   {
+      RectangleOutline(render_context, editor_panel->bounds, V4(0.2, 0.2, 0.2, 1), 3);
+   }
+   
+   if(block_editor_interact.became_selected)
+   {
+      if(!IsEmpty(auto_editor->grabbed_block.text))
+      {
+         auto_editor->editor_blocks[auto_editor->editor_block_count].text = auto_editor->grabbed_block.text;
+         auto_editor->editor_block_count++;
+         auto_editor->grabbed_block.text = Literal("");
+      }
+   }
+   
+   v2 block_size = V2(GetSize(editor_panel->bounds).x * 0.8, 40);
+   v2 block_margin = V2(GetSize(editor_panel->bounds).x * 0.1, 10);
+   
+   for(u32 i = 0;
+       auto_editor->editor_block_count > i;
+       i++)
+   {
+      AutonomousBlock *block = auto_editor->editor_blocks + i;
+      
+      //TODO: make this cleaner
+      _Button(POINTER_UI_ID(block), editor_panel, NULL, block->text, block_size, V2(0, 0), block_margin);
+   }
+}
+
+void DrawEditorPanel(layout *editor_panel, AutonomousEditor *auto_editor)
+{
+   RenderContext *render_context = editor_panel->context->render_context;
+   
+   Rectangle(render_context, editor_panel->bounds, V4(0.3, 0.3, 0.3, 0.6));
+   RectangleOutline(render_context, editor_panel->bounds, V4(0, 0, 0, 1));
+   
+   if(auto_editor->is_lua_editor)
+   {
+      DrawLuaEditor(editor_panel, auto_editor);
+   }
+   else
+   {
+      DrawBlockEditor(editor_panel, auto_editor);
+   }
+}
+
+void DrawAutonomousEditor(layout *auto_editor, UIContext *context, DashboardState *dashstate)
+{
+   v2 auto_editor_size = GetSize(auto_editor->bounds);
+   
+   layout block_selector = Panel(auto_editor, V2(auto_editor_size.x * 0.1, auto_editor_size.y) - V2(10, 10), V2(0, 0), V2(5, 5)).lout;
+   layout editor = Panel(auto_editor, V2(auto_editor_size.x * 0.8, auto_editor_size.y), V2(0, 0), V2(0, 0)).lout;
+   layout editor_menu = Panel(auto_editor, V2(auto_editor_size.x * 0.1, auto_editor_size.y) - V2(10, 10), V2(0, 0), V2(5, 5)).lout;
+   
+   RectangleOutline(context->render_context, editor.bounds, V4(0, 0, 0, 1));
+   
+   DrawBlockSelector(&block_selector, &dashstate->auto_editor);
+   DrawEditorMenu(&editor_menu, &dashstate->auto_editor);
+   
+   layout graph_view = Panel(&editor, V2(GetSize(editor.bounds).x, GetSize(editor.bounds).y * 0.3) - V2(10, 10), V2(0, 0), V2(5, 5)).lout;
+   layout editor_bar = Panel(&editor, V2(GetSize(editor.bounds).x, GetSize(editor.bounds).y * 0.05), V2(0, 0), V2(0, 0)).lout;
+   layout editor_panel = Panel(&editor, V2(GetSize(editor.bounds).x, GetSize(editor.bounds).y * 0.65), V2(0, 0), V2(0, 0)).lout;
+   
+   DrawGraphView(&graph_view, &dashstate->auto_editor);
+   DrawEditorBar(&editor_bar, &dashstate->auto_editor);
+   DrawEditorPanel(&editor_panel, &dashstate->auto_editor);
+   
+   if(!IsEmpty(dashstate->auto_editor.grabbed_block.text))
+   {
+      context->tooltip = dashstate->auto_editor.grabbed_block.text;
+   }
+   
 #if 0
    rect2 sandbox_bounds = RectPosSize(280, 20, 800, 675);
    Rectangle(&context, sandbox_bounds, V4(0.5f, 0.0f, 0.0f, 0.5f));

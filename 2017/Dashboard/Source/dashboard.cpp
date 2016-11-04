@@ -11,6 +11,7 @@ enum ui_window_type
 struct network_settings
 {
    string connect_to;
+   b32 is_mdns;
 };
 
 struct ui_window
@@ -29,7 +30,28 @@ struct ui_window
 enum DashboardPage
 {
    Page_Home,
-   Page_AutonomousEditor
+   Page_AutonomousEditor,
+   Page_Robot,
+   Page_Vision,
+   Page_Console
+};
+
+struct AutonomousBlock
+{
+   string text;
+};
+
+struct AutonomousEditor
+{
+   b32 is_lua_editor;
+   
+   AutonomousBlock *selector_blocks;
+   u32 selector_block_count;
+   
+   AutonomousBlock grabbed_block;
+   
+   AutonomousBlock editor_blocks[20];
+   u32 editor_block_count;
 };
 
 struct DashboardState
@@ -37,6 +59,11 @@ struct DashboardState
    DashboardPage page;
    ui_window *first_window;
    b32 connected;
+   
+   ui_window *network_settings_window;
+   ui_window *display_settings_window;
+   
+   AutonomousEditor auto_editor;
 };
 
 ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type type)
@@ -116,12 +143,28 @@ void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
              
    if(Button(&settings_bar, NULL, EmptyString(), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
    {
-      AddWindow(dashstate, V2(200, 100), V2(100, 100), WindowType_DisplaySettings);      
+      if(!dashstate->display_settings_window)
+      {
+         dashstate->display_settings_window =
+            AddWindow(dashstate, V2(200, 100), V2(100, 100), WindowType_DisplaySettings);
+      }
+      else
+      {
+         dashstate->display_settings_window->pos = V2(100, 100);
+      }
    }
    
    if(Button(&settings_bar, NULL, EmptyString(), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
    {
-      AddWindow(dashstate, V2(200, 100), V2(250, 100), WindowType_NetworkSettings);
+      if(!dashstate->network_settings_window)
+      {
+         dashstate->network_settings_window =
+            AddWindow(dashstate, V2(200, 100), V2(250, 100), WindowType_NetworkSettings);
+      }
+      else
+      {
+         dashstate->network_settings_window->pos = V2(250, 100);
+      }
    }
 }
 
@@ -159,24 +202,29 @@ void DrawLeftBar(layout *left_bar, UIContext *context, DashboardState *dashstate
       dashstate->page = Page_AutonomousEditor;
    }
    
-   /*
    if(Button(left_bar, NULL, Literal("Robot"), (dashstate->page == Page_Robot),
              V2(120, 40), V2(0, 0), V2(5, 5)).state)
    {
-      //page = PageType_Robot;
+      dashstate->page = Page_Robot;
    }
    
-   if(Button(left_bar, NULL, Literal("Console"), (page == PageType_Console),
+   if(Button(left_bar, NULL, Literal("Vision"), (dashstate->page == Page_Vision),
              V2(120, 40), V2(0, 0), V2(5, 5)).state)
    {
-      //page = PageType_Console;
+      dashstate->page = Page_Vision;
    }
-   */
+   
+   if(Button(left_bar, NULL, Literal("Console"), (dashstate->page == Page_Console),
+             V2(120, 40), V2(0, 0), V2(5, 5)).state)
+   {
+      dashstate->page = Page_Console;
+   }
 }
 
 void DrawRightBar(layout *right_bar, UIContext *context, DashboardState *dashstate)
 {
    Rectangle(context->render_context, right_bar->bounds, V4(0.2f, 0.2f, 0.2f, 0.7f));
+   v2 bar_size = GetSize(right_bar->bounds);
    
    for(ui_window *curr_window = dashstate->first_window;
        curr_window;)
@@ -206,8 +254,17 @@ void DrawRightBar(layout *right_bar, UIContext *context, DashboardState *dashsta
       }
       
       //TODO: make this cleaner
-      if(_Button(POINTER_UI_ID(op_window), right_bar, NULL, window_name, V2(40, 40), V2(0, 0), V2(5, 5)).state)
+      if(_Button(POINTER_UI_ID(op_window), right_bar, NULL, window_name, V2(bar_size.x * 0.9, 40), V2(0, 0), V2(bar_size.x * 0.05, 5)).state)
       {
+         if(op_window->type == WindowType_DisplaySettings)
+         {
+            dashstate->display_settings_window = NULL;
+         }
+         else if(op_window->type == WindowType_NetworkSettings)
+         {
+            dashstate->network_settings_window = NULL;
+         }
+         
          RemoveWindow(dashstate, op_window);
       }
    }
@@ -221,14 +278,15 @@ void DrawHome(layout *center_area, UIContext *context, DashboardState *dashstate
    //margin = V2(0, 10)
    layout banner_panel = Panel(center_area, V2(center_area_size.x * 0.8f, center_area_size.y * 0.2f), V2(0, 0), V2(center_area_size.x * 0.1f, 0)).lout;
    Rectangle(context->render_context, banner_panel.bounds, V4(0.5f, 0.0f, 0.0f, 0.5f));
-   Text(&banner_panel, Literal("CN Robotics"), 40, V2(0, 5));
+   Text(&banner_panel, Literal("CN Robotics"), 40,
+        V2((GetSize(banner_panel.bounds).x - GetTextWidth(context->render_context, Literal("CN Robotics"), 40)) / 2.0f, 0), V2(0, 5)); 
    
    //size = V2(400, 255)
    //margin = V2(10, 10)
    layout connect_panel = Panel(center_area, V2(center_area_size.x * 0.4f, center_area_size.y * 0.3f), V2(0, 0), V2(0, 0)).lout;
    Rectangle(context->render_context, connect_panel.bounds, V4(0.5f, 0.0f, 0.0f, 0.5f));
    RectangleOutline(context->render_context, connect_panel.bounds, V4(0.0f, 0.0f, 0.0f, 1.0f), 3);
-   Text(&connect_panel, Literal("Connection"), 20, V2(0, 5));
+   Text(&connect_panel, Literal("Connection"), 20, V2(0, 0), V2(0, 5));
    
    if(dashstate->connected)
    {
@@ -251,13 +309,11 @@ void DrawHome(layout *center_area, UIContext *context, DashboardState *dashstate
    }
    else
    {
-      Text(&connect_panel, Literal("Not Connected"), 20, V2(5, 5));
+      Text(&connect_panel, Literal("Not Connected"), 20, V2(0, 0), V2(5, 5));
    }
    
    NextLine(&connect_panel);
    
-   //size = V2(100, 40)
-   //margin = V2(5, 5)
    if(Button(&connect_panel, NULL, Literal("Reconnect"), V2(100, 40), V2(0, 0), V2(0, 0)).state)
    {
       /*
@@ -289,6 +345,7 @@ void DrawCenterArea(layout *center_area, UIContext *context, DashboardState *das
 void DrawBackground(UIContext *context)
 {
    Rectangle(context->render_context, RectMinSize(V2(0, 0), context->window_size), V4(1.0f, 1.0f, 1.0f, 1.0f));
+   
    //TODO: replace this with 3d spinning gear logo 
    Bitmap(context->render_context, &context->assets->logo, 
           V2((context->window_size.x / 2) - (context->assets->logo.width / 2), (context->window_size.y / 2) - (context->assets->logo.height / 2)));
@@ -296,13 +353,34 @@ void DrawBackground(UIContext *context)
 
 void DrawDisplaySettings(layout *window_layout)
 {
-   Text(window_layout, Literal("Display Settings"), 20, V2(0, 0));
+   Text(window_layout, Literal("Display Settings"), 20, V2(0, 0), V2(0, 0));
 }
 
 void DrawNetworkSettings(layout *window_layout, network_settings *net_settings)
 {
-   Text(window_layout, Literal("Network Settings"), 20, V2(0, 0));
+   Text(window_layout, Literal("Network Settings"), 20, V2(0,0), V2(0, 0));
    TextBox(window_layout, &net_settings->connect_to, V2(GetSize(window_layout->bounds).x * 0.9, 40), V2(0, 0), V2(0, 0));
+   ToggleSlider(window_layout, &net_settings->is_mdns, Literal("mDNS"), Literal("IP"), V2(120, 20), V2(0, 0), V2(0, 0));
+   
+   if(Button(window_layout, NULL, Literal("Reconnect"), V2(120, 20), V2(0, 0), V2(0, 0)).state)
+   {
+      
+   }
+}
+
+void DrawWindowTab(layout *tab_layout, ui_window *window)
+{
+   Rectangle(tab_layout->context->render_context, tab_layout->bounds, V4(0.3f, 0.3f, 0.3f, 1.0f));
+   
+   v2 tab_button_size = V2(GetSize(tab_layout->bounds).y, GetSize(tab_layout->bounds).y);
+   Rectangle(tab_layout, V4(0, 0, 0, 0), tab_button_size, V2(0, 0), V2(0, 0));
+   if(Button(tab_layout, NULL, EmptyString(), tab_button_size, V2(0, 0), V2(0, 0)).state)
+   {
+      //NOTE: currently clicking this button breaks all the things
+      //      it sets the button to active than dissapears leaving us with no way of setting it inactive
+      //      because its the button function that handles setting it inactive
+      int breakhere = 0;
+   }
 }
 
 void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
@@ -310,17 +388,23 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
    rect2 window_bounds = RectMinSize(window->pos, window->size);
    Rectangle(context->render_context, window_bounds, V4(0.7f, 0.7f, 0.7f, 1.0f));
    
-   rect2 tab_bounds = RectPosSize(window->pos, V2(10, 10));
-   rect2 extended_tab_bounds = RectMinSize(tab_bounds.min - V2(2, 2), V2(34, 14));
    ui_id tab_id = POINTER_UI_ID(window);
-   ClickInteraction(context, tab_id, context->input_state.left_up,
-                    context->input_state.left_down, Contains(tab_bounds, context->input_state.pos));
    
-   Rectangle(context->render_context,
-             ((context->hot_element == tab_id) || (context->active_element == tab_id)) ? extended_tab_bounds : tab_bounds,
-             (context->active_element == tab_id) ?  V4(0.3f, 0.3f, 0.3f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f));
-             
-   if(context->active_element == tab_id)
+   rect2 tab_bounds = RectPosSize(window->pos, V2(10, 10));
+   interaction_state tab_interact = ClickInteraction(context, Interaction(tab_id, 0, stack_layer), context->input_state.left_up,
+                                                     context->input_state.left_down, Contains(tab_bounds, context->input_state.pos));
+   
+   if(tab_interact.selected)
+   {
+      layout tab_layout = Layout(RectMinSize(window->pos - V2(7, 7), V2(window->size.x * 0.8, 14)), context, stack_layer);
+      DrawWindowTab(&tab_layout, window);
+   }
+   else
+   {
+      Rectangle(context->render_context, tab_bounds, V4(0.0f, 0.0f, 0.0f, 1.0f));
+   }
+   
+   if(tab_interact.active)
    {
       window->pos = context->input_state.pos;
    }
@@ -348,6 +432,8 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
 //TODO: stop passing UIContext to everything
 void DrawDashboardUI(UIContext *context, DashboardState *dashstate)
 {
+   context->tooltip = EmptyString();
+   
    layout root_layout = Layout(RectMinSize(V2(0, 0), context->window_size), context, 0);
    v2 layout_size = GetSize(root_layout.bounds);
    
@@ -374,5 +460,19 @@ void DrawDashboardUI(UIContext *context, DashboardState *dashstate)
    {
       DrawWindow(curr_window, context, stack_layer);
       stack_layer++;
+   }
+   
+   if(!IsEmpty(context->tooltip))
+   {
+      v2 tooltip_size = GetTextSize(context->render_context, context->tooltip, 20);
+      rect2 tooltip_bounds = RectMinSize(context->input_state.pos, tooltip_size);
+      
+      if(tooltip_bounds.max.x > root_layout.bounds.max.x)
+      {
+         tooltip_bounds = RectMinSize(context->input_state.pos - V2(tooltip_size.x, 0), tooltip_size);
+      }
+      
+      Rectangle(context->render_context, tooltip_bounds, V4(0.2, 0.2, 0.2, 0.4));
+      Text(context->render_context, tooltip_bounds.min, context->tooltip, 20);
    }
 }

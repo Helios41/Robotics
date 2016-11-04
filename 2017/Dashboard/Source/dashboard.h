@@ -250,6 +250,8 @@ void *PushSize(MemoryArena *arena, size_t size)
 }
 
 //TODO: this needs to be removed ASAP, its super prone to error
+//      ATM its only used to deallocate the temp memory when loading the fonts
+//      the arena system needs a proper temp_memory solution
 void PopSize(MemoryArena *arena, size_t size)
 {
    arena->used -= size;

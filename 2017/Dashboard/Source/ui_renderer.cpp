@@ -16,14 +16,16 @@ struct LoadedBitmap
 struct CharacterBitmap
 {
 	LoadedBitmap bitmap;
-	v2 offset;
+   r32 height_above_baseline;
+   r32 height_below_baseline;
 };
 
 enum RenderCommandType
 {
 	RenderCommandType_DrawRectangle,
 	RenderCommandType_DrawBitmap,
-   RenderCommandType_DrawRectangleOutline
+   RenderCommandType_DrawRectangleOutline,
+   RenderCommandType_DrawLine
 };
 
 struct RenderCommandHeader
@@ -43,6 +45,7 @@ struct DrawBitmapCommand
 {
 	RenderCommandHeader header;
 	v2 pos;
+   v2 size;
 	LoadedBitmap *bitmap;
 };
 
@@ -54,11 +57,27 @@ struct DrawRectangleOutlineCommand
    u32 thickness;
 };
 
+struct DrawLineCommand
+{
+	RenderCommandHeader header;
+	v4 color;
+	v2 a;
+   v2 b;
+   u32 thickness;
+};
+
 struct RenderContext
 {
    u32 render_commands_size;
    u8 *render_commands_at;
    u8 *render_commands;
+   
+   struct
+   {
+      r32 baseline_from_height;
+      r32 native_height;
+      r32 space_width;
+   } font;
    
    CharacterBitmap characters[94];
 };
@@ -114,6 +133,9 @@ RenderContext InitRenderContext(MemoryArena *memory, u32 render_commands_size)
    
    glEnable(GL_TEXTURE_2D);
    
+   r32 heightest_above_baseline = -FLTMAX;
+   r32 lowest_below_baseline = -FLTMAX;
+   
    for(u32 char_code = 33;
        char_code <= 126;
        char_code++)
@@ -122,13 +144,16 @@ RenderContext InitRenderContext(MemoryArena *memory, u32 render_commands_size)
       CharacterBitmap *char_bitmap = result.characters + (char_code - 33);
 
       int width, height, xoffset, yoffset;
-      u8 *mono_bitmap = stbtt_GetCodepointBitmap(&font, 0, stbtt_ScaleForPixelHeight(&font, 20.0f),
+      u8 *mono_bitmap = stbtt_GetCodepointBitmap(&font, 0, stbtt_ScaleForPixelHeight(&font, 80.0f),
                                                  curr_char, &width, &height, &xoffset, &yoffset);
 
       char_bitmap->bitmap.width = (u32) width;
       char_bitmap->bitmap.height = (u32) height;
-      char_bitmap->offset.x = (r32) xoffset;
-      char_bitmap->offset.y = (r32) yoffset;
+      char_bitmap->height_above_baseline = -yoffset;
+      char_bitmap->height_below_baseline = height + yoffset;
+      
+      heightest_above_baseline = Max(heightest_above_baseline, char_bitmap->height_above_baseline);
+      lowest_below_baseline = Max(lowest_below_baseline, char_bitmap->height_below_baseline);
 
       u32 *temp_texture = (u32 *) PushSize(memory, sizeof(u32) * width * height);
       
@@ -165,6 +190,14 @@ RenderContext InitRenderContext(MemoryArena *memory, u32 render_commands_size)
    }
    
    glDisable(GL_TEXTURE_2D);
+   
+   int space_width;
+   stbtt_GetCodepointHMetrics(&font, ' ', &space_width, 0);
+   
+   result.font.native_height = heightest_above_baseline + lowest_below_baseline;
+   result.font.baseline_from_height = heightest_above_baseline / result.font.native_height;
+   result.font.space_width = result.font.native_height * 0.4f;
+   
    return result;
 }
 
@@ -200,6 +233,30 @@ DrawBitmapCommand *Bitmap(RenderContext *context, LoadedBitmap *bitmap, v2 pos)
          draw_bitmap->header.type = RenderCommandType_DrawBitmap;
          draw_bitmap->bitmap = bitmap;
 			draw_bitmap->pos = pos;
+         draw_bitmap->size = V2(bitmap->width, bitmap->height);
+         
+         context->render_commands_at += sizeof(DrawBitmapCommand);
+         return draw_bitmap;
+      }
+	}
+   
+   return NULL;
+}
+
+DrawBitmapCommand *Bitmap(RenderContext *context, LoadedBitmap *bitmap, v2 pos, v2 size)
+{
+	if(bitmap)
+	{
+      DrawBitmapCommand *draw_bitmap = (DrawBitmapCommand *) context->render_commands_at;
+   
+      if((context->render_commands_at + sizeof(DrawBitmapCommand)) < 
+         (context->render_commands + context->render_commands_size))
+      {
+         draw_bitmap->header.size = sizeof(DrawBitmapCommand);
+         draw_bitmap->header.type = RenderCommandType_DrawBitmap;
+         draw_bitmap->bitmap = bitmap;
+			draw_bitmap->pos = pos;
+         draw_bitmap->size = size;
          
          context->render_commands_at += sizeof(DrawBitmapCommand);
          return draw_bitmap;
@@ -223,6 +280,27 @@ DrawRectangleOutlineCommand *RectangleOutline(RenderContext *context, rect2 area
       draw_rectangle_outline->thickness = thickness;
       
 		context->render_commands_at += sizeof(DrawRectangleOutlineCommand);
+      return draw_rectangle_outline;
+	}
+   
+   return NULL;
+}
+
+DrawLineCommand *Line(RenderContext *context, v2 a, v2 b, v4 color, u32 thickness = 1)
+{
+	DrawLineCommand *draw_rectangle_outline = (DrawLineCommand *) context->render_commands_at;
+   
+	if((context->render_commands_at + sizeof(DrawLineCommand)) < 
+      (context->render_commands + context->render_commands_size))
+	{
+		draw_rectangle_outline->header.size = sizeof(DrawLineCommand);
+		draw_rectangle_outline->header.type = RenderCommandType_DrawLine;
+		draw_rectangle_outline->a = a;
+      draw_rectangle_outline->b = b;
+		draw_rectangle_outline->color = color;
+      draw_rectangle_outline->thickness = thickness;
+      
+		context->render_commands_at += sizeof(DrawLineCommand);
       return draw_rectangle_outline;
 	}
    
@@ -275,7 +353,7 @@ void RenderUI(RenderContext *context, v2 window_size)
 			case RenderCommandType_DrawBitmap:
 			{
 				DrawBitmapCommand *draw_bitmap = (DrawBitmapCommand *) render_command;
-				rect2 area = RectMinSize(draw_bitmap->pos, V2(draw_bitmap->bitmap->width, draw_bitmap->bitmap->height));
+				rect2 area = RectMinSize(draw_bitmap->pos, draw_bitmap->size);
 
 				glBindTexture(GL_TEXTURE_2D, draw_bitmap->bitmap->gl_texture);
 
@@ -331,6 +409,28 @@ void RenderUI(RenderContext *context, v2 window_size)
             glLineWidth(1);
          }
          break;
+         
+         case RenderCommandType_DrawLine:
+         {
+            DrawLineCommand *draw_line = (DrawLineCommand *) render_command;
+				
+            v2 a = draw_line->a;
+            v2 b = draw_line->b;
+            
+            glLineWidth(draw_line->thickness);
+            
+				glBegin(GL_LINES);
+				{
+					glColor4fv(draw_line->color.vs);
+					
+               glVertex2f(a.x, a.y);
+					glVertex2f(b.x, b.y);
+				}
+				glEnd();
+            
+            glLineWidth(1);
+         }
+         break;
 		}
 
 		render_command = (RenderCommandHeader *) ((u8 *) render_command + render_command->size);
@@ -353,6 +453,8 @@ struct InputState
    b32 key_enter;
    b32 key_up;
    b32 key_down;
+   b32 key_left;
+   b32 key_right;
 };
 
 //TODO: make this more dynamic
@@ -386,49 +488,102 @@ ui_id UIID(u64 a, u64 b)
 #define POINTER_UI_ID(pointer) UIID((u64) pointer, (u64) __LINE__)
 #define NULL_UI_ID UIID((u64) 0, (u64) 0)
 
+struct interaction
+{
+   ui_id id;
+   u32 ui_layer;
+   u32 stack_layer;
+};
+
+#define NULL_INTERACTION Interaction(NULL_UI_ID, 0, 0)
+
+interaction Interaction(ui_id id, u32 ui_layer, u32 stack_layer)
+{
+   interaction result = {};
+   
+   result.id = id;
+   result.ui_layer = ui_layer;
+   result.stack_layer = stack_layer;
+   
+   return result;
+}
+
 struct UIContext
 {
    v2 window_size;
    
-   ui_id hot_element;
-   ui_id active_element;
-   //ui_interaction curr_interaction;
+   //TODO: store start times for all of these interactions
+   interaction hot_element;
+   interaction active_element;
+   interaction selected_element;
    
    RenderContext *render_context;
    InputState input_state;
    UIAssets *assets;
+   
+   u32 text_box_pointer;
+   
+   u32 tooltip_ui_layer;
+   u32 tooltip_stack_layer;
+   string tooltip;
 };
 
-b32 ClickInteraction(UIContext *context, ui_id id, b32 trigger_cond, b32 active_cond, b32 hot_cond)
+struct interaction_state
 {
-   b32 result = false;
+   b32 hot;
+   b32 became_hot;
    
-   if(context->active_element == id)
+   b32 active;
+   b32 became_active;
+   
+   b32 selected;
+   b32 became_selected;
+};
+
+interaction_state ClickInteraction(UIContext *context, interaction intrct, b32 trigger_cond, b32 active_cond, b32 hot_cond)
+{
+   interaction_state result = {};
+   result.hot = context->hot_element.id == intrct.id;
+   result.active = context->active_element.id == intrct.id;
+   result.selected = context->selected_element.id == intrct.id;
+   
+   if(context->active_element.id == intrct.id)
    {
       if(trigger_cond)
       {
-         if(context->hot_element == id)
+         if(context->hot_element.id == intrct.id)
          {
-            result = true;
+            result.became_selected = true;
+            context->selected_element = intrct;
          }
          
-         context->active_element = NULL_UI_ID;
+         context->active_element = NULL_INTERACTION;
       }
    }
    
-   if(context->hot_element == id)
+   if(context->hot_element.id == intrct.id)
    {
       if(active_cond)
       {
-         context->active_element = id;
+         result.became_active = true;
+         context->active_element = intrct;
       }
       
       if(!hot_cond)
-         context->hot_element = NULL_UI_ID;
+         context->hot_element = NULL_INTERACTION;
    }
 
-   if(((context->active_element == NULL_UI_ID) || (context->active_element == id)) && hot_cond) 
-      context->hot_element = id;
+   b32 can_set_hot = ((context->active_element.id == NULL_UI_ID) ||
+                     (context->active_element.id == intrct.id)) &&
+                     ((context->hot_element.stack_layer < intrct.stack_layer) ||
+                      ((context->hot_element.stack_layer == intrct.stack_layer) &&
+                       (context->hot_element.ui_layer < intrct.ui_layer)));
+                     
+   if(can_set_hot && hot_cond) 
+   {
+      result.became_hot = true;
+      context->hot_element = intrct;
+   }
    
    return result;
 }
@@ -466,6 +621,11 @@ layout Layout(rect2 bounds, UIContext *context, u32 stack_layer)
    result.stack_layer = stack_layer;
    
    return result;
+}
+
+interaction Interaction(ui_id id, layout *ui_layout)
+{
+   return Interaction(id, ui_layout->ui_layer, ui_layout->stack_layer);
 }
 
 v2 v2Max(v2 a, v2 b)
@@ -582,9 +742,45 @@ panel Panel(layout *parent_layout, v2 element_size, v2 padding_size, v2 margin_s
    return result;
 }
 
-void Text(RenderContext *context, v2 pos, string text, u32 scale)
+//TODO: add some form of spacing between characters, pretty much ghetto kerning
+r32 GetTextWidth(RenderContext *context, string text, r32 scale)
 {
-	if (IsEmpty(text)) return;
+   r32 scale_coeff = scale / context->font.native_height;
+   
+	u32 width = 0;
+	for(u32 i = 0;
+       i < text.length;
+       i++)
+	{
+      char c = text.text[i];
+      
+		if (c == ' ')
+		{
+			width += context->font.space_width * scale_coeff;
+		}
+		else
+		{
+			CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
+			width += char_bitmap->bitmap.width * scale_coeff;
+		}
+	}
+   
+   return width;
+}
+
+v2 GetTextSize(RenderContext *context, string text, u32 scale)
+{
+   return V2(GetTextWidth(context, text, scale), scale);
+}
+
+void Text(RenderContext *context, rect2 bounds, string text)
+{  
+   r32 baseline = GetSize(bounds).y * context->font.baseline_from_height;
+   v2 origin = bounds.min;
+   r32 scale_coeff = GetSize(bounds).y / context->font.native_height;
+   
+   RectangleOutline(context, bounds, V4(0, 0, 0, 1));
+   Line(context, V2(bounds.min.x, bounds.min.y + baseline), V2(bounds.max.x, bounds.min.y + baseline), V4(0, 0, 0, 1));
    
 	u32 xoffset = 0;
 	for(u32 i = 0;
@@ -595,46 +791,27 @@ void Text(RenderContext *context, v2 pos, string text, u32 scale)
       
 		if (c == ' ')
 		{
-			xoffset += 10;
+			xoffset += context->font.space_width * scale_coeff;
 		}
 		else
 		{
 			CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
-			Bitmap(context, &char_bitmap->bitmap, V2(pos.x + xoffset + char_bitmap->offset.x, pos.y + char_bitmap->offset.y + 10));
-			xoffset += char_bitmap->bitmap.width;
+			Bitmap(context, &char_bitmap->bitmap,
+                V2(origin.x + xoffset, origin.y + (baseline - char_bitmap->height_above_baseline * scale_coeff)),
+                V2(char_bitmap->bitmap.width, char_bitmap->bitmap.height) * scale_coeff);
+			xoffset += char_bitmap->bitmap.width * scale_coeff;
 		}
 	}
 }
 
-v2 TextSize(RenderContext *context, string text, u32 scale)
+rect2 Text(RenderContext *context, v2 pos, string text, u32 scale)
 {
-	if (IsEmpty(text)) return V2(0, 0);
-   
-	r32 width = 0.0f;
-   r32 highest = -FLTMAX;
-   r32 lowest = FLTMAX;
-	for(u32 i = 0;
-       i < text.length;
-       i++)
-	{
-      char c = text.text[i];
-      
-		if (c == ' ')
-		{
-			width += 10;
-		}
-		else
-		{
-			CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
-			width += char_bitmap->bitmap.width;
-         highest = Max(highest, char_bitmap->bitmap.height + char_bitmap->offset.y);
-         lowest = Min(lowest, char_bitmap->offset.y);
-		}
-	}
-   
-   return V2(width, highest - lowest);
+   rect2 bounds = RectMinSize(pos, GetTextSize(context, text, scale));
+   Text(context, bounds, text);
+   return bounds;
 }
 
+//TODO: clean up text wrap
 //TODO: optimize this by caching the text wrapping & segments?
 void TextWrapRect(RenderContext *render_context, rect2 bounds, string text)
 {
@@ -651,7 +828,7 @@ void TextWrapRect(RenderContext *render_context, rect2 bounds, string text)
           i++)
       {
          string curr_segment = segments[i];
-         v2 word_size = TextSize(render_context, curr_segment, 20);
+         v2 word_size = GetTextSize(render_context, curr_segment, 20);
          
          if((bounds.min.x + at.x + word_size.x) > bounds.max.x)
          {
@@ -715,14 +892,14 @@ element Bitmap(layout *ui_layout, LoadedBitmap *bitmap, v2 element_size, v2 padd
    return bmp_element;
 }
 
-element Text(layout *ui_layout, string text, u32 scale, v2 margin)
+element Text(layout *ui_layout, string text, u32 scale, v2 padding, v2 margin)
 {
    RenderContext *render_context = ui_layout->context->render_context;
 
-   element text_element = Element(ui_layout, TextSize(render_context, text, scale), V2(0, 0), margin);
+   element text_element = Element(ui_layout, GetTextSize(render_context, text, scale), padding, margin);
    Rectangle(render_context, text_element.bounds, V4(0, 0, 0, 0.2f));
    
-   Text(render_context, V2(text_element.bounds.min.x, text_element.bounds.min.y + 5), text, scale);
+   Text(render_context, text_element.bounds.min, text, scale);
    return text_element;
 }
 
@@ -730,9 +907,9 @@ struct button
 {
    b32 state;
    element elem;
+   interaction_state intrct;
 };
 
-//TODO: clean up text wrap
 button _Button(ui_id id, layout *ui_layout, LoadedBitmap *icon, string text, v2 element_size, v2 padding_size, v2 margin_size)
 {
    UIContext *context = ui_layout->context;
@@ -740,29 +917,38 @@ button _Button(ui_id id, layout *ui_layout, LoadedBitmap *icon, string text, v2 
    InputState input = ui_layout->context->input_state;
    element button_element = Element(ui_layout, element_size, padding_size, margin_size);
    
-   b32 state = ClickInteraction(context, id, context->input_state.left_up,
-                                context->input_state.left_down, Contains(button_element.bounds, context->input_state.pos));
+   interaction_state button_interact = ClickInteraction(context, Interaction(id, ui_layout->ui_layer + 1, ui_layout->stack_layer), context->input_state.left_up,
+                                                        context->input_state.left_down, Contains(button_element.bounds, context->input_state.pos));
    
-   if(context->active_element == id)
+   if(button_interact.active)
    {
       Rectangle(render_context, button_element.bounds, V4(1.0f, 0.0f, 0.75f, 1.0f));
    }
-   else if(context->hot_element == id)
+   else if(button_interact.hot)
    {
       Rectangle(render_context, button_element.bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
-      //TODO: set tooltip to text
    }
    else
    {
       Rectangle(render_context, button_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
    }
    
+   if(button_interact.hot)
+   {
+      if((ui_layout->stack_layer > context->tooltip_stack_layer) ||
+         ((ui_layout->stack_layer == context->tooltip_stack_layer) && (ui_layout->ui_layer > context->tooltip_ui_layer)))
+      {
+         context->tooltip = text;
+      }
+   }
+   
    Bitmap(render_context, icon, button_element.bounds.min);
    TextWrapRect(render_context, button_element.bounds, text);
    
    button result = {};
-   result.state = state;
+   result.state = button_interact.became_selected;
    result.elem = button_element;
+   result.intrct = button_interact;
    return result;
 }
 
@@ -780,6 +966,71 @@ button _Button(ui_id id, layout *ui_layout, LoadedBitmap *icon, string text, b32
 
 #define Button(...) _Button(GEN_UI_ID, __VA_ARGS__)
 
+element _ToggleSlider(ui_id id, layout *ui_layout, b32 *option, string option1, string option2, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   UIContext *context = ui_layout->context;
+   RenderContext *render_context = context->render_context;
+   InputState input = ui_layout->context->input_state;
+   element toggle_element = Element(ui_layout, element_size, padding_size, margin_size);
+   
+   interaction_state toggle_interact = ClickInteraction(context, Interaction(id, ui_layout->ui_layer + 1, ui_layout->stack_layer), context->input_state.left_up,
+                                                        context->input_state.left_down, Contains(toggle_element.bounds, context->input_state.pos));
+   
+   v2 option_bounds_size = V2(GetSize(toggle_element.bounds).x / 2, GetSize(toggle_element.bounds).y);
+   rect2 option1_bounds = RectMinSize(toggle_element.bounds.min, option_bounds_size);
+   rect2 option2_bounds = RectMinSize(toggle_element.bounds.min + V2(option_bounds_size.x, 0),
+                                      option_bounds_size);   
+   
+   if(toggle_interact.became_selected)
+   {
+      *option = !(*option);
+   }
+   
+   Rectangle(render_context, option1_bounds, (*option) ? V4(1, 0, 0, 1) : V4(0.5, 0, 0, 1));
+   TextWrapRect(render_context, option1_bounds, option1);
+   
+   Rectangle(render_context, option2_bounds, !(*option) ? V4(1, 0, 0, 1) : V4(0.5, 0, 0, 1));
+   TextWrapRect(render_context, option2_bounds, option2);
+   
+   if(toggle_interact.active)
+   {
+      RectangleOutline(render_context, toggle_element.bounds, V4(0.6f, 0.6f, 0.6f, 1.0f));
+   }
+   else if(toggle_interact.hot)
+   {
+      RectangleOutline(render_context, toggle_element.bounds, V4(0.3f, 0.3f, 0.3f, 1.0f));
+   }
+   else
+   {
+      RectangleOutline(render_context, toggle_element.bounds, V4(0.0f, 0.0f, 0.0f, 1.0f));
+   }
+   
+   if(toggle_interact.hot)
+   {
+      string tooltip_text = EmptyString();
+      
+      if(Contains(option1_bounds, context->input_state.pos))
+      {
+         tooltip_text = option1;
+      }
+      else if(Contains(option2_bounds, context->input_state.pos))
+      {
+         tooltip_text = option2;
+      }
+      
+      if(IsEmpty(context->tooltip) || (ui_layout->stack_layer > context->tooltip_stack_layer) ||
+         ((ui_layout->stack_layer == context->tooltip_stack_layer) && (ui_layout->ui_layer > context->tooltip_ui_layer)))
+      {
+         context->tooltip = tooltip_text;
+      }
+   }
+   
+   return toggle_element;
+}
+
+#define ToggleSlider(...) _ToggleSlider(GEN_UI_ID, __VA_ARGS__)
+
+//TODO: finish the cursor & do text input
 void _TextBox(ui_id id, layout *ui_layout, string *buffer, v2 element_size, v2 padding_size, v2 margin_size)
 {
    UIContext *context = ui_layout->context;
@@ -789,7 +1040,107 @@ void _TextBox(ui_id id, layout *ui_layout, string *buffer, v2 element_size, v2 p
    Rectangle(render_context, textbox_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
    RectangleOutline(render_context, textbox_element.bounds, V4(0.0f, 0.0f, 0.f, 1.0f));
    
-   TextWrapRect(render_context, textbox_element.bounds, *buffer);
+   if(context->input_state.key_right)
+   {
+      context->text_box_pointer++;
+   }
+   else if(context->input_state.key_left && (context->text_box_pointer > 0))
+   {
+      context->text_box_pointer--;
+   }
+   
+   rect2 bounds = textbox_element.bounds;
+   string text = *buffer;
+   
+   if(!IsEmpty(text))
+   {
+      u32 segment_count;
+      string *segments = Split(text, ' ', &segment_count);
+      
+      v2 at = V2(0, 0);
+      r32 row_height = 0.0f;
+      
+      u32 char_index = 0;
+      v2 pointer_at = V2(0, 0);
+      r32 pointer_height = 30.0f;
+      
+      for(u32 i = 0;
+          i < segment_count;
+          i++)
+      {
+         string curr_segment = segments[i];
+         v2 word_size = GetTextSize(render_context, curr_segment, 20);
+         
+         if((bounds.min.x + at.x + word_size.x) > bounds.max.x)
+         {
+            if((at.y + row_height + word_size.y) > GetSize(bounds).y)
+            {
+               
+            }
+            else
+            {
+               if(word_size.x > GetSize(bounds).x)
+               {
+                  
+               }
+               else
+               {
+                  i--;
+               }
+               
+               at.x = 0.0f;
+               at.y += row_height;
+               row_height = 0.0f;
+            }
+         }
+         else
+         {
+            Rectangle(render_context, RectPosSize(bounds.min + at + V2(5, 5), V2(3, 3)),
+                      V4(0.0f, 0.0f, 0.0f, 1.0f));
+            /*
+            v2 segment_pos = bounds.min + at + V2(5, 5);
+            u32 xoffset = 0;
+            for(u32 i = 0;
+                i < curr_segment.length;
+                i++)
+            {
+               char c = curr_segment.text[i];
+               r32 char_width = 0.0f;
+               
+               if(c == ' ')
+               {
+                  char_width = 10;
+               }
+               else
+               {
+                  CharacterBitmap *char_bitmap = render_context->characters + ((u32)c - 33);
+                  Bitmap(render_context, &char_bitmap->bitmap,
+                         V2(segment_pos.x + xoffset + char_bitmap->offset.x,
+                            segment_pos.y + char_bitmap->offset.y + 10));
+                  char_width = char_bitmap->bitmap.width;
+               }
+               
+               xoffset += char_width;
+               
+               if(i == (context->text_box_pointer - char_index))
+               {
+                  pointer_at = segment_pos + V2(xoffset - char_width, 0) - V2(0, 5);
+                  xoffset += 5;
+               }
+            }
+            */
+                 
+            row_height = Max(row_height, word_size.y);
+            at.x += word_size.x + 10;
+            char_index += curr_segment.length;
+         }
+      }
+      
+      Rectangle(render_context, RectMinSize(pointer_at, V2(4, pointer_height)),
+                V4(0.0f, 1.0f, 0.0f, 1.0f));
+      
+      free(segments);
+   }
 }
 
 #define TextBox(...) _TextBox(GEN_UI_ID, __VA_ARGS__)
