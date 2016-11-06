@@ -663,8 +663,7 @@ get_padding_rect_result GetPaddingRect(layout ui_layout, v2 element_size, v2 pad
    }
    
    v2 padding_min = ui_layout.at + padding_offset;
-   rect2 padding_rect = RectMinSize(padding_min, padding_size.x * 2.0f + element_size.x,
-                                                 padding_size.y * 2.0f + element_size.y);
+   rect2 padding_rect = RectMinSize(padding_min, (padding_size * 2.0f) + element_size);
    
    get_padding_rect_result result = {};
    result.padding_rect = padding_rect;
@@ -674,6 +673,7 @@ get_padding_rect_result GetPaddingRect(layout ui_layout, v2 element_size, v2 pad
 
 struct element
 {
+   rect2 margin_bounds;
    rect2 bounds;
    b32 fit;
 };
@@ -712,6 +712,9 @@ element Element(layout *ui_layout, v2 element_size, v2 padding_size, v2 margin_s
       }
    }
    
+   result.bounds = RectMinSize(padding_rect.min + padding_size, element_size);
+   result.margin_bounds = RectMinSize(ui_layout->at, (margin_size * 2.0f) + (padding_size * 2.0f) + element_size);
+   
    ui_layout->at = V2(padding_rect.max.x, ui_layout->at.y);
    ui_layout->new_line_issued = false;
    ui_layout->has_elements = true;
@@ -719,8 +722,6 @@ element Element(layout *ui_layout, v2 element_size, v2 padding_size, v2 margin_s
    ui_layout->last_element_right_margin = margin_size.x;
    ui_layout->row_effective_height = Max(padding_offset.y + padding_rect_size.y, ui_layout->row_effective_height);
    ui_layout->abs_row_bottom_margin = Max(padding_offset.y + padding_rect_size.y + margin_size.y, ui_layout->abs_row_bottom_margin);
-   
-   result.bounds = RectMinSize(padding_rect.min + padding_size, element_size);
    
    return result;
 }

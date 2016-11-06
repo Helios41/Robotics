@@ -36,22 +36,65 @@ enum DashboardPage
    Page_Console
 };
 
+enum RobotHardwareType
+{
+   Hardware_Motor,
+   Hardware_Solenoid,
+   Hardware_Drive
+};
+
+struct RobotHardware
+{
+   RobotHardwareType type;
+   u32 id;
+   string name;
+};
+
+enum SolenoidState
+{
+   Solenoid_Extended,
+   Solenoid_Retracted
+};
+
 struct AutonomousBlock
 {
-   string text;
+   b32 is_wait_block;
+   
+   union
+   {
+      struct
+      {
+         RobotHardware *hardware;
+   
+         union
+         {
+            r32 motor_state;
+            SolenoidState solenoid_state;
+            struct
+            {
+               r32 forward_value;
+               r32 rotate_value;
+            } drive_state;
+         };   
+      };
+      
+      r32 wait_duration;
+   };
 };
 
 struct AutonomousEditor
 {
    b32 is_lua_editor;
    
+   AutonomousBlock wait_block;
    AutonomousBlock *selector_blocks;
    u32 selector_block_count;
    
-   AutonomousBlock grabbed_block;
-   
    AutonomousBlock editor_blocks[20];
    u32 editor_block_count;
+   
+   AutonomousBlock *grabbed_block;
+   AutonomousBlock *selected_block;
 };
 
 struct DashboardState
@@ -120,6 +163,7 @@ void RemoveWindow(DashboardState *dashstate, ui_window *window)
 }
 
 #include "autonomous_editor.cpp"
+#include "robot.cpp"
 
 void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
 {
@@ -339,6 +383,10 @@ void DrawCenterArea(layout *center_area, UIContext *context, DashboardState *das
    else if(dashstate->page == Page_AutonomousEditor)
    {
       DrawAutonomousEditor(center_area, context, dashstate);
+   }
+   else if(dashstate->page == Page_Robot)
+   {
+      DrawRobot(center_area, context, dashstate);
    }
 }
 

@@ -8,16 +8,24 @@ void DrawBlockSelector(layout *block_selector, AutonomousEditor *auto_editor)
    v2 block_size = V2(GetSize(block_selector->bounds).x * 0.8, 40);
    v2 block_margin = V2(GetSize(block_selector->bounds).x * 0.1, 10);
    
+   if(Button(block_selector, NULL, Literal("Wait"), block_size, V2(0, 0), block_margin).state)
+   {
+      auto_editor->grabbed_block = &auto_editor->wait_block;
+   }
+   
    for(u32 i = 0;
        auto_editor->selector_block_count > i;
        i++)
    {
       AutonomousBlock *block = auto_editor->selector_blocks + i;
+      string text = block->hardware ? block->hardware->name : EmptyString();
+      
+      Assert(!block->is_wait_block);
       
       //TODO: make this cleaner
-      if(_Button(POINTER_UI_ID(block), block_selector, NULL, block->text, block_size, V2(0, 0), block_margin).state)
+      if(_Button(POINTER_UI_ID(block), block_selector, NULL, text, block_size, V2(0, 0), block_margin).state)
       {
-         auto_editor->grabbed_block = *block;
+         auto_editor->grabbed_block = block;
       }
    }
 }
@@ -36,6 +44,8 @@ void DrawEditorMenu(layout *editor_menu, AutonomousEditor *auto_editor)
    Button(editor_menu, NULL, Literal("Load"), button_size, V2(0, 0), button_margin);
    Button(editor_menu, NULL, Literal("Save"), button_size, V2(0, 0), button_margin);
    Button(editor_menu, NULL, Literal("Upload"), button_size, V2(0, 0), button_margin);
+   Button(editor_menu, NULL, Literal("Simulate"), button_size, V2(0, 0), button_margin);
+   Button(editor_menu, NULL, Literal("Record"), button_size, V2(0, 0), button_margin);
 }
 
 void DrawGraphView(layout *graph_view, AutonomousEditor *auto_editor)
@@ -77,11 +87,13 @@ void DrawEditorBar(layout *editor_bar, AutonomousEditor *auto_editor)
    Rectangle(render_context, editor_bar->bounds, V4(0.3, 0.3, 0.3, 0.6));
    RectangleOutline(render_context, editor_bar->bounds, V4(0, 0, 0, 1));
    
-   v2 button_size = V2(GetSize(editor_bar->bounds).y, GetSize(editor_bar->bounds).y);
+   v2 button_size = V2(GetSize(editor_bar->bounds).y * 1.8, GetSize(editor_bar->bounds).y * 0.8);
+   v2 button_margin = V2(GetSize(editor_bar->bounds).y * 0.1, GetSize(editor_bar->bounds).y * 0.1);
+    
    ToggleSlider(editor_bar, &auto_editor->is_lua_editor, Literal("Lua"), Literal("Block"), V2(120, GetSize(editor_bar->bounds).y), V2(0, 0), V2(0, 0));
    
-   Button(editor_bar, NULL, EmptyString(), button_size, V2(0, 0), V2(0, 0));
-   Button(editor_bar, NULL, EmptyString(), button_size, V2(0, 0), V2(0, 0));
+   Button(editor_bar, NULL, EmptyString(), button_size, V2(0, 0), button_margin);
+   Button(editor_bar, NULL, EmptyString(), button_size, V2(0, 0), button_margin);
 }
 
 void DrawLuaEditor(layout *editor_panel, AutonomousEditor *auto_editor)
@@ -91,36 +103,76 @@ void DrawLuaEditor(layout *editor_panel, AutonomousEditor *auto_editor)
         V2((GetSize(editor_panel->bounds).x - GetTextWidth(render_context, Literal("Lua Editor"), 20)) / 2.0f, 0), V2(0, 5)); 
 }
 
-void DrawBlockEditor(layout *editor_panel, AutonomousEditor *auto_editor)
+void DrawAutonomousBlock(ui_id id, layout *ui_layout, AutonomousBlock *block,
+                         v2 element_size, v2 margin_size, AutonomousEditor *auto_editor)
 {
-   UIContext *context = editor_panel->context;
+   UIContext *context = ui_layout->context;
    RenderContext *render_context = context->render_context;
    
-   Text(editor_panel, Literal("Block Editor"), 20,
-        V2((GetSize(editor_panel->bounds).x - GetTextWidth(render_context, Literal("Block Editor"), 20)) / 2.0f, 0), V2(0, 5)); 
+   element block_element = Element(ui_layout, element_size, V2(0, 0), margin_size);
+   interaction_state block_interact = ClickInteraction(context, Interaction(id, ui_layout->ui_layer + 1, ui_layout->stack_layer), context->input_state.left_up,
+                                                       context->input_state.left_down, Contains(block_element.bounds, context->input_state.pos));
     
+   if(block_interact.became_selected)
+   {
+      auto_editor->selected_block = block;
+   }
+    
+   if(block_interact.active || (block == auto_editor->selected_block))
+   {
+      Rectangle(render_context, block_element.bounds, V4(1.0f, 0.0f, 0.75f, 1.0f));
+   }
+   else if(block_interact.hot)
+   {
+      Rectangle(render_context, block_element.bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
+   }
+   else
+   {
+      Rectangle(render_context, block_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
+   }
+   
+   //TODO: concat the block's data into its text
+   //      eg. "Motor @ 10%" or "Wait for 10 seconds"
+   string text = block->is_wait_block ? Literal("Wait") : (block->hardware ? block->hardware->name : EmptyString());
+   
+   TextWrapRect(render_context, block_element.bounds, text);
+}
+
+void DrawBlockList(layout *block_list, AutonomousEditor *auto_editor)
+{
+   UIContext *context = block_list->context;
+   RenderContext *render_context = context->render_context;
+   
    ui_id tab_id = POINTER_UI_ID(auto_editor);
    interaction_state block_editor_interact =
-      ClickInteraction(context, Interaction(tab_id, editor_panel), context->input_state.left_up,
-                       context->input_state.left_down, Contains(editor_panel->bounds, context->input_state.pos));
+      ClickInteraction(context, Interaction(tab_id, block_list), context->input_state.left_up,
+                       context->input_state.left_down, Contains(block_list->bounds, context->input_state.pos));
    
    if(block_editor_interact.hot)
    {
-      RectangleOutline(render_context, editor_panel->bounds, V4(0.2, 0.2, 0.2, 1), 3);
+      RectangleOutline(render_context, block_list->bounds, V4(0.2, 0.2, 0.2, 1), 3);
+   }
+   else
+   {
+      RectangleOutline(render_context, block_list->bounds, V4(0, 0, 0, 1));
    }
    
    if(block_editor_interact.became_selected)
    {
-      if(!IsEmpty(auto_editor->grabbed_block.text))
+      if(auto_editor->grabbed_block)
       {
-         auto_editor->editor_blocks[auto_editor->editor_block_count].text = auto_editor->grabbed_block.text;
+         auto_editor->editor_blocks[auto_editor->editor_block_count] = *auto_editor->grabbed_block;
          auto_editor->editor_block_count++;
-         auto_editor->grabbed_block.text = Literal("");
+         auto_editor->grabbed_block = NULL;
+      }
+      else
+      {
+         auto_editor->selected_block = NULL;
       }
    }
    
-   v2 block_size = V2(GetSize(editor_panel->bounds).x * 0.8, 40);
-   v2 block_margin = V2(GetSize(editor_panel->bounds).x * 0.1, 10);
+   v2 block_size = V2(GetSize(block_list->bounds).x * 0.8, 40);
+   v2 block_margin = V2(GetSize(block_list->bounds).x * 0.1, 10);
    
    for(u32 i = 0;
        auto_editor->editor_block_count > i;
@@ -129,8 +181,47 @@ void DrawBlockEditor(layout *editor_panel, AutonomousEditor *auto_editor)
       AutonomousBlock *block = auto_editor->editor_blocks + i;
       
       //TODO: make this cleaner
-      _Button(POINTER_UI_ID(block), editor_panel, NULL, block->text, block_size, V2(0, 0), block_margin);
+      DrawAutonomousBlock(POINTER_UI_ID(block), block_list, block, block_size, block_margin, auto_editor);
    }
+}
+
+void DrawBlockDetails(layout *block_details, AutonomousEditor *auto_editor)
+{
+   UIContext *context = block_details->context;
+   RenderContext *render_context = context->render_context;
+   
+   AutonomousBlock *block = auto_editor->selected_block;
+   
+   if(block)
+   {
+      string text = block->is_wait_block ? Literal("Wait") : (block->hardware ? block->hardware->name : EmptyString());
+      
+      RectangleOutline(render_context, block_details->bounds, V4(0.2, 0.2, 0.2, 1), 3);
+      Text(block_details, text, 20,
+           V2((GetSize(block_details->bounds).x - GetTextWidth(render_context, text, 20)) / 2.0f, 0), V2(0, 5)); 
+   
+   }
+   else
+   {
+      RectangleOutline(render_context, block_details->bounds, V4(0, 0, 0, 1));
+   }
+}
+
+void DrawBlockEditor(layout *editor_panel, AutonomousEditor *auto_editor)
+{
+   UIContext *context = editor_panel->context;
+   RenderContext *render_context = context->render_context;
+   
+   element title_element = Text(editor_panel, Literal("Block Editor"), 20,
+                                V2((GetSize(editor_panel->bounds).x - GetTextWidth(render_context, Literal("Block Editor"), 20)) / 2.0f, 0), V2(0, 5)); 
+   
+   layout block_list = Panel(editor_panel, V2(GetSize(editor_panel->bounds).x * 0.25, GetSize(editor_panel->bounds).y - GetSize(title_element.margin_bounds).y), V2(0, 0), V2(0, 0)).lout;
+   layout block_details = Panel(editor_panel, V2(GetSize(editor_panel->bounds).x * 0.75, GetSize(editor_panel->bounds).y - GetSize(title_element.margin_bounds).y), V2(0, 0), V2(0, 0)).lout;
+    
+   RectangleOutline(render_context, editor_panel->bounds, V4(0, 0, 0, 1), 3);
+   
+   DrawBlockList(&block_list, auto_editor);
+   DrawBlockDetails(&block_details, auto_editor);
 }
 
 void DrawEditorPanel(layout *editor_panel, AutonomousEditor *auto_editor)
@@ -171,9 +262,14 @@ void DrawAutonomousEditor(layout *auto_editor, UIContext *context, DashboardStat
    DrawEditorBar(&editor_bar, &dashstate->auto_editor);
    DrawEditorPanel(&editor_panel, &dashstate->auto_editor);
    
-   if(!IsEmpty(dashstate->auto_editor.grabbed_block.text))
+   if(dashstate->auto_editor.grabbed_block)
    {
-      context->tooltip = dashstate->auto_editor.grabbed_block.text;
+      string grabbed_block_text = dashstate->auto_editor.grabbed_block->is_wait_block ? Literal("Wait") : (dashstate->auto_editor.grabbed_block->hardware ? dashstate->auto_editor.grabbed_block->hardware->name : EmptyString());
+      
+      if(!IsEmpty(grabbed_block_text))
+      {
+         context->tooltip = grabbed_block_text;
+      }
    }
    
 #if 0

@@ -26,7 +26,7 @@ struct generic_packet_header
 #define HARDWARE_TYPE_FLOAT_SENSOR 3
 #define HARDWARE_TYPE_BOOL_SENSOR 4
 #define HARDWARE_TYPE_DRIVE 5
-#define HARDWARE_TYPE_CAMERA 6
+#define HARDWARE_TYPE_CAMERA 6  //TODO: replace camera with vision system
 
 struct hardware_details_header
 {
@@ -44,8 +44,6 @@ struct hardware_component
 #define SOLENOID_STATE_INVALID 0
 #define SOLENOID_STATE_EXTENDED 1
 #define SOLENOID_STATE_RETRACTED 2
-#define SOLENOID_STATE_STOPPED 3
-#define SOLENOID_STATE_TOGGLE 3
 
 struct hardware_update_header
 {
@@ -74,6 +72,8 @@ struct welcome_header
 	char name[32];
 };
 
+//TODO: dont send auto_ops anymore, send lua bytecode 
+/*
 struct send_autonomous_header
 {
 	generic_packet_header header;
@@ -98,15 +98,11 @@ struct auto_operation
 		};
 	};
 };
-
-#define DEBUG_TYPE_INVALID 0
-#define DEBUG_TYPE_MESSAGE 1
-#define DEBUG_TYPE_PACKET 2
+*/
 
 struct debug_header
 {
 	generic_packet_header header;
-	uint16_t type;
 	char text[32];
 };
 

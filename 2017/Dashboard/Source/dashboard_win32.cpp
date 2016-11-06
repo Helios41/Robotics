@@ -6,6 +6,7 @@
 #include "packet_definitions.h"
 #include "dashboard.cpp"
 
+/*
 enum PageType
 {
    PageType_Home,
@@ -161,6 +162,7 @@ struct ConsoleState
 	int message_index;
 	bool track_hardware;
 };
+*/
 
 #pragma pack(push, 1)
 struct AutoFileHeader
@@ -262,7 +264,6 @@ b32 GUIButton(RenderContext *context, InputState input, rect2 bounds, LoadedBitm
 
    return result;
 }
-*/
 
 b32 AutoBuilderBlock(RenderContext *context, AutoBlock block, v2 pos, InputState input)
 {
@@ -283,7 +284,6 @@ b32 AutoBuilderBlock(RenderContext *context, AutoBlock block, v2 pos, InputState
    return hot && (input.left_up || input.right_up);
 }
 
-/*
 void TextBox(RenderContext *context, InputState input, rect2 bounds, char *text_buffer, u32 buffer_size, b32 *active)
 {
 	if (*active)
@@ -312,7 +312,6 @@ void TextBox(RenderContext *context, InputState input, rect2 bounds, char *text_
 		      (*active) ? V4(0.0f, 0.0f, 0.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 0.0f));
 
 }
-*/
 
 AutoBlock *AddAutoBlock(AutoBlock *auto_blocks, u32 *auto_block_count, AutoBlockPreset preset)
 {
@@ -326,6 +325,7 @@ AutoBlock *AddAutoBlock(AutoBlock *auto_blocks, u32 *auto_block_count, AutoBlock
    
    return &auto_blocks[*auto_block_count - 1];
 }
+*/
 
 r64 GetCounterFrequency(void)
 {
@@ -344,6 +344,7 @@ r64 GetCounter(s64 *last_timer, r64 frequency)
    return result;
 }
 
+/*
 u32 GetHardwareIndex(RobotState *robot_state, u32 hw_id, u32 hw_type)
 {
 	for (u32 i = 0; i < robot_state->robot_hardware_count; i++)
@@ -593,7 +594,6 @@ void HandlePacket(SOCKET socket_id, AutoBuilderState *auto_builder_state, RobotS
 			}
 			else if (hardware_components[i].hw_type == HARDWARE_TYPE_CAMERA)
 			{
-            /*
 				robot_state->robot_hardware[i].type = HardwareType_Camera;
 				robot_state->robot_hardware[i].camera_frame = new LoadedBitmap; //TODO remove new
 
@@ -606,7 +606,6 @@ void HandlePacket(SOCKET socket_id, AutoBuilderState *auto_builder_state, RobotS
 							  robot_state->robot_hardware[i].camera_frame->height,
 							  robot_state->robot_hardware[i].camera_frame->width,
 							  V4(0.0f, 0.0f, 0.0f, 1.0f));
-            */
 			}
 		}
 
@@ -681,6 +680,7 @@ b32 HandleNetwork(SOCKET socket_id, AutoBuilderState *auto_builder_state, RobotS
 
 	return connected;
 }
+*/
 
 void SetFullscreen(b32 state)
 {
@@ -805,7 +805,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    InputState input = {};
    b32 fullscreen = false;
    b32 connected = false;
-   PageType page = PageType_Home;
+   //PageType page = PageType_Home;
    MSG msg = {};
    r64 timer_freq = GetCounterFrequency();
    s64 last_timer = 0;
@@ -827,16 +827,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    connect(server_socket, (struct sockaddr *)&server, sizeof(server));
 
+   //TODO: move state initialization out of the platform layer & organize it
    MemoryArena generic_arena = {};
    InitMemoryArena(&generic_arena, VirtualAlloc(0, Megabyte(64), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE), Megabyte(64));
    
    RenderContext context = InitRenderContext(&generic_arena, Megabyte(12));
    
+   /*
    AutoBuilderState auto_builder_state = {};
    StringCopy("unnamed", auto_builder_state.auto_file_name);
    
    RobotState robot_state = {};
    ConsoleState console_state = {};
+   */
    
    UIContext ui_context = {};
    ui_context.render_context = &context;
@@ -844,17 +847,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    AutonomousBlock test_blocks[] = 
    {
-      {Literal("Test1")},
-      {Literal("Test2")}
+      {false, NULL},
+      {false, NULL}
    };
    
    DashboardState dashstate = {};
    dashstate.auto_editor.selector_blocks = test_blocks;
    dashstate.auto_editor.selector_block_count = ArrayCount(test_blocks);
+   dashstate.auto_editor.wait_block.is_wait_block = true;
    
    b32 update_mouse = true;
    
-   connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
+   //connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
    GetCounter(&last_timer, timer_freq);
    while(running)
    {
@@ -1480,7 +1484,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       RenderUI(&context, window_size);
       SwapBuffers(device_context);
       
-      connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
+      //connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
 
       frame_length = GetCounter(&last_timer, timer_freq);
       if(frame_length < 33.3)
