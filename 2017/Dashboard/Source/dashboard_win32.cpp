@@ -845,16 +845,15 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    ui_context.render_context = &context;
    ui_context.assets = &ui_assets;
    
-   AutonomousBlock test_blocks[] = 
+   RobotHardware test_hardware[] = 
    {
-      {false, NULL},
-      {false, NULL}
+      {Hardware_Motor, 0, Literal("Test Motor")},
+      {Hardware_Solenoid, 1, Literal("Test Solenoid")}
    };
    
    DashboardState dashstate = {};
-   dashstate.auto_editor.selector_blocks = test_blocks;
-   dashstate.auto_editor.selector_block_count = ArrayCount(test_blocks);
-   dashstate.auto_editor.wait_block.is_wait_block = true;
+   dashstate.robot.hardware = test_hardware;
+   dashstate.robot.hardware_count = ArrayCount(test_hardware);
    
    b32 update_mouse = true;
    

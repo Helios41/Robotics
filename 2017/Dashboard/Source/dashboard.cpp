@@ -56,6 +56,12 @@ enum SolenoidState
    Solenoid_Retracted
 };
 
+struct Robot
+{
+   RobotHardware *hardware;
+   u32 hardware_count;
+};
+
 struct AutonomousBlock
 {
    b32 is_wait_block;
@@ -86,15 +92,13 @@ struct AutonomousEditor
 {
    b32 is_lua_editor;
    
-   AutonomousBlock wait_block;
-   AutonomousBlock *selector_blocks;
-   u32 selector_block_count;
-   
    AutonomousBlock editor_blocks[20];
    u32 editor_block_count;
    
-   AutonomousBlock *grabbed_block;
    AutonomousBlock *selected_block;
+   
+   b32 block_grabbed;
+   AutonomousBlock grabbed_block;
 };
 
 struct DashboardState
@@ -106,6 +110,7 @@ struct DashboardState
    ui_window *network_settings_window;
    ui_window *display_settings_window;
    
+   Robot robot;
    AutonomousEditor auto_editor;
 };
 

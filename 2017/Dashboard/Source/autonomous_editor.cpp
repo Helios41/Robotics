@@ -1,4 +1,37 @@
-void DrawBlockSelector(layout *block_selector, AutonomousEditor *auto_editor)
+AutonomousBlock WaitBlock(r32 wait_duration)
+{
+   AutonomousBlock result = {};
+   result.is_wait_block = true;
+   result.wait_duration = wait_duration;
+   return result;
+}
+
+AutonomousBlock MotorBlock(RobotHardware *hardware, r32 motor_state)
+{
+   AutonomousBlock result = {};
+   result.hardware = hardware;
+   result.motor_state = motor_state;
+   return result;
+}
+
+AutonomousBlock SolenoidBlock(RobotHardware *hardware, SolenoidState solenoid_state)
+{
+   AutonomousBlock result = {};
+   result.hardware = hardware;
+   result.solenoid_state = solenoid_state;
+   return result;
+}
+
+AutonomousBlock DriveBlock(RobotHardware *hardware, r32 forward_value, r32 rotate_value)
+{
+   AutonomousBlock result = {};
+   result.hardware = hardware;
+   result.drive_state.forward_value = forward_value;
+   result.drive_state.rotate_value = rotate_value;
+   return result;
+}
+
+void DrawBlockSelector(layout *block_selector, AutonomousEditor *auto_editor, Robot *robot)
 {
    RenderContext *render_context = block_selector->context->render_context;
    
@@ -10,22 +43,46 @@ void DrawBlockSelector(layout *block_selector, AutonomousEditor *auto_editor)
    
    if(Button(block_selector, NULL, Literal("Wait"), block_size, V2(0, 0), block_margin).state)
    {
-      auto_editor->grabbed_block = &auto_editor->wait_block;
+      auto_editor->grabbed_block = WaitBlock(0);
+      auto_editor->block_grabbed = true;
    }
    
    for(u32 i = 0;
-       auto_editor->selector_block_count > i;
+       robot->hardware_count > i;
        i++)
    {
-      AutonomousBlock *block = auto_editor->selector_blocks + i;
-      string text = block->hardware ? block->hardware->name : EmptyString();
+      RobotHardware *hardware = robot->hardware + i;
       
-      Assert(!block->is_wait_block);
-      
-      //TODO: make this cleaner
-      if(_Button(POINTER_UI_ID(block), block_selector, NULL, text, block_size, V2(0, 0), block_margin).state)
+      //TODO: clean this up
+      if(hardware->type == Hardware_Motor)
       {
-         auto_editor->grabbed_block = block;
+         if(_Button(POINTER_UI_ID(hardware), block_selector, NULL, hardware->name, block_size, V2(0, 0), block_margin).state)
+         {
+            auto_editor->grabbed_block = MotorBlock(hardware, 0);
+            auto_editor->block_grabbed = true;
+         }
+      }
+      else if(hardware->type == Hardware_Solenoid)
+      {
+         if(_Button(POINTER_UI_ID(hardware), block_selector, NULL, /*Concat(Literal("Extend "),*/ hardware->name/*)*/, block_size, V2(0, 0), block_margin).state)
+         {
+            auto_editor->grabbed_block = SolenoidBlock(hardware, Solenoid_Extended);
+            auto_editor->block_grabbed = true;
+         }
+         
+         if(_Button(POINTER_UI_ID(hardware), block_selector, NULL, /*Concat(Literal("Retract "),*/ hardware->name/*)*/, block_size, V2(0, 0), block_margin).state)
+         {
+            auto_editor->grabbed_block = SolenoidBlock(hardware, Solenoid_Retracted);
+            auto_editor->block_grabbed = true;
+         }
+      }
+      else if(hardware->type == Hardware_Drive)
+      {
+         if(_Button(POINTER_UI_ID(hardware), block_selector, NULL, hardware->name, block_size, V2(0, 0), block_margin).state)
+         {
+            auto_editor->grabbed_block = DriveBlock(hardware, 0, 0);
+            auto_editor->block_grabbed = true;
+         }
       }
    }
 }
@@ -159,11 +216,13 @@ void DrawBlockList(layout *block_list, AutonomousEditor *auto_editor)
    
    if(block_editor_interact.became_selected)
    {
-      if(auto_editor->grabbed_block)
+      if(auto_editor->block_grabbed)
       {
-         auto_editor->editor_blocks[auto_editor->editor_block_count] = *auto_editor->grabbed_block;
+         auto_editor->editor_blocks[auto_editor->editor_block_count] = auto_editor->grabbed_block;
          auto_editor->editor_block_count++;
-         auto_editor->grabbed_block = NULL;
+         
+         auto_editor->block_grabbed = false;
+         auto_editor->grabbed_block = {};
       }
       else
       {
@@ -251,7 +310,7 @@ void DrawAutonomousEditor(layout *auto_editor, UIContext *context, DashboardStat
    
    RectangleOutline(context->render_context, editor.bounds, V4(0, 0, 0, 1));
    
-   DrawBlockSelector(&block_selector, &dashstate->auto_editor);
+   DrawBlockSelector(&block_selector, &dashstate->auto_editor, &dashstate->robot);
    DrawEditorMenu(&editor_menu, &dashstate->auto_editor);
    
    layout graph_view = Panel(&editor, V2(GetSize(editor.bounds).x, GetSize(editor.bounds).y * 0.3) - V2(10, 10), V2(0, 0), V2(5, 5)).lout;
@@ -262,9 +321,9 @@ void DrawAutonomousEditor(layout *auto_editor, UIContext *context, DashboardStat
    DrawEditorBar(&editor_bar, &dashstate->auto_editor);
    DrawEditorPanel(&editor_panel, &dashstate->auto_editor);
    
-   if(dashstate->auto_editor.grabbed_block)
+   if(dashstate->auto_editor.block_grabbed)
    {
-      string grabbed_block_text = dashstate->auto_editor.grabbed_block->is_wait_block ? Literal("Wait") : (dashstate->auto_editor.grabbed_block->hardware ? dashstate->auto_editor.grabbed_block->hardware->name : EmptyString());
+      string grabbed_block_text = dashstate->auto_editor.grabbed_block.is_wait_block ? Literal("Wait") : dashstate->auto_editor.grabbed_block.hardware->name;
       
       if(!IsEmpty(grabbed_block_text))
       {
