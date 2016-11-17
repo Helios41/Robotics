@@ -709,7 +709,7 @@ void SetFullscreen(b32 state)
 
 HDC SetupWindow(HINSTANCE hInstance, int nCmdShow, HWND *window)
 {
-   *window = CreateWindowExA(WS_EX_CLIENTEDGE, "WindowClass", "Dashboard V2",
+   *window = CreateWindowExA(WS_EX_CLIENTEDGE, "WindowClass", "Dashboard V-I Lost Count",
                              WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
                              1440, 759, NULL, NULL,
                              hInstance, NULL);
@@ -848,12 +848,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    RobotHardware test_hardware[] = 
    {
       {Hardware_Motor, 0, Literal("Test Motor")},
-      {Hardware_Solenoid, 1, Literal("Test Solenoid")}
+      {Hardware_Solenoid, 1, Literal("Test Solenoid")},
+      {Hardware_Drive, 2, Literal("Test Drive")}
    };
    
    DashboardState dashstate = {};
    dashstate.robot.hardware = test_hardware;
    dashstate.robot.hardware_count = ArrayCount(test_hardware);
+   dashstate.robot.name = Literal("Bob Ross");
    
    b32 update_mouse = true;
    

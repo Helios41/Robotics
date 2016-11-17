@@ -60,6 +60,9 @@ struct Robot
 {
    RobotHardware *hardware;
    u32 hardware_count;
+   
+   string name;
+   RobotHardware *selected_hardware;
 };
 
 struct AutonomousBlock
