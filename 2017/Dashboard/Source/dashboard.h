@@ -35,7 +35,7 @@ TODO:
    -animations for ui
    -only draw ui frame when nessisary (animation, input, other event, etc...) & only
     redraw the required section of the screen
-   -
+   -port backend to SDL
 */
 
 union v4
@@ -334,6 +334,13 @@ string String(char *text, u32 length)
    return result;
 }
 
+string ToString(string buffer, r32 flt)
+{
+   _snprintf(buffer.text, buffer.length, "%f", flt);
+   for(u32 i = 0; i < buffer.length; i++) if(buffer.text[i] == '\0') buffer.text[i] = ' ';
+   return buffer;
+}
+
 b32 IsEmpty(string text)
 {
    return (text.length == 0) || (text.text == NULL);
@@ -343,6 +350,26 @@ string EmptyString()
 {
    string result = {NULL, 0};
    return result;
+}
+
+void CopyTo(string source, string dest)
+{
+   for(u32 i = 0;
+       i < Min(source.length, dest.length);
+       i++)
+   {
+      dest.text[i] = source.text[i];
+   }
+}
+
+void Clear(string str)
+{
+   for(u32 i = 0;
+       i < str.length;
+       i++)
+   {
+      str.text[i] = ' ';
+   }
 }
 
 //TODO: make this more robust
@@ -545,6 +572,21 @@ char *ConcatStrings(char *str1, char *str2, char *str3, char *str4, char *str5, 
 
 	str[i] = '\0';
 	return str;
+}
+
+r32 ToR32(string str)
+{
+   string buffer = String((char *) malloc(21 * sizeof(char)), 20);
+   CopyTo(str, buffer);
+   buffer.text[buffer.length] = '\0';
+   r32 result = atof(buffer.text);
+   free(buffer.text);
+   return result;
+}
+
+r32 Clamp(r32 min, r32 max, r32 in)
+{
+   return Min(Max(min, in), max);
 }
 
 #endif

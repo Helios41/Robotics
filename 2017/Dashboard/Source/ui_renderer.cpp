@@ -522,6 +522,7 @@ struct UIContext
    UIAssets *assets;
    
    u32 text_box_pointer;
+   char temp_text_box[20]; //NOTE: for float/int/etc... text boxes
    
    u32 tooltip_ui_layer;
    u32 tooltip_stack_layer;
@@ -594,8 +595,8 @@ struct layout
    u32 stack_layer;
    
    UIContext *context;
-   rect2 bounds; 
-   //v2 offset; //NOTE: for use in scroll bars
+   rect2 bounds;
+   //r32 left_x; //NOTE: x coord of "at"'s origin, used for horizontal translations
    v2 at;
    
    r32 row_effective_height; // = size.y + topleft_margin.y, accumulate the max, not just the latest element
@@ -610,13 +611,13 @@ struct layout
    b32 new_line_issued;
 };
 
-layout Layout(rect2 bounds, UIContext *context, u32 stack_layer)
+layout Layout(rect2 bounds, UIContext *context, u32 stack_layer, r32 vertical_scroll = 0)
 {
    layout result = {};
    
    result.context = context;
    result.bounds = bounds;
-   result.at = bounds.min;
+   result.at = bounds.min + V2(0, vertical_scroll);
    result.ui_layer = 0;
    result.stack_layer = stack_layer;
    
@@ -638,7 +639,7 @@ void NextLine(layout *ui_layout)
    ui_layout->last_row_effective_height = ui_layout->row_effective_height;
    ui_layout->last_row_bottom_margin = ui_layout->abs_row_bottom_margin - ui_layout->row_effective_height;
    
-   ui_layout->at = V2(ui_layout->bounds.min.x, ui_layout->at.y + ui_layout->row_effective_height);
+   ui_layout->at = V2(ui_layout->bounds.min.x /*->left_x*/, ui_layout->at.y + ui_layout->row_effective_height);
    ui_layout->new_line_issued = true;
    
    ui_layout->row_effective_height = 0.0f;
@@ -678,8 +679,8 @@ struct element
    b32 fit;
 };
 
-element Element(layout *ui_layout, v2 element_size, v2 padding_size, v2 margin_size)
-{
+element Element(layout *ui_layout, v2 element_size, v2 padding_size, v2 margin_size, b32 no_fit_nextline = false)
+{  
    get_padding_rect_result padding_rect_result = GetPaddingRect(*ui_layout, element_size, padding_size, margin_size);
    
    v2 padding_offset = padding_rect_result.padding_offset;
@@ -709,6 +710,17 @@ element Element(layout *ui_layout, v2 element_size, v2 padding_size, v2 margin_s
       else
       {
          result.fit = false;
+         
+         if(no_fit_nextline)
+         {
+            *ui_layout = temp_layout;
+         
+            padding_rect_result = GetPaddingRect(*ui_layout, element_size, padding_size, margin_size);
+   
+            padding_offset = padding_rect_result.padding_offset;
+            padding_rect = padding_rect_result.padding_rect;
+            padding_rect_size = GetSize(padding_rect);
+         }
       }
    }
    
@@ -732,18 +744,17 @@ struct panel
    element elem;
 };
 
-panel Panel(layout *parent_layout, v2 element_size, v2 padding_size, v2 margin_size)
+panel Panel(layout *parent_layout, v2 element_size, v2 padding_size, v2 margin_size, r32 vertical_scroll = 0)
 {
    panel result = {};
    
    result.elem = Element(parent_layout, element_size, padding_size, margin_size);
-   result.lout = Layout(result.elem.bounds, parent_layout->context, parent_layout->stack_layer);
+   result.lout = Layout(result.elem.bounds, parent_layout->context, parent_layout->stack_layer, vertical_scroll);
    result.lout.ui_layer = parent_layout->ui_layer + 1;
    
    return result;
 }
 
-//TODO: add some form of spacing between characters, pretty much ghetto kerning
 r32 GetTextWidth(RenderContext *context, string text, r32 scale)
 {
    r32 scale_coeff = scale / context->font.native_height;
@@ -762,7 +773,7 @@ r32 GetTextWidth(RenderContext *context, string text, r32 scale)
 		else
 		{
 			CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
-			width += char_bitmap->bitmap.width * scale_coeff;
+			width += char_bitmap->bitmap.width * scale_coeff + Min(char_bitmap->bitmap.width * scale_coeff / 2, scale_coeff * 10);
 		}
 	}
    
@@ -800,7 +811,7 @@ void Text(RenderContext *context, rect2 bounds, string text)
 			Bitmap(context, &char_bitmap->bitmap,
                 V2(origin.x + xoffset, origin.y + (baseline - char_bitmap->height_above_baseline * scale_coeff)),
                 V2(char_bitmap->bitmap.width, char_bitmap->bitmap.height) * scale_coeff);
-			xoffset += char_bitmap->bitmap.width * scale_coeff;
+			xoffset += char_bitmap->bitmap.width * scale_coeff + Min(char_bitmap->bitmap.width * scale_coeff / 2, scale_coeff * 10);
 		}
 	}
 }
@@ -812,9 +823,60 @@ rect2 Text(RenderContext *context, v2 pos, string text, u32 scale)
    return bounds;
 }
 
+rect2 GetCharBounds(RenderContext *context, rect2 bounds, string text, u32 char_index)
+{  
+   r32 baseline = GetSize(bounds).y * context->font.baseline_from_height;
+   v2 origin = bounds.min;
+   r32 scale_coeff = GetSize(bounds).y / context->font.native_height;
+   
+   rect2 result = RectMinSize(V2(0, 0), V2(0, 0));
+   
+   u32 xoffset = 0;
+	for(u32 i = 0;
+       i < text.length;
+       i++)
+	{
+      char c = text.text[i];
+      
+      if(i == char_index)
+      {
+         if (c == ' ')
+         {
+            result = RectMinSize(V2(origin.x + xoffset, origin.y), V2(context->font.space_width * scale_coeff, GetSize(bounds).y));
+         }
+         else
+         {
+            CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
+            result = RectMinSize(V2(origin.x + xoffset,
+                                    origin.y + (baseline - char_bitmap->height_above_baseline * scale_coeff)),
+                                 V2(char_bitmap->bitmap.width, char_bitmap->bitmap.height) * scale_coeff);
+         }
+      }
+      
+		if (c == ' ')
+		{
+			xoffset += context->font.space_width * scale_coeff;
+		}
+		else
+		{
+			CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
+			xoffset += char_bitmap->bitmap.width * scale_coeff + Min(char_bitmap->bitmap.width * scale_coeff / 2, scale_coeff * 10);
+		}
+	}
+   
+   return result;
+}
+
+rect2 GetCharBounds(RenderContext *context, v2 pos, string text, u32 scale, u32 char_index)
+{
+   rect2 bounds = RectMinSize(pos, GetTextSize(context, text, scale));
+   return GetCharBounds(context, bounds, text, char_index);
+}
+
 //TODO: clean up text wrap
 //TODO: optimize this by caching the text wrapping & segments?
-void TextWrapRect(RenderContext *render_context, rect2 bounds, string text)
+//TODO: calculate text scale based on bounds, clamp min scale, I dont want the text TOOO small
+void TextWrapRect(RenderContext *render_context, rect2 bounds, string text, r32 scale = 20)
 {
    if(!IsEmpty(text))
    {
@@ -829,25 +891,25 @@ void TextWrapRect(RenderContext *render_context, rect2 bounds, string text)
           i++)
       {
          string curr_segment = segments[i];
-         v2 word_size = GetTextSize(render_context, curr_segment, 20);
+         v2 word_size = GetTextSize(render_context, curr_segment, scale);
          
          if((bounds.min.x + at.x + word_size.x) > bounds.max.x)
          {
             if((at.y + row_height + word_size.y) > GetSize(bounds).y)
             {
-               Rectangle(render_context, RectPosSize(bounds.min + at + V2(5, 5), V2(3, 3)),
+               Rectangle(render_context, RectPosSize(bounds.min + at, V2(3, 3)),
                          V4(0.0f, 0.0f, 0.0f, 1.0f));
-               Text(render_context, bounds.min + at + V2(5, 5),
-                    Literal("..."), 20);
+               Text(render_context, bounds.min + at,
+                    Literal("..."), scale);
             }
             else
             {
                if(word_size.x > GetSize(bounds).x)
                {
-                  Rectangle(render_context, RectPosSize(bounds.min + at + V2(5, 5), V2(3, 3)),
+                  Rectangle(render_context, RectPosSize(bounds.min + at, V2(3, 3)),
                          V4(0.0f, 0.0f, 0.0f, 1.0f));
-                  Text(render_context, bounds.min + at + V2(5, 5),
-                       Literal("..."), 20);
+                  Text(render_context, bounds.min + at,
+                       Literal("..."), scale);
                }
                else
                {
@@ -861,10 +923,10 @@ void TextWrapRect(RenderContext *render_context, rect2 bounds, string text)
          }
          else
          {
-            Rectangle(render_context, RectPosSize(bounds.min + at + V2(5, 5), V2(3, 3)),
+            Rectangle(render_context, RectPosSize(bounds.min + at, V2(3, 3)),
                       V4(0.0f, 0.0f, 0.0f, 1.0f));
-            Text(render_context, bounds.min + at + V2(5, 5),
-                 curr_segment, 20);
+            Text(render_context, bounds.min + at,
+                 curr_segment, scale);
                  
             row_height = Max(row_height, word_size.y);
             at.x += word_size.x + 10;
@@ -1031,117 +1093,210 @@ element _ToggleSlider(ui_id id, layout *ui_layout, b32 *option, string option1, 
 
 #define ToggleSlider(...) _ToggleSlider(GEN_UI_ID, __VA_ARGS__)
 
-//TODO: finish the cursor & do text input
 void _TextBox(ui_id id, layout *ui_layout, string *buffer, v2 element_size, v2 padding_size, v2 margin_size)
 {
    UIContext *context = ui_layout->context;
    RenderContext *render_context = context->render_context;
    element textbox_element = Element(ui_layout, element_size, padding_size, margin_size);
+   
+   interaction_state text_box_interact =
+      ClickInteraction(context, Interaction(id, ui_layout), context->input_state.left_up,
+                       context->input_state.left_down, Contains(textbox_element.bounds, context->input_state.pos));
   
-   Rectangle(render_context, textbox_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
-   RectangleOutline(render_context, textbox_element.bounds, V4(0.0f, 0.0f, 0.f, 1.0f));
-   
-   if(context->input_state.key_right)
+   if(text_box_interact.became_selected)
    {
-      context->text_box_pointer++;
+      context->text_box_pointer = 0;
    }
-   else if(context->input_state.key_left && (context->text_box_pointer > 0))
-   {
-      context->text_box_pointer--;
-   }
-   
-   rect2 bounds = textbox_element.bounds;
-   string text = *buffer;
-   
-   if(!IsEmpty(text))
-   {
-      u32 segment_count;
-      string *segments = Split(text, ' ', &segment_count);
-      
-      v2 at = V2(0, 0);
-      r32 row_height = 0.0f;
-      
-      u32 char_index = 0;
-      v2 pointer_at = V2(0, 0);
-      r32 pointer_height = 30.0f;
-      
-      for(u32 i = 0;
-          i < segment_count;
-          i++)
+  
+   if(text_box_interact.selected)
+   {  
+      if(context->input_state.char_key_up)
       {
-         string curr_segment = segments[i];
-         v2 word_size = GetTextSize(render_context, curr_segment, 20);
-         
-         if((bounds.min.x + at.x + word_size.x) > bounds.max.x)
+         buffer->text[context->text_box_pointer] = context->input_state.key_char;
+         if(context->text_box_pointer < (buffer->length - 1))
          {
-            if((at.y + row_height + word_size.y) > GetSize(bounds).y)
-            {
-               
-            }
-            else
-            {
-               if(word_size.x > GetSize(bounds).x)
-               {
-                  
-               }
-               else
-               {
-                  i--;
-               }
-               
-               at.x = 0.0f;
-               at.y += row_height;
-               row_height = 0.0f;
-            }
-         }
-         else
-         {
-            Rectangle(render_context, RectPosSize(bounds.min + at + V2(5, 5), V2(3, 3)),
-                      V4(0.0f, 0.0f, 0.0f, 1.0f));
-            /*
-            v2 segment_pos = bounds.min + at + V2(5, 5);
-            u32 xoffset = 0;
-            for(u32 i = 0;
-                i < curr_segment.length;
-                i++)
-            {
-               char c = curr_segment.text[i];
-               r32 char_width = 0.0f;
-               
-               if(c == ' ')
-               {
-                  char_width = 10;
-               }
-               else
-               {
-                  CharacterBitmap *char_bitmap = render_context->characters + ((u32)c - 33);
-                  Bitmap(render_context, &char_bitmap->bitmap,
-                         V2(segment_pos.x + xoffset + char_bitmap->offset.x,
-                            segment_pos.y + char_bitmap->offset.y + 10));
-                  char_width = char_bitmap->bitmap.width;
-               }
-               
-               xoffset += char_width;
-               
-               if(i == (context->text_box_pointer - char_index))
-               {
-                  pointer_at = segment_pos + V2(xoffset - char_width, 0) - V2(0, 5);
-                  xoffset += 5;
-               }
-            }
-            */
-                 
-            row_height = Max(row_height, word_size.y);
-            at.x += word_size.x + 10;
-            char_index += curr_segment.length;
+            context->text_box_pointer++;
          }
       }
-      
-      Rectangle(render_context, RectMinSize(pointer_at, V2(4, pointer_height)),
-                V4(0.0f, 1.0f, 0.0f, 1.0f));
-      
-      free(segments);
+      if(context->input_state.key_backspace)
+      {
+         buffer->text[context->text_box_pointer] = ' ';
+         if(context->text_box_pointer > 0)
+         {
+            context->text_box_pointer--;
+         }
+      }
+      if(context->input_state.key_right && (context->text_box_pointer < (buffer->length - 1)))
+      {
+         context->text_box_pointer++;
+      }
+      if(context->input_state.key_left && (context->text_box_pointer > 0))
+      {
+         context->text_box_pointer--;
+      }
+   }
+  
+   Rectangle(render_context, textbox_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
+   RectangleOutline(render_context, textbox_element.bounds, V4(0.0f, 0.0f, 0.f, 1.0f), text_box_interact.selected ? 3 : 1);
+   
+   //TODO: wrapped text
+   Text(render_context, textbox_element.bounds.min, *buffer, 20);
+   
+   if(text_box_interact.selected)
+   {
+      rect2 selected_char = GetCharBounds(render_context, textbox_element.bounds.min,
+                                          *buffer, 20, context->text_box_pointer);
+      Rectangle(render_context, selected_char, V4(0, 0, 0, 0.3f));
    }
 }
 
+void _TextBox(ui_id id, layout *ui_layout, r32 *value, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   UIContext *context = ui_layout->context;
+   RenderContext *render_context = context->render_context;
+   element textbox_element = Element(ui_layout, element_size, padding_size, margin_size);
+   string temp_text_box = String(context->temp_text_box, ArrayCount(context->temp_text_box));
+   
+   interaction_state text_box_interact =
+      ClickInteraction(context, Interaction(id, ui_layout), context->input_state.left_up,
+                       context->input_state.left_down, Contains(textbox_element.bounds, context->input_state.pos));
+  
+   if(text_box_interact.became_selected)
+   {
+      context->text_box_pointer = 0;
+   }
+  
+   if(text_box_interact.selected)
+   {
+      //TODO: a way to allocate strings safely in functions like ToString instead of passing one in as a buffer
+      string buffer = String((char *) malloc(20 * sizeof(char)), 20);
+      Clear(buffer);
+      CopyTo(ToString(buffer, *value), temp_text_box);
+      free(buffer.text);
+   }
+   
+   if(text_box_interact.selected)
+   {
+      if(context->input_state.char_key_up)
+      {
+         temp_text_box.text[context->text_box_pointer] = context->input_state.key_char;
+         if(context->text_box_pointer < (temp_text_box.length - 1))
+         {
+            context->text_box_pointer++;
+         }
+      }
+      if(context->input_state.key_backspace)
+      {
+         temp_text_box.text[context->text_box_pointer] = ' ';
+         if(context->text_box_pointer > 0)
+         {
+            context->text_box_pointer--;
+         }
+      }
+      if(context->input_state.key_right && (context->text_box_pointer < (temp_text_box.length - 1)))
+      {
+         context->text_box_pointer++;
+      }
+      if(context->input_state.key_left && (context->text_box_pointer > 0))
+      {
+         context->text_box_pointer--;
+      }
+   }
+   
+   if(text_box_interact.selected)
+   {
+      *value = ToR32(temp_text_box);
+   }
+   
+   Rectangle(render_context, textbox_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
+   RectangleOutline(render_context, textbox_element.bounds, V4(0.0f, 0.0f, 0.f, 1.0f), text_box_interact.selected ? 3 : 1);
+   
+   string buffer = String((char *) malloc(20 * sizeof(char)), 20);
+   Clear(buffer);
+   Text(render_context, textbox_element.bounds.min,
+        text_box_interact.selected ? temp_text_box : ToString(buffer, *value), 20);
+   free(buffer.text);
+   
+   if(text_box_interact.selected)
+   {
+      rect2 selected_char = GetCharBounds(render_context, textbox_element.bounds.min,
+                                          temp_text_box, 20, context->text_box_pointer);
+      Rectangle(render_context, selected_char, V4(0, 0, 0, 0.3f));
+   }
+}
+
+void _TextBox(ui_id id, layout *ui_layout, r32 min, r32 max, r32 *value, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   _TextBox(id, ui_layout, value, element_size, padding_size, margin_size);
+   *value = Clamp(min, max, *value);
+}
+
 #define TextBox(...) _TextBox(GEN_UI_ID, __VA_ARGS__)
+
+void _SliderBar(ui_id id, layout *ui_layout, r32 min, r32 max, r32 *value, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   UIContext *context = ui_layout->context;
+   RenderContext *render_context = context->render_context;
+   element slider_element = Element(ui_layout, element_size, padding_size, margin_size);
+   
+   v2 tab_size;
+   v2 tab_pos;
+   
+   r32 min_mouse;
+   r32 max_mouse;
+   r32 curr_mouse;
+   
+   Assert(GetSize(slider_element.bounds).y != GetSize(slider_element.bounds).x);
+   
+   if(GetSize(slider_element.bounds).x > GetSize(slider_element.bounds).y)
+   {
+      tab_size = V2(GetSize(slider_element.bounds).y, GetSize(slider_element.bounds).y);
+      min_mouse = slider_element.bounds.min.x + tab_size.x * 0.5;
+      max_mouse = slider_element.bounds.max.x - tab_size.x * 0.5;
+      tab_pos = V2(min_mouse + (max_mouse - min_mouse) * ((*value - min) / (max - min)), GetCenter(slider_element.bounds).y);
+      curr_mouse = context->input_state.pos.x;
+   }
+   else if(GetSize(slider_element.bounds).y > GetSize(slider_element.bounds).x)
+   {
+      tab_size = V2(GetSize(slider_element.bounds).x, GetSize(slider_element.bounds).x);
+      min_mouse = slider_element.bounds.min.y + tab_size.y * 0.5;
+      max_mouse = slider_element.bounds.max.y - tab_size.y * 0.5;
+      tab_pos = V2(GetCenter(slider_element.bounds).x, min_mouse + (max_mouse - min_mouse) * ((*value - min) / (max - min)));
+      curr_mouse = context->input_state.pos.y;
+   }
+   
+   rect2 tab_bounds = RectPosSize(tab_pos, tab_size);
+   
+   interaction_state tab_interact =
+      ClickInteraction(context, Interaction(id, ui_layout), context->input_state.left_up,
+                       context->input_state.left_down, Contains(tab_bounds, context->input_state.pos));
+   
+   Rectangle(render_context, slider_element.bounds, V4(0.5, 0.5, 0.5, 1));
+   
+   if(tab_interact.active)
+   {
+      Rectangle(render_context, tab_bounds, V4(1.0f, 0.0f, 0.75f, 1.0f));
+      if(min_mouse > curr_mouse)
+      {
+         *value = min;
+      }
+      else if(curr_mouse > max_mouse)
+      {
+         *value = max;
+      }
+      else
+      {
+         *value = min + (max - min) * ((curr_mouse - min_mouse) / (max_mouse - min_mouse));
+      }
+   }
+   else if(tab_interact.hot)
+   {
+      Rectangle(render_context, tab_bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
+   }
+   else
+   {
+      Rectangle(render_context, tab_bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
+   }
+}
+
+#define SliderBar(...) _SliderBar(GEN_UI_ID, __VA_ARGS__)

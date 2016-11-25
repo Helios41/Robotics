@@ -1,5 +1,13 @@
 #include "dashboard.h"
 
+//TODO: move this into an appropriate place, was in dashboard.cpp originally, moved out so it could be used in the network layer
+struct network_settings
+{
+   string connect_to;
+   b32 is_mdns;
+   b32 reconnect;
+};
+
 #include "network_win32.cpp"
 #include <windows.h>
 
@@ -744,10 +752,10 @@ void UpdateInputState(InputState *input, HWND window, b32 update_mouse)
    
       input->pos.x = p.x;
       input->pos.y = p.y;
-   }
    
-   input->left_up = false;
-   input->right_up = false;
+      input->left_up = false;
+      input->right_up = false;
+   }
    
    input->char_key_up = false;
    input->key_backspace = false;
@@ -773,12 +781,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    RegisterClassExA(&window_class);
    
    volatile b32 running = true;
-   volatile b32 reconnect = true;
-
+   volatile char *connect_to = NULL;
+   volatile b32 use_mdns = false;
+   volatile b32 reconnect = false;
+   volatile b32 connect_status = false;
+   
    net_main_params net_params = {};
    net_params.running = &running;
+   net_params.connect_to = connect_to;
+   net_params.use_mdns = &use_mdns;
    net_params.reconnect = &reconnect;
-
+   net_params.connect_status = &connect_status;
+   
    HANDLE network_thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)NetMain, &net_params, 0, NULL);
 
    HWND window = {};
@@ -833,14 +847,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    RenderContext context = InitRenderContext(&generic_arena, Megabyte(12));
    
-   /*
-   AutoBuilderState auto_builder_state = {};
-   StringCopy("unnamed", auto_builder_state.auto_file_name);
-   
-   RobotState robot_state = {};
-   ConsoleState console_state = {};
-   */
-   
    UIContext ui_context = {};
    ui_context.render_context = &context;
    ui_context.assets = &ui_assets;
@@ -857,6 +863,13 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    dashstate.robot.hardware_count = ArrayCount(test_hardware);
    dashstate.robot.name = Literal("Bob Ross");
    
+   dashstate.net_settings.connect_to = String((char *) malloc(sizeof(char) * 30), 30);
+   Clear(dashstate.net_settings.connect_to);
+   CopyTo(Literal("roborio-4618-frc.local") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
+   dashstate.net_settings.is_mdns = true;
+   
+   RequestReconnect(&dashstate.net_settings, &net_params);
+   
    b32 update_mouse = true;
    
    //connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
@@ -870,23 +883,35 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
          switch(msg.message)
          {            
             case WM_LBUTTONUP:
-               input.left_down = false;
-               input.left_up = true;
+               if(update_mouse)
+               {
+                  input.left_down = false;
+                  input.left_up = true;
+               }
                break;
          
             case WM_LBUTTONDOWN:
-               input.left_down = true;
-               input.left_up = false;
+               if(update_mouse)
+               {
+                  input.left_down = true;
+                  input.left_up = false;
+               }
                break;
                
             case WM_RBUTTONUP:
-               input.right_down = false;
-               input.right_up = true;
+               if(update_mouse)
+               {
+                  input.right_down = false;
+                  input.right_up = true;
+               }
                break;
          
             case WM_RBUTTONDOWN:
-               input.right_down = true;
-               input.right_up = false;
+               if(update_mouse)
+               {
+                  input.right_down = true;
+                  input.right_up = false;
+               }
                break;   
             
             case WM_KEYUP:

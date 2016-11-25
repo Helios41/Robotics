@@ -8,12 +8,6 @@ enum ui_window_type
    WindowType_FileSelector
 };
 
-struct network_settings
-{
-   string connect_to;
-   b32 is_mdns;
-};
-
 struct ui_window
 {
    ui_window_type type;
@@ -23,7 +17,7 @@ struct ui_window
    
    union
    {
-      network_settings net_settings;
+      network_settings *net_settings;
    };
 };
 
@@ -109,6 +103,7 @@ struct DashboardState
    DashboardPage page;
    ui_window *first_window;
    b32 connected;
+   network_settings net_settings;
    
    ui_window *network_settings_window;
    ui_window *display_settings_window;
@@ -133,7 +128,7 @@ ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type 
    }
    else if(new_window->type == WindowType_NetworkSettings)
    {
-      new_window->net_settings.connect_to = Literal("chimera.local"); //String((char *) malloc(sizeof(char) * 20), 20);
+      new_window->net_settings = &dashstate->net_settings;
    }
    else if(new_window->type == WindowType_VideoStream)
    {
@@ -473,7 +468,7 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
    }
    else if(window->type == WindowType_NetworkSettings)
    {
-      DrawNetworkSettings(&window_layout, &window->net_settings);
+      DrawNetworkSettings(&window_layout, window->net_settings);
    }
    else if(window->type == WindowType_VideoStream)
    {
@@ -531,4 +526,6 @@ void DrawDashboardUI(UIContext *context, DashboardState *dashstate)
       Rectangle(context->render_context, tooltip_bounds, V4(0.2, 0.2, 0.2, 0.4));
       Text(context->render_context, tooltip_bounds.min, context->tooltip, 20);
    }
+   
+   //TODO: if left was clicked but didnt hit anything, set selected to NULL
 }

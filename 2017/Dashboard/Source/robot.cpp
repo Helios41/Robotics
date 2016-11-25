@@ -6,6 +6,16 @@ void DrawHardwareList(layout *hardware_list, UIContext *context, Robot *robot)
    Text(hardware_list, Literal("Hardware"), 40,
         V2((GetSize(hardware_list->bounds).x - GetTextWidth(context->render_context, Literal("Hardware"), 40)) / 2.0f, 0), V2(0, 5)); 
    
+   ui_id list_id = GEN_UI_ID;
+   interaction_state hardware_list_interact =
+      ClickInteraction(context, Interaction(list_id, hardware_list), context->input_state.left_up,
+                       context->input_state.left_down, Contains(hardware_list->bounds, context->input_state.pos));
+   
+   if(hardware_list_interact.became_selected)
+   {
+      robot->selected_hardware = NULL;
+   }
+   
    v2 button_size = V2(GetSize(hardware_list->bounds).x * 0.8, 40);
    v2 button_margin = V2(GetSize(hardware_list->bounds).x * 0.1, 10);
     
