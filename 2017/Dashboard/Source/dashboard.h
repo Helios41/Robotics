@@ -375,13 +375,35 @@ void Clear(string str)
 //TODO: make this more robust
 string *Split(string input, char split_char, u32 *array_length)
 {
+   {
+      u32 i = 0;
+      while((i < input.length) && 
+            (input.text[i] == split_char))
+      {
+         input.text++;
+         input.length--;
+         i++;
+      }
+   }
+   
+   {
+      u32 i = input.length - 1;
+      while((i > 0) && 
+            (input.text[i] == split_char))
+      {
+         input.length--;
+         i--;
+      }
+   }
+   
    *array_length = 1;
    
    for(u32 i = 0;
        i < input.length;
        i++)
    {
-      if(input.text[i] == split_char)
+      if((input.text[i] == split_char) &&
+         ((input.text[i - 1] != split_char) || (input.text[i + 1] != split_char)))
          (*array_length)++;
    }
    
@@ -587,6 +609,23 @@ r32 ToR32(string str)
 r32 Clamp(r32 min, r32 max, r32 in)
 {
    return Min(Max(min, in), max);
+}
+
+struct ticket_mutex
+{
+   s32 handout;
+   s32 serving;
+};
+
+void BeginTicketMutex(ticket_mutex *mutex)
+{
+   s32 ticket = InterlockedIncrement((long volatile *) &mutex->handout) - 1;
+   while(ticket != mutex->serving);
+}
+
+void EndTicketMutex(ticket_mutex *mutex)
+{
+   InterlockedIncrement((long volatile *) &mutex->serving);
 }
 
 #endif

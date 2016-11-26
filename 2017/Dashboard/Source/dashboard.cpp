@@ -8,6 +8,13 @@ enum ui_window_type
    WindowType_FileSelector
 };
 
+struct network_settings
+{
+   string connect_to;
+   b32 is_mdns;
+   b32 reconnect;
+};
+
 struct ui_window
 {
    ui_window_type type;
@@ -98,6 +105,34 @@ struct AutonomousEditor
    AutonomousBlock grabbed_block;
 };
 
+struct Notification
+{
+   Notification *next;
+   string name;
+   u32 count;
+};
+
+struct ConsoleMessage
+{
+   ConsoleMessage *next;
+   Notification *notification;
+   
+   string text;
+};
+
+struct Console
+{
+   //TODO: notification/message arena
+   ticket_mutex message_mutex;
+   ticket_mutex notification_mutex;
+   
+   ConsoleMessage *top_message;
+   ConsoleMessage *selected_message;
+   
+   Notification *top_notification;
+   Notification *selected_notification;
+};
+
 struct DashboardState
 {
    DashboardPage page;
@@ -110,6 +145,7 @@ struct DashboardState
    
    Robot robot;
    AutonomousEditor auto_editor;
+   Console console;
 };
 
 ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type type)
@@ -167,6 +203,7 @@ void RemoveWindow(DashboardState *dashstate, ui_window *window)
 
 #include "autonomous_editor.cpp"
 #include "robot.cpp"
+#include "console.cpp"
 
 void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
 {
@@ -182,11 +219,34 @@ void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
    layout settings_bar = Panel(top_bar, V2(settings_bar_width, top_bar_size.y), V2(0, 0), V2(0, 0)).lout;
    RectangleOutline(context->render_context, settings_bar.bounds, V4(0.0f, 0.0f, 0.0f, 1.0f), 3);
    
+   ui_id notification_bar_id = GEN_UI_ID;
+   interaction_state notification_bar_interact =
+      ClickInteraction(context, Interaction(notification_bar_id, &notification_bar), context->input_state.left_up,
+                       context->input_state.left_down, Contains(notification_bar.bounds, context->input_state.pos));
+   
+   if(notification_bar_interact.became_selected)
+   {
+      dashstate->console.selected_notification = NULL;
+   }
+   
    Rectangle(&notification_bar, dashstate->connected ? V4(1.0f, 1.0f, 1.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f),
              top_bar_element_size, V2(0, 0), top_bar_element_margin);
              
-   Rectangle(&notification_bar, V4(0.2f, 0.2f, 0.2f, 1.0f),
-             top_bar_element_size, V2(0, 0), top_bar_element_margin);
+   BeginTicketMutex(&dashstate->console.notification_mutex);
+   for(Notification *notification = dashstate->console.top_notification;
+       notification;
+       notification = notification->next)
+   {
+      button notification_button = _Button(POINTER_UI_ID(notification), &notification_bar, NULL,
+                                           notification->name, dashstate->console.selected_notification == notification,
+                                           top_bar_element_size, V2(0, 0), top_bar_element_margin);
+      
+      if(notification_button.state)
+      {
+         dashstate->console.selected_notification = (dashstate->console.selected_notification == notification) ? NULL : notification;
+      }
+   }
+   EndTicketMutex(&dashstate->console.notification_mutex);
              
    if(Button(&settings_bar, NULL, EmptyString(), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
    {
@@ -390,6 +450,14 @@ void DrawCenterArea(layout *center_area, UIContext *context, DashboardState *das
    else if(dashstate->page == Page_Robot)
    {
       DrawRobot(center_area, context, dashstate);
+   }
+   else if(dashstate->page == Page_Vision)
+   {
+      
+   }
+   else if(dashstate->page == Page_Console)
+   {
+      DrawConsole(center_area, context, dashstate);
    }
 }
 

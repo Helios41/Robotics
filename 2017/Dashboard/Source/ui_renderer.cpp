@@ -873,9 +873,7 @@ rect2 GetCharBounds(RenderContext *context, v2 pos, string text, u32 scale, u32 
    return GetCharBounds(context, bounds, text, char_index);
 }
 
-//TODO: clean up text wrap
-//TODO: optimize this by caching the text wrapping & segments?
-//TODO: calculate text scale based on bounds, clamp min scale, I dont want the text TOOO small
+//TODO: replace this with "WrappedText" below
 void TextWrapRect(RenderContext *render_context, rect2 bounds, string text, r32 scale = 20)
 {
    if(!IsEmpty(text))
@@ -935,6 +933,117 @@ void TextWrapRect(RenderContext *render_context, rect2 bounds, string text, r32 
       
       free(segments);
    }
+}
+
+//TODO: calculate text scale based on bounds, clamp min scale, I dont want the text TOOO small
+//TODO: reintroduce the "..." for words that dont fit
+void WrappedText(RenderContext *render_context, rect2 bounds, string text, r32 scale)
+{
+   if(!IsEmpty(text))
+   {
+      u32 segment_count;
+      string *segments = Split(text, ' ', &segment_count);
+      v2 bounds_size = GetSize(bounds);
+      
+      if(segment_count > 1)
+      {
+         string curr_line = String(text.text, 0);
+         v2 at = bounds.min;
+         
+         for(u32 i = 0;
+             i < segment_count;
+             i++)
+         {
+            string curr_string = segments[i];
+            string new_line = String(curr_line.text, curr_line.length + curr_string.length);
+            v2 new_line_size = GetTextSize(render_context, new_line, scale);
+            
+            if(new_line_size.x > bounds_size.x)
+            {
+               Text(render_context, at, curr_line, scale);
+               curr_line = curr_string;
+               at = at + V2(0, GetTextSize(render_context, curr_line, scale).y);
+            }
+            else
+            {
+               curr_line = new_line;
+            }
+         }
+         
+         Text(render_context, at, curr_line, scale);
+      }
+      else
+      {
+         Text(render_context, bounds.min, text, scale);
+      }
+      
+      free(segments);
+   }
+}
+
+rect2 WrappedGetCharBounds(RenderContext *render_context, rect2 bounds, string text, r32 scale, u32 char_index)
+{
+   rect2 result = RectMinSize(V2(0, 0), V2(0, 0));
+   
+   if(!IsEmpty(text))
+   {
+      u32 segment_count;
+      string *segments = Split(text, ' ', &segment_count);
+      v2 bounds_size = GetSize(bounds);
+      
+      if(segment_count > 1)
+      {
+         string curr_line = String(text.text, 0);
+         v2 at = bounds.min;
+         
+         for(u32 i = 0;
+             i < segment_count;
+             i++)
+         {
+            string curr_string = segments[i];
+            string new_line = String(curr_line.text, curr_line.length + curr_string.length);
+            v2 new_line_size = GetTextSize(render_context, new_line, scale);
+            
+            if(new_line_size.x > bounds_size.x)
+            {
+               u32 first_index = (u32)(curr_line.text - text.text);
+               u32 last_index = first_index + curr_line.length;
+               
+               if((first_index <= char_index) && (char_index <= last_index))
+               {
+                  u32 index_in_line = char_index - first_index;
+                  result = GetCharBounds(render_context, at, curr_line, scale, index_in_line);
+               }
+               
+               curr_line = curr_string;
+               at = at + V2(0, GetTextSize(render_context, curr_line, scale).y);
+            }
+            else
+            {
+               curr_line = new_line;
+            }
+         }
+         
+         {
+            u32 first_index = (u32)(curr_line.text - text.text);
+            u32 last_index = first_index + curr_line.length;
+               
+            if((first_index <= char_index) && (char_index <= last_index))
+            {
+               u32 index_in_line = char_index - first_index;
+               result = GetCharBounds(render_context, at, curr_line, scale, index_in_line);
+            }
+         }
+      }
+      else
+      {
+         result = GetCharBounds(render_context, bounds.min, text, scale, char_index);
+      }
+      
+      free(segments);
+   }
+   
+   return result;
 }
 
 element Rectangle(layout *ui_layout, v4 color, v2 element_size, v2 padding_size, v2 margin_size)
@@ -1139,13 +1248,12 @@ void _TextBox(ui_id id, layout *ui_layout, string *buffer, v2 element_size, v2 p
    Rectangle(render_context, textbox_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
    RectangleOutline(render_context, textbox_element.bounds, V4(0.0f, 0.0f, 0.f, 1.0f), text_box_interact.selected ? 3 : 1);
    
-   //TODO: wrapped text
-   Text(render_context, textbox_element.bounds.min, *buffer, 20);
+   WrappedText(render_context, textbox_element.bounds, *buffer, 20);
    
    if(text_box_interact.selected)
    {
-      rect2 selected_char = GetCharBounds(render_context, textbox_element.bounds.min,
-                                          *buffer, 20, context->text_box_pointer);
+      rect2 selected_char = WrappedGetCharBounds(render_context, textbox_element.bounds,
+                                                 *buffer, 20, context->text_box_pointer);
       Rectangle(render_context, selected_char, V4(0, 0, 0, 0.3f));
    }
 }
@@ -1229,6 +1337,19 @@ void _TextBox(ui_id id, layout *ui_layout, r32 min, r32 max, r32 *value, v2 elem
 {
    _TextBox(id, ui_layout, value, element_size, padding_size, margin_size);
    *value = Clamp(min, max, *value);
+}
+
+void _TextBox(ui_id id, layout *ui_layout, u32 *value, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   r32 float_value = (r32) *value;
+   _TextBox(id, ui_layout, &float_value, element_size, padding_size, margin_size);
+   *value = (u32)(float_value + 0.5);
+}
+
+void _TextBox(ui_id id, layout *ui_layout, u32 min, u32 *value, v2 element_size, v2 padding_size, v2 margin_size)
+{
+   _TextBox(id, ui_layout, value, element_size, padding_size, margin_size);
+   *value = Max(min, *value);
 }
 
 #define TextBox(...) _TextBox(GEN_UI_ID, __VA_ARGS__)

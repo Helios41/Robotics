@@ -1,18 +1,11 @@
-#include "dashboard.h"
-
-//TODO: move this into an appropriate place, was in dashboard.cpp originally, moved out so it could be used in the network layer
-struct network_settings
-{
-   string connect_to;
-   b32 is_mdns;
-   b32 reconnect;
-};
-
-#include "network_win32.cpp"
+#include <winsock2.h>
+#include <Ws2tcpip.h>
 #include <windows.h>
 
+#include "dashboard.h"
 #include "packet_definitions.h"
 #include "dashboard.cpp"
+#include "network_win32.cpp"
 
 /*
 enum PageType
@@ -780,21 +773,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    RegisterClassExA(&window_class);
    
-   volatile b32 running = true;
-   volatile char *connect_to = NULL;
-   volatile b32 use_mdns = false;
-   volatile b32 reconnect = false;
-   volatile b32 connect_status = false;
-   
-   net_main_params net_params = {};
-   net_params.running = &running;
-   net_params.connect_to = connect_to;
-   net_params.use_mdns = &use_mdns;
-   net_params.reconnect = &reconnect;
-   net_params.connect_status = &connect_status;
-   
-   HANDLE network_thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)NetMain, &net_params, 0, NULL);
-
    HWND window = {};
    HDC device_context = SetupWindow(hInstance, nCmdShow, &window);
    
@@ -859,6 +837,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    };
    
    DashboardState dashstate = {};
+   
    dashstate.robot.hardware = test_hardware;
    dashstate.robot.hardware_count = ArrayCount(test_hardware);
    dashstate.robot.name = Literal("Bob Ross");
@@ -867,6 +846,22 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    Clear(dashstate.net_settings.connect_to);
    CopyTo(Literal("roborio-4618-frc.local") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
    dashstate.net_settings.is_mdns = true;
+   
+   volatile b32 running = true;
+   volatile char *connect_to = NULL;
+   volatile b32 use_mdns = false;
+   volatile b32 reconnect = false;
+   volatile b32 connect_status = false;
+   
+   net_main_params net_params = {};
+   net_params.running = &running;
+   net_params.connect_to = connect_to;
+   net_params.use_mdns = &use_mdns;
+   net_params.reconnect = &reconnect;
+   net_params.connect_status = &connect_status;
+   net_params.dashstate = &dashstate;
+   
+   HANDLE network_thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)NetMain, &net_params, 0, NULL);
    
    RequestReconnect(&dashstate.net_settings, &net_params);
    

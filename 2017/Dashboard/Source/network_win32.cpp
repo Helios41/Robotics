@@ -1,6 +1,3 @@
-#include <winsock2.h>
-#include <Ws2tcpip.h>
-
 struct net_main_params
 {
 	volatile b32 *running;
@@ -8,6 +5,7 @@ struct net_main_params
    volatile b32 *use_mdns;
    volatile b32 *reconnect;
    volatile b32 *connect_status;
+   volatile DashboardState *dashstate;
 };
 
 void RequestReconnect(network_settings *net_settings, net_main_params *params)
@@ -23,20 +21,28 @@ void RequestReconnect(network_settings *net_settings, net_main_params *params)
    }
 }
 
+//TODO: functions that send packets to the connected server
+
 DWORD NetMain(LPVOID *data)
 {
 	net_main_params *params = (net_main_params *) data;
 
 	WSADATA wsa_data = {};
 	WSAStartup(MAKEWORD(2, 2), &wsa_data);
-
+   
+   Notification *network_notification = AddNotification((Console *) &params->dashstate->console, Literal("Network"));
+   
+   AddMessage((Console *) &params->dashstate->console,
+              Literal("Starting Network Thread"), network_notification);
+   
 	while(*params->running)
 	{
 		if(*params->reconnect)
 		{
-         //TODO: remove these message boxes, send messages to the console
-         //      ***Make the console fully thread safe, notifications included***
-         MessageBoxA(NULL, (char *) params->connect_to, "Address", MB_OK);
+         AddMessage((Console *) &params->dashstate->console,
+                    /*"Attempting to connect to: "*/ Literal((char *) params->connect_to),
+                    network_notification);
+         
 			char *host_ip = params->use_mdns ? NULL : (char *) params->connect_to;
          
          if(params->use_mdns)
@@ -46,15 +52,21 @@ DWORD NetMain(LPVOID *data)
             if(robot_server)
             {
                host_ip = inet_ntoa(*((in_addr *)robot_server->h_addr));
-               MessageBoxA(NULL, host_ip, "Address", MB_OK);
+               
+               AddMessage((Console *) &params->dashstate->console,
+                          /*"MDNS IP: "*/ Literal(host_ip),
+                          network_notification);
             }
             else
             {
-               MessageBoxA(NULL, "Not Found", "Address", MB_OK);
+               AddMessage((Console *) &params->dashstate->console, Literal("MDNS IP address lookup FAILED"),
+                          network_notification);
             }
          }
          
-         MessageBoxA(NULL, host_ip ? host_ip : "NULL", "Address", MB_OK);
+         AddMessage((Console *) &params->dashstate->console,
+                    host_ip ? /*concat "Host IP: "*/ Literal(host_ip) : Literal("Address: NULL"),
+                    network_notification);
 			
          if(host_ip)
          {
@@ -71,7 +83,8 @@ DWORD NetMain(LPVOID *data)
             connect(server_socket, (struct sockaddr *)&server, sizeof(server));
          }
          
-         free((void *) params->connect_to);
+         //NOTE: we're not freeing here because we pass the connect_to string to the console
+         //free((void *) params->connect_to);
          params->connect_to = NULL;
 			
          //connect_status = ?;

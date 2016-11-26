@@ -24,7 +24,9 @@ void DrawHardwareList(layout *hardware_list, UIContext *context, Robot *robot)
        i++)
    {
       RobotHardware *hardware = robot->hardware + i;
-      button hardware_button = _Button(POINTER_UI_ID(hardware), hardware_list, NULL, hardware->name, button_size, V2(0, 0), button_margin);
+      button hardware_button = _Button(POINTER_UI_ID(hardware), hardware_list, NULL,
+                                       hardware->name, robot->selected_hardware == hardware,
+                                       button_size, V2(0, 0), button_margin);
       
       if(hardware_button.state)
       {
