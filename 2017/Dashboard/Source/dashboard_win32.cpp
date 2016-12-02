@@ -865,6 +865,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    RequestReconnect(&dashstate.net_settings, &net_params);
    
+   Notification *vision_notification =
+      AddNotification((Console *) &dashstate.console, Literal("Vision"));
+   
+   AddMessage((Console *) &dashstate.console,
+              Literal("Vision System Not Present XD"), vision_notification);
+   
    b32 update_mouse = true;
    
    //connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);

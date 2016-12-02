@@ -611,6 +611,11 @@ r32 Clamp(r32 min, r32 max, r32 in)
    return Min(Max(min, in), max);
 }
 
+u32 Clamp(u32 min, u32 max, u32 in)
+{
+   return Min(Max(min, in), max);
+}
+
 struct ticket_mutex
 {
    s32 handout;

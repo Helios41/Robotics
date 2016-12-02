@@ -165,11 +165,17 @@ void DrawEditorBar(layout *editor_bar, AutonomousEditor *auto_editor)
    Button(editor_bar, NULL, EmptyString(), button_size, V2(0, 0), button_margin);
 }
 
+char lua_src_temp[] = "motor.set(1.0)\nmotor.set(0.0)\nsolenoid.set(Extended)";
+string lua_src = Literal(lua_src_temp);
+
 void DrawLuaEditor(layout *editor_panel, AutonomousEditor *auto_editor)
 {
    RenderContext *render_context = editor_panel->context->render_context;
-   Text(editor_panel, Literal("Lua Editor"), 20,
-        V2((GetSize(editor_panel->bounds).x - GetTextWidth(render_context, Literal("Lua Editor"), 20)) / 2.0f, 0), V2(0, 5)); 
+   element title_element = Text(editor_panel, Literal("Lua Editor"), 20,
+                                V2((GetSize(editor_panel->bounds).x - GetTextWidth(render_context, Literal("Lua Editor"), 20)) / 2.0f, 0), V2(0, 5)); 
+  
+   v2 src_editor_size = V2(GetSize(editor_panel->bounds).x, GetSize(editor_panel->bounds).y - GetSize(title_element.margin_bounds).y);
+   TEST_TextBox(GEN_UI_ID, editor_panel, lua_src, src_editor_size, V2(0, 0), V2(0, 0));
 }
 
 void DrawAutonomousBlock(ui_id id, layout *ui_layout, AutonomousBlock *block,
@@ -187,7 +193,7 @@ void DrawAutonomousBlock(ui_id id, layout *ui_layout, AutonomousBlock *block,
       auto_editor->selected_block = block;
    }
     
-   if(block_interact.active || (block == auto_editor->selected_block))
+   if(block_interact.active)
    {
       Rectangle(render_context, block_element.bounds, V4(1.0f, 0.0f, 0.75f, 1.0f));
    }
@@ -205,6 +211,12 @@ void DrawAutonomousBlock(ui_id id, layout *ui_layout, AutonomousBlock *block,
    string text = block->is_wait_block ? Literal("Wait") : (block->hardware ? block->hardware->name : EmptyString());
    
    TextWrapRect(render_context, block_element.bounds, text);
+   
+   if(block == auto_editor->selected_block)
+   {
+      Rectangle(render_context, RectMinSize(block_element.bounds.min, V2(5, GetSize(block_element.bounds).y)),
+               V4(0.0f, 0.0f, 0.0f, 1.0f));
+   }
 }
 
 r32 debug_scroll = -80;

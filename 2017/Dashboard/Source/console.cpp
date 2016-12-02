@@ -1,5 +1,6 @@
 Notification *AddNotification(Console *console, string name)
 {
+   //TODO: switch this to a memory arena & recycle allocator
    Notification *result = (Notification *) malloc(sizeof(Notification));
    *result = {};
    
@@ -15,6 +16,7 @@ Notification *AddNotification(Console *console, string name)
 
 ConsoleMessage *AddMessage(Console *console, string text, Notification *notification = NULL)
 {
+   //TODO: switch this to a memory arena & recycle allocator
    ConsoleMessage *result = (ConsoleMessage *) malloc(sizeof(ConsoleMessage));
    *result = {};
    
