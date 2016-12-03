@@ -478,7 +478,7 @@ void DrawDisplaySettings(layout *window_layout)
 void DrawNetworkSettings(layout *window_layout, network_settings *net_settings)
 {
    Text(window_layout, Literal("Network Settings"), 20, V2(0,0), V2(0, 0));
-   TextBox(window_layout, &net_settings->connect_to, V2(GetSize(window_layout->bounds).x * 0.9, 40), V2(0, 0), V2(0, 0));
+   TextBox(window_layout, net_settings->connect_to, V2(GetSize(window_layout->bounds).x * 0.9, 40), V2(0, 0), V2(0, 0));
    ToggleSlider(window_layout, &net_settings->is_mdns, Literal("mDNS"), Literal("IP"), V2(120, 20), V2(0, 0), V2(0, 0));
    
    if(Button(window_layout, NULL, Literal("Reconnect"), V2(120, 20), V2(0, 0), V2(0, 0)).state)

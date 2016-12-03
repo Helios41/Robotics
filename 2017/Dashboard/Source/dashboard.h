@@ -23,6 +23,7 @@ typedef uint32_t b32;
 #define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
 #define Min(a, b) (((a) > (b)) ? (b) : (a))
 #define Max(a, b) (((a) < (b)) ? (b) : (a))
+#define Clamp(min, max, in) Min(Max(min, in), max)
 #define FLTMAX 3.402823e+38
 
 /**
@@ -596,6 +597,34 @@ char *ConcatStrings(char *str1, char *str2, char *str3, char *str4, char *str5, 
 	return str;
 }
 
+u32 CountChar(string str, char c)
+{
+   u32 result = 0;
+   for(u32 i = 0;
+       i < str.length;
+       i++)
+   {
+      if(str.text[i] == c)
+      {
+         result++;
+      }
+   }
+   return result;
+}
+
+u32 IndexOfFirst(string str, char c)
+{
+   u32 result = 0;
+   for(u32 i = 0;
+       i < str.length;
+       i++)
+   {
+      if(str.text[i] == c) break;
+      result++;
+   }
+   return result;
+}
+
 r32 ToR32(string str)
 {
    string buffer = String((char *) malloc(21 * sizeof(char)), 20);
@@ -604,16 +633,6 @@ r32 ToR32(string str)
    r32 result = atof(buffer.text);
    free(buffer.text);
    return result;
-}
-
-r32 Clamp(r32 min, r32 max, r32 in)
-{
-   return Min(Max(min, in), max);
-}
-
-u32 Clamp(u32 min, u32 max, u32 in)
-{
-   return Min(Max(min, in), max);
 }
 
 struct ticket_mutex

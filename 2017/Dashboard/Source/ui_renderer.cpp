@@ -876,70 +876,9 @@ rect2 GetCharBounds(RenderContext *context, v2 pos, string text, u32 scale, u32 
    return GetCharBounds(context, bounds, text, char_index);
 }
 
-//TODO: replace this with "WrappedText" below
-void TextWrapRect(RenderContext *render_context, rect2 bounds, string text, r32 scale = 20)
-{
-   if(!IsEmpty(text))
-   {
-      u32 segment_count;
-      string *segments = Split(text, ' ', &segment_count);
-      
-      v2 at = V2(0.0f, 0.0f);
-      r32 row_height = 0.0f;
-      
-      for(u32 i = 0;
-          i < segment_count;
-          i++)
-      {
-         string curr_segment = segments[i];
-         v2 word_size = GetTextSize(render_context, curr_segment, scale);
-         
-         if((bounds.min.x + at.x + word_size.x) > bounds.max.x)
-         {
-            if((at.y + row_height + word_size.y) > GetSize(bounds).y)
-            {
-               Rectangle(render_context, RectPosSize(bounds.min + at, V2(3, 3)),
-                         V4(0.0f, 0.0f, 0.0f, 1.0f));
-               Text(render_context, bounds.min + at,
-                    Literal("..."), scale);
-            }
-            else
-            {
-               if(word_size.x > GetSize(bounds).x)
-               {
-                  Rectangle(render_context, RectPosSize(bounds.min + at, V2(3, 3)),
-                         V4(0.0f, 0.0f, 0.0f, 1.0f));
-                  Text(render_context, bounds.min + at,
-                       Literal("..."), scale);
-               }
-               else
-               {
-                  i--;
-               }
-               
-               at.x = 0.0f;
-               at.y += row_height;
-               row_height = 0.0f;
-            }
-         }
-         else
-         {
-            Rectangle(render_context, RectPosSize(bounds.min + at, V2(3, 3)),
-                      V4(0.0f, 0.0f, 0.0f, 1.0f));
-            Text(render_context, bounds.min + at,
-                 curr_segment, scale);
-                 
-            row_height = Max(row_height, word_size.y);
-            at.x += word_size.x + 10;
-         }
-      }
-      
-      free(segments);
-   }
-}
-
 r32 TextLabelSuggestScale(RenderContext *render_context, rect2 bounds, string text)
 {
+   //TODO: write and start using this
    return 0.0f;
 }
 
@@ -960,115 +899,23 @@ void TextLabel(RenderContext *render_context, rect2 bounds, string text, r32 sca
              i < segment_count;
              i++)
          {
-            string curr_string = segments[i];
-            string new_line = String(curr_line.text, curr_line.length + curr_string.length);
+            string curr_segment = segments[i];
+            string new_line = String(curr_line.text, curr_line.length + ((i == 0) ? 0 : 1) + curr_segment.length);
             v2 new_line_size = GetTextSize(render_context, new_line, scale);
             
             if(new_line_size.x > bounds_size.x)
             {
-               Text(render_context, at, curr_line, scale);
-               curr_line = curr_string;
-               at = at + V2(0, GetTextSize(render_context, curr_line, scale).y);
-            }
-            else
-            {
-               curr_line = new_line;
-            }
-         }
-         
-         Text(render_context, at, curr_line, scale);
-      }
-      else
-      {
-         Text(render_context, bounds.min, text, scale);
-      }
-      
-      free(segments);
-   }
-}
-
-//TODO: calculate text scale based on bounds, clamp min scale, I dont want the text TOOO small
-//TODO: reintroduce the "..." for words that dont fit
-void WrappedText(RenderContext *render_context, rect2 bounds, string text, r32 scale)
-{
-   if(!IsEmpty(text))
-   {
-      u32 segment_count;
-      string *segments = Split(text, ' ', &segment_count);
-      v2 bounds_size = GetSize(bounds);
-      
-      if(segment_count > 1)
-      {
-         string curr_line = String(text.text, 0);
-         v2 at = bounds.min;
-         
-         for(u32 i = 0;
-             i < segment_count;
-             i++)
-         {
-            string curr_string = segments[i];
-            string new_line = String(curr_line.text, curr_line.length + curr_string.length);
-            v2 new_line_size = GetTextSize(render_context, new_line, scale);
-            
-            if(new_line_size.x > bounds_size.x)
-            {
-               Text(render_context, at, curr_line, scale);
-               curr_line = curr_string;
-               at = at + V2(0, GetTextSize(render_context, curr_line, scale).y);
-            }
-            else
-            {
-               curr_line = new_line;
-            }
-         }
-         
-         Text(render_context, at, curr_line, scale);
-      }
-      else
-      {
-         Text(render_context, bounds.min, text, scale);
-      }
-      
-      free(segments);
-   }
-}
-
-rect2 WrappedGetCharBounds(RenderContext *render_context, rect2 bounds, string text, r32 scale, u32 char_index)
-{
-   rect2 result = RectMinSize(V2(0, 0), V2(0, 0));
-   
-   if(!IsEmpty(text))
-   {
-      u32 segment_count;
-      string *segments = Split(text, ' ', &segment_count);
-      v2 bounds_size = GetSize(bounds);
-      
-      if(segment_count > 1)
-      {
-         string curr_line = String(text.text, 0);
-         v2 at = bounds.min;
-         
-         for(u32 i = 0;
-             i < segment_count;
-             i++)
-         {
-            string curr_string = segments[i];
-            string new_line = String(curr_line.text, curr_line.length + curr_string.length);
-            v2 new_line_size = GetTextSize(render_context, new_line, scale);
-            
-            if(new_line_size.x > bounds_size.x)
-            {
-               u32 first_index = (u32)(curr_line.text - text.text);
-               u32 last_index = first_index + curr_line.length;
+               r32 curr_line_height = GetTextSize(render_context, curr_line, scale).y;
                
-               if((first_index <= char_index) && (char_index <= last_index))
+               if((at.y + curr_line_height) > bounds.max.y)
                {
-                  u32 index_in_line = char_index - first_index;
-                  result = GetCharBounds(render_context, at, curr_line, scale, index_in_line);
+                  curr_line = EmptyString();
+                  break;
                }
-               
-               curr_line = curr_string;
-               at = at + V2(0, GetTextSize(render_context, curr_line, scale).y);
+                  
+               Text(render_context, at, curr_line, scale);
+               curr_line = curr_segment;
+               at = at + V2(0, curr_line_height);
             }
             else
             {
@@ -1076,26 +923,15 @@ rect2 WrappedGetCharBounds(RenderContext *render_context, rect2 bounds, string t
             }
          }
          
-         {
-            u32 first_index = (u32)(curr_line.text - text.text);
-            u32 last_index = first_index + curr_line.length;
-               
-            if((first_index <= char_index) && (char_index <= last_index))
-            {
-               u32 index_in_line = char_index - first_index;
-               result = GetCharBounds(render_context, at, curr_line, scale, index_in_line);
-            }
-         }
+         Text(render_context, at, curr_line, scale);
       }
       else
       {
-         result = GetCharBounds(render_context, bounds.min, text, scale, char_index);
+         Text(render_context, bounds.min, text, scale);
       }
       
       free(segments);
    }
-   
-   return result;
 }
 
 element Rectangle(layout *ui_layout, v4 color, v2 element_size, v2 padding_size, v2 margin_size)
@@ -1167,7 +1003,7 @@ button _Button(ui_id id, layout *ui_layout, LoadedBitmap *icon, string text, v2 
    }
    
    Bitmap(render_context, icon, button_element.bounds.min);
-   TextWrapRect(render_context, button_element.bounds, text);
+   TextLabel(render_context, button_element.bounds, text, 20);
    
    button result = {};
    result.state = button_interact.became_selected;
@@ -1211,10 +1047,10 @@ element _ToggleSlider(ui_id id, layout *ui_layout, b32 *option, string option1, 
    }
    
    Rectangle(render_context, option1_bounds, (*option) ? V4(1, 0, 0, 1) : V4(0.5, 0, 0, 1));
-   TextWrapRect(render_context, option1_bounds, option1);
+   TextLabel(render_context, option1_bounds, option1, 20);
    
    Rectangle(render_context, option2_bounds, !(*option) ? V4(1, 0, 0, 1) : V4(0.5, 0, 0, 1));
-   TextWrapRect(render_context, option2_bounds, option2);
+   TextLabel(render_context, option2_bounds, option2, 20);
    
    if(toggle_interact.active)
    {
@@ -1254,7 +1090,48 @@ element _ToggleSlider(ui_id id, layout *ui_layout, b32 *option, string option1, 
 
 #define ToggleSlider(...) _ToggleSlider(GEN_UI_ID, __VA_ARGS__)
 
-void _TextBox(ui_id id, layout *ui_layout, string *buffer, v2 element_size, v2 padding_size, v2 margin_size)
+void TextBoxInsert(string buffer, string curr_line, UIContext *context, char c)
+{
+   for(u32 i = buffer.length;
+       i > (context->text_box_column + (u32)(curr_line.text - buffer.text));
+       i--)
+   {
+      buffer.text[i] = buffer.text[i - 1];
+   }
+   
+   curr_line.text[context->text_box_column] = c;
+   if(context->text_box_column < curr_line.length)
+   {
+      context->text_box_column++;
+   }
+}
+
+void CheckDrawCursor(interaction_state text_box_interact, rect2 textbox_bounds, string curr_draw_line,
+                     string curr_line, UIContext *context, u32 cursor_width, r32 line_height, v2 at)
+{
+   RenderContext *render_context = context->render_context;
+   if(text_box_interact.selected && (curr_draw_line.text == curr_line.text))
+   {
+      rect2 cursor_rect;
+      
+      if(context->text_box_column == curr_line.length)
+      {
+         rect2 selected_char = GetCharBounds(render_context, textbox_bounds.min,
+                                             curr_line, 20, curr_line.length - 1);
+         cursor_rect = RectMinSize(V2(selected_char.max.x, at.y), V2(cursor_width, line_height));
+      }
+      else
+      {
+         rect2 selected_char = GetCharBounds(render_context, textbox_bounds.min,
+                                             curr_line, 20, context->text_box_column);
+         cursor_rect = RectMinSize(V2(selected_char.min.x - cursor_width, at.y), V2(cursor_width, line_height));
+      }
+      
+      Rectangle(render_context, cursor_rect, V4(0, 0, 0, 1));                                    
+   }
+}
+
+void _TextBox(ui_id id, layout *ui_layout, string buffer, v2 element_size, v2 padding_size, v2 margin_size)
 {
    UIContext *context = ui_layout->context;
    RenderContext *render_context = context->render_context;
@@ -1266,48 +1143,116 @@ void _TextBox(ui_id id, layout *ui_layout, string *buffer, v2 element_size, v2 p
   
    if(text_box_interact.became_selected)
    {
-      context->text_box_pointer = 0;
+      context->text_box_line = 0;
+      context->text_box_column = 0;
    }
-  
-   if(text_box_interact.selected)
-   {  
-      if(context->input_state.char_key_up)
-      {
-         buffer->text[context->text_box_pointer] = context->input_state.key_char;
-         if(context->text_box_pointer < (buffer->length - 1))
-         {
-            context->text_box_pointer++;
-         }
-      }
-      if(context->input_state.key_backspace)
-      {
-         buffer->text[context->text_box_pointer] = ' ';
-         if(context->text_box_pointer > 0)
-         {
-            context->text_box_pointer--;
-         }
-      }
-      if(context->input_state.key_right && (context->text_box_pointer < (buffer->length - 1)))
-      {
-         context->text_box_pointer++;
-      }
-      if(context->input_state.key_left && (context->text_box_pointer > 0))
-      {
-         context->text_box_pointer--;
-      }
-   }
-  
-   Rectangle(render_context, textbox_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
-   RectangleOutline(render_context, textbox_element.bounds, V4(0.0f, 0.0f, 0.f, 1.0f), text_box_interact.selected ? 3 : 1);
    
-   WrappedText(render_context, textbox_element.bounds, *buffer, 20);
+   string curr_line = EmptyString();
    
    if(text_box_interact.selected)
    {
-      rect2 selected_char = WrappedGetCharBounds(render_context, textbox_element.bounds,
-                                                 *buffer, 20, context->text_box_pointer);
-      Rectangle(render_context, selected_char, V4(0, 0, 0, 0.3f));
+      u32 on_line = 0;
+      
+      for(u32 i = 0;
+          i < buffer.length;
+          i++)
+      {
+         char c = buffer.text[i];
+         
+         if(on_line == context->text_box_line)
+         {
+            curr_line = String(buffer.text + i,
+                               IndexOfFirst(String(buffer.text + i, buffer.length - i), '\n'));
+            break;
+         }
+         
+         if(c == '\n')
+         {
+            on_line++;
+         }
+      }
+      
+      u32 line_count = CountChar(buffer, '\n');
+      
+      Assert(curr_line.text != NULL);
+      context->text_box_column = Clamp(0, curr_line.length, context->text_box_column);
+   
+      if(context->input_state.char_key_up &&
+         ((context->text_box_column + (u32)(curr_line.text - buffer.text)) < buffer.length))
+      {
+         TextBoxInsert(buffer, curr_line, context, context->input_state.key_char);
+      }
+      
+      if(context->input_state.key_enter &&
+         ((context->text_box_column + (u32)(curr_line.text - buffer.text)) < buffer.length))
+      {
+         TextBoxInsert(buffer, curr_line, context, '\n');
+      }
+      
+      if(context->input_state.key_backspace && (context->text_box_column > 0))
+      {
+         for(u32 i = context->text_box_column + (u32)(curr_line.text - buffer.text) - 1;
+             i < (buffer.length - 1);
+             i++)
+         {
+            buffer.text[i] = buffer.text[i + 1];
+         }
+         
+         buffer.text[buffer.length - 1] = ' ';
+         context->text_box_column--;
+      }
+      
+      if(context->input_state.key_up && (context->text_box_line > 0))
+      {
+         context->text_box_line--;
+      }
+      if(context->input_state.key_down && (context->text_box_line < line_count))
+      {
+         context->text_box_line++;
+      }
+      
+      if(context->input_state.key_right && (context->text_box_column < curr_line.length))
+      {
+         context->text_box_column++;
+      }
+      if(context->input_state.key_left && (context->text_box_column > 0))
+      {
+         context->text_box_column--;
+      }
    }
+   
+   RectangleOutline(render_context, textbox_element.bounds, V4(0, 0, 0, 1), 2);
+   
+   u32 cursor_width = 2;
+   
+   string curr_draw_line = String(buffer.text, 0);
+   v2 at = textbox_element.bounds.min;
+   for(u32 i = 0;
+      i < buffer.length;
+      i++)
+   {
+      if(buffer.text[i] == '\n')
+      {
+         Text(render_context, at, curr_draw_line, 20);
+         r32 line_height = GetTextSize(render_context, curr_draw_line, 20).y;
+         
+         CheckDrawCursor(text_box_interact, textbox_element.bounds, curr_draw_line,
+                         curr_line, context, cursor_width, line_height, at);
+            
+         at = at + V2(0, line_height);
+         curr_draw_line = String(curr_draw_line.text + curr_draw_line.length + 1, 0);
+      }
+      else
+      {
+         curr_draw_line.length++;
+      }
+   }
+   
+   Text(render_context, at, curr_draw_line, 20);
+   r32 line_height = GetTextSize(render_context, curr_draw_line, 20).y;
+   
+   CheckDrawCursor(text_box_interact, textbox_element.bounds, curr_draw_line,
+                     curr_line, context, cursor_width, line_height, at);
 }
 
 void _TextBox(ui_id id, layout *ui_layout, r32 *value, v2 element_size, v2 padding_size, v2 margin_size)
@@ -1405,205 +1350,6 @@ void _TextBox(ui_id id, layout *ui_layout, u32 min, u32 *value, v2 element_size,
 }
 
 #define TextBox(...) _TextBox(GEN_UI_ID, __VA_ARGS__)
-
-void TEST_TextBox(ui_id id, layout *ui_layout, string buffer, v2 element_size, v2 padding_size, v2 margin_size)
-{
-   UIContext *context = ui_layout->context;
-   RenderContext *render_context = context->render_context;
-   element textbox_element = Element(ui_layout, element_size, padding_size, margin_size);
-   
-   interaction_state text_box_interact =
-      ClickInteraction(context, Interaction(id, ui_layout), context->input_state.left_up,
-                       context->input_state.left_down, Contains(textbox_element.bounds, context->input_state.pos));
-  
-   if(text_box_interact.became_selected)
-   {
-      context->text_box_line = 0;
-      context->text_box_column = 0;
-   }
-   
-   string curr_line = EmptyString();
-   
-   if(text_box_interact.selected)
-   {
-      u32 on_line = 0;
-      
-      for(u32 i = 0;
-          i < buffer.length;
-          i++)
-      {
-         char c = buffer.text[i];
-         
-         if(on_line == context->text_box_line)
-         {
-            u32 curr_line_length = 0;
-            for(u32 j = i;
-                j < buffer.length;
-                j++)
-            {
-               if(buffer.text[j] == '\n') break;
-               curr_line_length++;
-            }
-            
-            curr_line = String(buffer.text + i, curr_line_length);
-            break;
-         }
-         
-         if(c == '\n')
-         {
-            on_line++;
-         }
-      }
-      
-      u32 line_count = 0;
-      for(u32 i = 0;
-          i < buffer.length;
-          i++)
-      {
-         if(buffer.text[i] == '\n')
-         {
-            line_count++;
-         }
-      }
-      
-      Assert(curr_line.text != NULL);
-      context->text_box_column = Clamp(0, curr_line.length, context->text_box_column);
-   
-      if(context->input_state.char_key_up &&
-         ((context->text_box_column + (u32)(curr_line.text - buffer.text)) < buffer.length))
-      {
-         for(u32 i = buffer.length;
-             i > (context->text_box_column + (u32)(curr_line.text - buffer.text));
-             i--)
-         {
-            buffer.text[i] = buffer.text[i - 1];
-         }
-         
-         curr_line.text[context->text_box_column] = context->input_state.key_char;
-         if(context->text_box_column < curr_line.length)
-         {
-            context->text_box_column++;
-         }
-      }
-      
-      if(context->input_state.key_enter &&
-         ((context->text_box_column + (u32)(curr_line.text - buffer.text)) < buffer.length))
-      {
-         for(u32 i = buffer.length;
-             i > (context->text_box_column + (u32)(curr_line.text - buffer.text));
-             i--)
-         {
-            buffer.text[i] = buffer.text[i - 1];
-         }
-         
-         curr_line.text[context->text_box_column] = '\n';
-         if(context->text_box_column < curr_line.length)
-         {
-            context->text_box_column++;
-         }
-      }
-      
-      if(context->input_state.key_backspace && (context->text_box_column > 0))
-      {
-         for(u32 i = context->text_box_column + (u32)(curr_line.text - buffer.text) - 1;
-             i < (buffer.length - 1);
-             i++)
-         {
-            buffer.text[i] = buffer.text[i + 1];
-         }
-         
-         buffer.text[buffer.length - 1] = ' ';
-         context->text_box_column--;
-      }
-      
-      if(context->input_state.key_up && (context->text_box_line > 0))
-      {
-         context->text_box_line--;
-      }
-      if(context->input_state.key_down && (context->text_box_line < line_count))
-      {
-         context->text_box_line++;
-      }
-      
-      if(context->input_state.key_right && (context->text_box_column < curr_line.length))
-      {
-         context->text_box_column++;
-      }
-      if(context->input_state.key_left && (context->text_box_column > 0))
-      {
-         context->text_box_column--;
-      }
-   }
-   
-   RectangleOutline(render_context, textbox_element.bounds, V4(0, 0, 0, 1), 2);
-   
-   u32 cursor_width = 2;
-   
-   string curr_draw_line = String(buffer.text, 0);
-   v2 at = textbox_element.bounds.min;
-   for(u32 i = 0;
-      i < buffer.length;
-      i++)
-   {
-      if(buffer.text[i] == '\n')
-      {
-         Text(render_context, at, curr_draw_line, 20);
-         r32 line_height = GetTextSize(render_context, curr_draw_line, 20).y;
-         
-         if(text_box_interact.selected && (curr_draw_line.text == curr_line.text))
-         {
-            rect2 cursor_rect;
-            
-            if(context->text_box_column == curr_line.length)
-            {
-               rect2 selected_char = GetCharBounds(render_context, textbox_element.bounds.min,
-                                                   curr_line, 20, curr_line.length - 1);
-               cursor_rect = RectMinSize(V2(selected_char.max.x, at.y), V2(cursor_width, line_height));
-            }
-            else
-            {
-               rect2 selected_char = GetCharBounds(render_context, textbox_element.bounds.min,
-                                                   curr_line, 20, context->text_box_column);
-               cursor_rect = RectMinSize(V2(selected_char.min.x - cursor_width, at.y), V2(cursor_width, line_height));
-            }
-            
-            Rectangle(render_context, cursor_rect, V4(0, 0, 0, 1));                                    
-         }
-            
-         at = at + V2(0, line_height);
-         curr_draw_line = String(curr_draw_line.text + curr_draw_line.length + 1, 0);
-      }
-      else
-      {
-         curr_draw_line.length++;
-      }
-   }
-   
-   {
-      Text(render_context, at, curr_draw_line, 20);
-      r32 line_height = GetTextSize(render_context, curr_draw_line, 20).y;
-      
-      if(text_box_interact.selected && (curr_draw_line.text == curr_line.text))
-      {
-         rect2 cursor_rect;
-         
-         if(context->text_box_column == curr_line.length)
-         {
-            rect2 selected_char = GetCharBounds(render_context, textbox_element.bounds.min,
-                                                curr_line, 20, curr_line.length - 1);
-            cursor_rect = RectMinSize(V2(selected_char.max.x, at.y), V2(cursor_width, line_height));
-         }
-         else
-         {
-            rect2 selected_char = GetCharBounds(render_context, textbox_element.bounds.min,
-                                                curr_line, 20, context->text_box_column);
-            cursor_rect = RectMinSize(V2(selected_char.min.x - cursor_width, at.y), V2(cursor_width, line_height));
-         }
-         
-         Rectangle(render_context, cursor_rect, V4(0, 0, 0, 1));                                    
-      }
-   }
-}
 
 void _SliderBar(ui_id id, layout *ui_layout, r32 min, r32 max, r32 *value, v2 element_size, v2 padding_size, v2 margin_size)
 {

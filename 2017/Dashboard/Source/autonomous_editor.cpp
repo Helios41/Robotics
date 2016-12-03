@@ -175,7 +175,7 @@ void DrawLuaEditor(layout *editor_panel, AutonomousEditor *auto_editor)
                                 V2((GetSize(editor_panel->bounds).x - GetTextWidth(render_context, Literal("Lua Editor"), 20)) / 2.0f, 0), V2(0, 5)); 
   
    v2 src_editor_size = V2(GetSize(editor_panel->bounds).x, GetSize(editor_panel->bounds).y - GetSize(title_element.margin_bounds).y);
-   TEST_TextBox(GEN_UI_ID, editor_panel, lua_src, src_editor_size, V2(0, 0), V2(0, 0));
+   TextBox(editor_panel, lua_src, src_editor_size, V2(0, 0), V2(0, 0));
 }
 
 void DrawAutonomousBlock(ui_id id, layout *ui_layout, AutonomousBlock *block,
@@ -210,7 +210,7 @@ void DrawAutonomousBlock(ui_id id, layout *ui_layout, AutonomousBlock *block,
    //      eg. "Motor @ 10%" or "Wait for 10 seconds"
    string text = block->is_wait_block ? Literal("Wait") : (block->hardware ? block->hardware->name : EmptyString());
    
-   TextWrapRect(render_context, block_element.bounds, text);
+   TextLabel(render_context, block_element.bounds, text, 20);
    
    if(block == auto_editor->selected_block)
    {
@@ -219,20 +219,31 @@ void DrawAutonomousBlock(ui_id id, layout *ui_layout, AutonomousBlock *block,
    }
 }
 
-r32 debug_scroll = -80;
+r32 debug_scroll = 0;
 
+//TODO: ability to drop grabbed block between blocks, not just add to the end
+//TODO: ability to remove blocks
 void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
 {
    UIContext *context = block_list_full->context;
    RenderContext *render_context = context->render_context;
    v2 block_list_full_size = GetSize(block_list_full->bounds);
    
-   layout scroll_bar = Panel(block_list_full, V2(block_list_full_size.x * 0.1, block_list_full_size.y), V2(0, 0), V2(0, 0)).lout;
-   layout block_list = Panel(block_list_full, V2(block_list_full_size.x * 0.9, block_list_full_size.y), V2(0, 0), V2(0, 0), debug_scroll).lout;
+   r32 block_height = 40;
+   r32 block_margin_height = block_height / 4.0f;
    
-   //TODO: calc these bounds based on the number of blocks in the list
-   SliderBar(&scroll_bar, -100, 100, &debug_scroll, GetSize(scroll_bar.bounds), V2(0, 0), V2(0, 0));
+   r32 max_blocks = (block_list_full_size.y - block_margin_height) / (block_height + block_margin_height);
+   u32 overflow_blocks = (u32) Max(RoundR32ToS32(auto_editor->editor_block_count - max_blocks), 0);
    
+   if(overflow_blocks > 0)
+   {
+      layout scroll_bar = Panel(block_list_full, V2(block_list_full_size.x * 0.1, block_list_full_size.y), V2(0, 0), V2(0, 0)).lout;
+      r32 scrollbar_bounds = (overflow_blocks * (block_height + block_margin_height));
+      SliderBar(&scroll_bar, -scrollbar_bounds, 0, &debug_scroll, GetSize(scroll_bar.bounds), V2(0, 0), V2(0, 0));
+   }
+   
+   layout block_list = Panel(block_list_full, V2(block_list_full_size.x * (overflow_blocks > 0 ? 0.9 : 1), block_list_full_size.y), V2(0, 0), V2(0, 0), debug_scroll).lout;
+  
    RectangleOutline(render_context, block_list.bounds, V4(0.2, 0.2, 0.2, 1), 3);
    
    ui_id list_id = GEN_UI_ID;
@@ -256,6 +267,8 @@ void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
          auto_editor->editor_blocks[auto_editor->editor_block_count] = auto_editor->grabbed_block;
          auto_editor->editor_block_count++;
          
+         //TODO: insert lua src for block that was just added
+         
          auto_editor->block_grabbed = false;
          auto_editor->grabbed_block = {};
       }
@@ -265,14 +278,24 @@ void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
       }
    }
    
-   v2 block_size = V2(GetSize(block_list.bounds).x * 0.8, 40);
-   v2 block_margin = V2(GetSize(block_list.bounds).x * 0.1, 10);
+   v2 block_size = V2(GetSize(block_list.bounds).x * 0.8, block_height);
+   v2 block_margin = V2(GetSize(block_list.bounds).x * 0.1, block_margin_height);
+   
+   rect2 grabbed_block_rect = auto_editor->block_grabbed ? RectMinSize(context->input_state.pos, block_size) :
+                                                           RectPosSize(V2(0, 0), V2(0, 0));
    
    for(u32 i = 0;
        auto_editor->editor_block_count > i;
        i++)
    {
       AutonomousBlock *block = auto_editor->editor_blocks + i;
+      
+      //TODO: move block down if grabbed block is about to be inserted here/hovering here
+      if(false)
+      {
+         Element(&block_list, block_size, V2(0, 0), block_margin);
+         NextLine(&block_list);
+      }
       
       //TODO: make this cleaner
       DrawAutonomousBlock(POINTER_UI_ID(block), &block_list, block, block_size, block_margin, auto_editor);
