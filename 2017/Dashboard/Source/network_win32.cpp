@@ -90,6 +90,9 @@ DWORD NetMain(LPVOID *data)
          //connect_status = ?;
          InterlockedExchange(params->reconnect, false);
 		}
+      
+      //NOTE: this thread just spins atm so this is here until we get an actual thread wake/sleep system
+      break;
 	}
 
 	return 0;

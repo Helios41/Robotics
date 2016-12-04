@@ -131,6 +131,18 @@ v2 operator/ (v2 v, r32 s)
 	return output;
 }
 
+#include "math.h"
+
+r32 Length(v2 a)
+{
+   return sqrtf(a.x * a.x + a.y * a.y);
+}
+
+r32 Distance(v2 a, v2 b)
+{
+   return Length(a - b);
+}
+
 struct rect2
 {
    v2 min;
@@ -186,6 +198,11 @@ inline b32 Equal(r32 a, r32 b)
    return difference < 0.1f;
 }
 
+inline r32 Abs(r32 real)
+{
+   return (real > 0) ? -real : real;
+}
+
 inline b32 GreaterOrEqual(r32 a, r32 b)
 {
    return (a > b) || Equal(a, b);
@@ -220,6 +237,11 @@ inline v2 GetCenter(rect2 rect)
 {
    return V2(rect.min.x + GetSize(rect).x / 2,
              rect.min.y + GetSize(rect).y / 2);
+}
+
+inline b32 Intersects(rect2 a, rect2 b)
+{
+   return Contains(RectPosSize(GetCenter(a), GetSize(a) + GetSize(b)), GetCenter(b));
 }
 
 inline s32 RoundR32ToS32(r32 real)

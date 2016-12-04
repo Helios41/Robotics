@@ -510,7 +510,7 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
    ui_id tab_id = POINTER_UI_ID(window);
    
    rect2 tab_bounds = RectPosSize(window->pos, V2(10, 10));
-   interaction_state tab_interact = ClickInteraction(context, Interaction(tab_id, 0, stack_layer), context->input_state.left_up,
+   interaction_state tab_interact = ClickInteraction(context, Interaction(tab_id, 0, stack_layer, context), context->input_state.left_up,
                                                      context->input_state.left_down, Contains(tab_bounds, context->input_state.pos));
    
    if(tab_interact.selected)

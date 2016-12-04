@@ -178,51 +178,54 @@ void DrawLuaEditor(layout *editor_panel, AutonomousEditor *auto_editor)
    TextBox(editor_panel, lua_src, src_editor_size, V2(0, 0), V2(0, 0));
 }
 
-void DrawAutonomousBlock(ui_id id, layout *ui_layout, AutonomousBlock *block,
-                         v2 element_size, v2 margin_size, AutonomousEditor *auto_editor)
+interaction_state AutonomousBlockUILogic(ui_id id, layout *ui_layout, AutonomousBlock *block,
+                                         rect2 element_bounds, AutonomousEditor *auto_editor)
 {
    UIContext *context = ui_layout->context;
-   RenderContext *render_context = context->render_context;
-   
-   element block_element = Element(ui_layout, element_size, V2(0, 0), margin_size);
-   interaction_state block_interact = ClickInteraction(context, Interaction(id, ui_layout->ui_layer + 1, ui_layout->stack_layer), context->input_state.left_up,
-                                                       context->input_state.left_down, Contains(block_element.bounds, context->input_state.pos));
+   interaction_state block_interact = ClickInteraction(context, Interaction(id, ui_layout->ui_layer + 1, ui_layout->stack_layer, context), context->input_state.left_up,
+                                                       context->input_state.left_down, Contains(element_bounds, context->input_state.pos));
     
    if(block_interact.became_selected)
    {
       auto_editor->selected_block = block;
    }
-    
-   if(block_interact.active)
+   
+   return block_interact;
+}
+
+void DrawAutonomousBlock(RenderContext *render_context, AutonomousBlock *block,
+                         rect2 element_bounds, AutonomousEditor *auto_editor,
+                         b32 is_active, b32 is_hot)
+{   
+   if(is_active)
    {
-      Rectangle(render_context, block_element.bounds, V4(1.0f, 0.0f, 0.75f, 1.0f));
+      Rectangle(render_context, element_bounds, V4(1.0f, 0.0f, 0.75f, 1.0f));
    }
-   else if(block_interact.hot)
+   else if(is_hot)
    {
-      Rectangle(render_context, block_element.bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
+      Rectangle(render_context, element_bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
    }
    else
    {
-      Rectangle(render_context, block_element.bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
+      Rectangle(render_context, element_bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
    }
    
    //TODO: concat the block's data into its text
    //      eg. "Motor @ 10%" or "Wait for 10 seconds"
    string text = block->is_wait_block ? Literal("Wait") : (block->hardware ? block->hardware->name : EmptyString());
    
-   TextLabel(render_context, block_element.bounds, text, 20);
+   TextLabel(render_context, element_bounds, text, 20);
    
    if(block == auto_editor->selected_block)
    {
-      Rectangle(render_context, RectMinSize(block_element.bounds.min, V2(5, GetSize(block_element.bounds).y)),
+      Rectangle(render_context, RectMinSize(element_bounds.min, V2(5, GetSize(element_bounds).y)),
                V4(0.0f, 0.0f, 0.0f, 1.0f));
    }
 }
 
 r32 debug_scroll = 0;
 
-//TODO: ability to drop grabbed block between blocks, not just add to the end
-//TODO: ability to remove blocks
+//TODO: ability to remove blocks, do this by grabbing a block and dropping it into the selection panel
 void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
 {
    UIContext *context = block_list_full->context;
@@ -260,12 +263,87 @@ void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
       RectangleOutline(render_context, block_list.bounds, V4(0, 0, 0, 1));
    }
    
+   v2 block_size = V2(GetSize(block_list.bounds).x * 0.8, block_height);
+   v2 block_margin = V2(GetSize(block_list.bounds).x * 0.1, block_margin_height);
+   
+   rect2 grabbed_block_rect = auto_editor->block_grabbed ? RectMinSize(context->input_state.pos, block_size) :
+                                                           RectPosSize(V2(0, 0), V2(0, 0));
+   
+   if(auto_editor->block_grabbed)
+   {
+      DrawAutonomousBlock(render_context, &auto_editor->grabbed_block,
+                          grabbed_block_rect, auto_editor, false, false);
+   }
+   
+   u32 grabbed_block_hover_index = auto_editor->editor_block_count;
+   
+   for(u32 i = 0;
+       auto_editor->editor_block_count > i;
+       i++)
+   {
+      AutonomousBlock *block = auto_editor->editor_blocks + i;
+      layout temp_block_list = block_list;
+      element block_element;
+      
+      block_element = Element(&temp_block_list, block_size, V2(0, 0), block_margin);
+      NextLine(&temp_block_list);
+      
+      if(Intersects(block_element.bounds, grabbed_block_rect))
+      {
+         grabbed_block_hover_index = i;
+         Element(&block_list, block_size, V2(0, 0), block_margin);
+         NextLine(&block_list);
+         
+         block_element = Element(&block_list, block_size, V2(0, 0), block_margin);
+         NextLine(&block_list);
+      }
+      else
+      {
+         block_list = temp_block_list;
+      }
+      
+      interaction_state block_interact = AutonomousBlockUILogic(POINTER_UI_ID(block), &block_list, block, block_element.bounds, auto_editor);
+      
+      if(!auto_editor->block_grabbed && block_interact.active &&
+         (Distance(context->active_element.start_pos, context->input_state.pos) > 10))
+      {
+         auto_editor->block_grabbed = true;
+         auto_editor->grabbed_block = *block;
+        
+         //remove block from list
+      }
+      
+      DrawAutonomousBlock(render_context, block, block_element.bounds, auto_editor, block_interact.active, block_interact.hot);
+   }
+   
    if(block_editor_interact.became_selected)
    {
       if(auto_editor->block_grabbed)
       {
-         auto_editor->editor_blocks[auto_editor->editor_block_count] = auto_editor->grabbed_block;
+         //TODO: dynamically expand this?
+         Assert(ArrayCount(auto_editor->editor_blocks) > (auto_editor->editor_block_count + 1));
          auto_editor->editor_block_count++;
+         
+         if(auto_editor->selected_block)
+         {
+            u32 selected_block_index = (u32)(auto_editor->selected_block - auto_editor->editor_blocks);
+            
+            if(selected_block_index >= grabbed_block_hover_index)
+            {
+               selected_block_index++;
+            }
+            
+            auto_editor->selected_block = auto_editor->editor_blocks + selected_block_index;
+         }
+         
+         for(u32 i = (auto_editor->editor_block_count - 1);
+             i > grabbed_block_hover_index;
+             i--)
+         {
+            auto_editor->editor_blocks[i] = auto_editor->editor_blocks[i - 1];
+         }
+         
+         auto_editor->editor_blocks[grabbed_block_hover_index] = auto_editor->grabbed_block;
          
          //TODO: insert lua src for block that was just added
          
@@ -276,30 +354,6 @@ void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
       {
          auto_editor->selected_block = NULL;
       }
-   }
-   
-   v2 block_size = V2(GetSize(block_list.bounds).x * 0.8, block_height);
-   v2 block_margin = V2(GetSize(block_list.bounds).x * 0.1, block_margin_height);
-   
-   rect2 grabbed_block_rect = auto_editor->block_grabbed ? RectMinSize(context->input_state.pos, block_size) :
-                                                           RectPosSize(V2(0, 0), V2(0, 0));
-   
-   for(u32 i = 0;
-       auto_editor->editor_block_count > i;
-       i++)
-   {
-      AutonomousBlock *block = auto_editor->editor_blocks + i;
-      
-      //TODO: move block down if grabbed block is about to be inserted here/hovering here
-      if(false)
-      {
-         Element(&block_list, block_size, V2(0, 0), block_margin);
-         NextLine(&block_list);
-      }
-      
-      //TODO: make this cleaner
-      DrawAutonomousBlock(POINTER_UI_ID(block), &block_list, block, block_size, block_margin, auto_editor);
-      NextLine(&block_list);
    }
 }
 
@@ -330,9 +384,9 @@ void DrawBlockDetails(layout *block_details, AutonomousEditor *auto_editor)
          if(block->hardware->type == Hardware_Motor)
          {
             Text(block_details, Literal("State: "), 20, V2(0, 0), V2(0, 5)); 
-            TextBox(block_details, 0, 1, &block->motor_state, V2(100, 40), V2(0, 0), V2(0, 0)); 
+            TextBox(block_details, -1, 1, &block->motor_state, V2(100, 40), V2(0, 0), V2(0, 0)); 
             NextLine(block_details);
-            SliderBar(block_details, 0, 1, &block->motor_state, V2(180, 20), V2(0, 0), V2(0, 0));
+            SliderBar(block_details, -1, 1, &block->motor_state, V2(180, 20), V2(0, 0), V2(0, 0));
          }
          else if(block->hardware->type == Hardware_Solenoid)
          {
@@ -347,16 +401,16 @@ void DrawBlockDetails(layout *block_details, AutonomousEditor *auto_editor)
          else if(block->hardware->type == Hardware_Drive)
          {
             Text(block_details, Literal("Forward: "), 20, V2(0, 0), V2(0, 5)); 
-            TextBox(block_details, 0, 1, &block->drive_state.forward_value, V2(100, 40), V2(0, 0), V2(0, 0)); 
+            TextBox(block_details, -1, 1, &block->drive_state.forward_value, V2(100, 40), V2(0, 0), V2(0, 0)); 
             NextLine(block_details);
-            SliderBar(block_details, 0, 1, &block->drive_state.forward_value, V2(180, 20), V2(0, 0), V2(0, 0));
+            SliderBar(block_details, -1, 1, &block->drive_state.forward_value, V2(180, 20), V2(0, 0), V2(0, 0));
             
             NextLine(block_details);
             
             Text(block_details, Literal("Rotate: "), 20, V2(0, 0), V2(0, 5)); 
-            TextBox(block_details, 0, 1, &block->drive_state.rotate_value, V2(100, 40), V2(0, 0), V2(0, 0)); 
+            TextBox(block_details, -1, 1, &block->drive_state.rotate_value, V2(100, 40), V2(0, 0), V2(0, 0)); 
             NextLine(block_details);
-            SliderBar(block_details, 0, 1, &block->drive_state.rotate_value, V2(180, 20), V2(0, 0), V2(0, 0));
+            SliderBar(block_details, -1, 1, &block->drive_state.rotate_value, V2(180, 20), V2(0, 0), V2(0, 0));
          }
       }
    }

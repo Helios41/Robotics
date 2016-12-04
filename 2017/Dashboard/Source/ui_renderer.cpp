@@ -493,17 +493,22 @@ struct interaction
    ui_id id;
    u32 ui_layer;
    u32 stack_layer;
+   r64 start_time;
+   v2 start_pos;
 };
 
-#define NULL_INTERACTION Interaction(NULL_UI_ID, 0, 0)
+#define NULL_INTERACTION Interaction(NULL_UI_ID, 0, 0, 0, V2(0, 0))
 
-interaction Interaction(ui_id id, u32 ui_layer, u32 stack_layer)
+interaction Interaction(ui_id id, u32 ui_layer, u32 stack_layer,
+                        r64 start_time, v2 start_pos)
 {
    interaction result = {};
    
    result.id = id;
    result.ui_layer = ui_layer;
    result.stack_layer = stack_layer;
+   result.start_time = start_time;
+   result.start_pos = start_pos;
    
    return result;
 }
@@ -512,7 +517,6 @@ struct UIContext
 {
    v2 window_size;
    
-   //TODO: store start times for all of these interactions
    interaction hot_element;
    interaction active_element;
    interaction selected_element;
@@ -530,7 +534,14 @@ struct UIContext
    u32 tooltip_ui_layer;
    u32 tooltip_stack_layer;
    string tooltip;
+   
+   r64 curr_time;
 };
+
+interaction Interaction(ui_id id, u32 ui_layer, u32 stack_layer, UIContext *context)
+{
+   return Interaction(id, ui_layer, stack_layer, context->curr_time, context->input_state.pos);
+}
 
 struct interaction_state
 {
@@ -629,7 +640,7 @@ layout Layout(rect2 bounds, UIContext *context, u32 stack_layer, r32 vertical_sc
 
 interaction Interaction(ui_id id, layout *ui_layout)
 {
-   return Interaction(id, ui_layout->ui_layer, ui_layout->stack_layer);
+   return Interaction(id, ui_layout->ui_layer, ui_layout->stack_layer, ui_layout->context);
 }
 
 v2 v2Max(v2 a, v2 b)
@@ -977,7 +988,7 @@ button _Button(ui_id id, layout *ui_layout, LoadedBitmap *icon, string text, v2 
    InputState input = ui_layout->context->input_state;
    element button_element = Element(ui_layout, element_size, padding_size, margin_size);
    
-   interaction_state button_interact = ClickInteraction(context, Interaction(id, ui_layout->ui_layer + 1, ui_layout->stack_layer), context->input_state.left_up,
+   interaction_state button_interact = ClickInteraction(context, Interaction(id, ui_layout->ui_layer + 1, ui_layout->stack_layer, context), context->input_state.left_up,
                                                         context->input_state.left_down, Contains(button_element.bounds, context->input_state.pos));
    
    if(button_interact.active)
@@ -1033,7 +1044,7 @@ element _ToggleSlider(ui_id id, layout *ui_layout, b32 *option, string option1, 
    InputState input = ui_layout->context->input_state;
    element toggle_element = Element(ui_layout, element_size, padding_size, margin_size);
    
-   interaction_state toggle_interact = ClickInteraction(context, Interaction(id, ui_layout->ui_layer + 1, ui_layout->stack_layer), context->input_state.left_up,
+   interaction_state toggle_interact = ClickInteraction(context, Interaction(id, ui_layout->ui_layer + 1, ui_layout->stack_layer, context), context->input_state.left_up,
                                                         context->input_state.left_down, Contains(toggle_element.bounds, context->input_state.pos));
    
    v2 option_bounds_size = V2(GetSize(toggle_element.bounds).x / 2, GetSize(toggle_element.bounds).y);
