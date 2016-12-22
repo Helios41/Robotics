@@ -7,6 +7,10 @@
 #include "dashboard.cpp"
 #include "network_win32.cpp"
 
+//NOTE: this disables the fps limiter, remove this on ligit builds
+//      if we're burning core on the main thread
+#define NO_FPS_LIMITER
+
 LRESULT CALLBACK WindowMessageEvent(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {	
 	switch(message)
@@ -187,13 +191,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    RobotHardware test_hardware[] = 
    {
-      {Hardware_Motor, 0, Literal("Test Motor")},
-      {Hardware_Solenoid, 1, Literal("Test Solenoid")},
-      {Hardware_Drive, 2, Literal("Test Drive")}
+      {Hardware_Motor, 0, Literal("Test Motor"), 30, 0, PushArray(&generic_arena, 30, RobotHardwareSample, Arena_Clear)},
+      {Hardware_Solenoid, 1, Literal("Test Solenoid"), 30, 0, PushArray(&generic_arena, 30, RobotHardwareSample, Arena_Clear)},
+      {Hardware_Drive, 2, Literal("Test Drive"), 30, 0, PushArray(&generic_arena, 30, RobotHardwareSample, Arena_Clear)}
    };
    
    DashboardState dashstate = {};
    
+   dashstate.generic_arena = &generic_arena;
    dashstate.robot.hardware = test_hardware;
    dashstate.robot.hardware_count = ArrayCount(test_hardware);
    dashstate.robot.name = Literal("Bob Ross");
@@ -203,11 +208,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    CopyTo(Literal("roborio-4618-frc.local") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
    dashstate.net_settings.is_mdns = true;
    
+   InsertAt(lua_src, Literal("test_motor.set(0)\n"), 0);
+   InsertAt(lua_src, Literal("test_motor.set(0)\n"), IndexOfNth(lua_src, 0, '\n') + 1);
+   InsertAt(lua_src, Literal("test_solenoid.set(Extended)\n"), IndexOfNth(lua_src, 1, '\n') + 1);
+   InsertAt(lua_src, Literal("wait(2)\n"), IndexOfNth(lua_src, 2, '\n') + 1);
+   InsertAt(lua_src, Literal("test_solenoid.set(Retracted)\n"), IndexOfNth(lua_src, 3, '\n') + 1);
+   
    volatile b32 running = true;
    volatile char *connect_to = NULL;
    volatile b32 use_mdns = false;
    volatile b32 reconnect = false;
    volatile b32 connect_status = false;
+   volatile HANDLE net_semaphore = CreateSemaphore(0, 1, 1, NULL);
    
    net_main_params net_params = {};
    net_params.running = &running;
@@ -216,6 +228,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    net_params.reconnect = &reconnect;
    net_params.connect_status = &connect_status;
    net_params.dashstate = &dashstate;
+   net_params.net_semaphore = net_semaphore;
    
    HANDLE network_thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)NetMain, &net_params, 0, NULL);
    
@@ -342,6 +355,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       Rectangle(&context, RectMinSize(V2(200, 40), V2(200, 20)), V4(0, 0, 0, 0.5));
       Text(&context, V2(200, 40), Literal(R64ToString(frame_length, frame_time_buffer)), 20);
 
+      char frame_rate_buffer[64];
+      Rectangle(&context, RectMinSize(V2(200, 60), V2(200, 20)), V4(0, 0, 0, 0.5));
+      Text(&context, V2(200, 60), Literal(R64ToString(1000.0 / frame_length, frame_rate_buffer)), 20);
+      
       char ui_time_buffer[64];
       Rectangle(&context, RectMinSize(V2(200, 80), V2(200, 20)), V4(0, 0, 0, 0.5));
       Text(&context, V2(200, 80), Literal(R64ToString(ui_context.curr_time, frame_time_buffer)), 20);
@@ -353,11 +370,16 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
       frame_length = GetCounter(&last_timer, timer_freq);
       ui_context.curr_time += frame_length / 1000.0f;
+#ifndef NO_FPS_LIMITER
       if(frame_length < 33.3)
       {
          Sleep(33.3 - frame_length);
       }
+#endif
    }
+   
+   //NOTE: release net semaphore to give the net thread a chance to exit
+   ReleaseSemaphore(net_semaphore, 1, NULL);
    
    /*
    shutdown(server_socket, SD_BOTH);
@@ -366,6 +388,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    WSACleanup();
  
    WaitForSingleObject(network_thread, INFINITE);
-
+   CloseHandle(network_thread);
+   CloseHandle(net_semaphore);
+   
    return 0;
 }

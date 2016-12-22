@@ -44,17 +44,38 @@ enum RobotHardwareType
    Hardware_Drive
 };
 
+enum SolenoidState
+{
+   Solenoid_Extended,
+   Solenoid_Retracted
+};
+
+union RobotHardwareState
+{
+   r32 motor;
+   SolenoidState solenoid;
+   struct
+   {
+      r32 forward;
+      r32 rotate;
+   };
+};  
+
+struct RobotHardwareSample
+{
+   RobotHardwareState state;
+   u64 timestamp;
+};
+
 struct RobotHardware
 {
    RobotHardwareType type;
    u32 id;
    string name;
-};
-
-enum SolenoidState
-{
-   Solenoid_Extended,
-   Solenoid_Retracted
+   
+   u32 sample_count;
+   u32 at_sample;
+   RobotHardwareSample *samples;
 };
 
 struct Robot
@@ -75,17 +96,7 @@ struct AutonomousBlock
       struct
       {
          RobotHardware *hardware;
-   
-         union
-         {
-            r32 motor_state;
-            SolenoidState solenoid_state;
-            struct
-            {
-               r32 forward_value;
-               r32 rotate_value;
-            } drive_state;
-         };   
+         RobotHardwareState state;
       };
       
       r32 wait_duration;
@@ -135,6 +146,8 @@ struct Console
 
 struct DashboardState
 {
+   MemoryArena *generic_arena;
+   
    DashboardPage page;
    ui_window *first_window;
    b32 connected;
@@ -495,10 +508,7 @@ void DrawWindowTab(layout *tab_layout, ui_window *window)
    Rectangle(tab_layout, V4(0, 0, 0, 0), tab_button_size, V2(0, 0), V2(0, 0));
    if(Button(tab_layout, NULL, EmptyString(), tab_button_size, V2(0, 0), V2(0, 0)).state)
    {
-      //NOTE: currently clicking this button breaks all the things
-      //      it sets the button to active than dissapears leaving us with no way of setting it inactive
-      //      because its the button function that handles setting it inactive
-      int breakhere = 0;
+      
    }
 }
 
@@ -581,6 +591,9 @@ void DrawDashboardUI(UIContext *context, DashboardState *dashstate)
       stack_layer++;
    }
    
+   /**
+      BEGIN UI STUFF
+   */
    if(!IsEmpty(context->tooltip))
    {
       v2 tooltip_size = GetTextSize(context->render_context, context->tooltip, 20);
@@ -595,5 +608,30 @@ void DrawDashboardUI(UIContext *context, DashboardState *dashstate)
       Text(context->render_context, tooltip_bounds.min, context->tooltip, 20);
    }
    
-   //TODO: if left was clicked but didnt hit anything, set selected to NULL
+   if(!context->hot_element_refreshed)
+   {
+      context->hot_element = NULL_INTERACTION;
+   }
+   context->hot_element_refreshed = false;
+   
+   if(!context->active_element_refreshed)
+   {
+      context->active_element = NULL_INTERACTION;
+   }
+   context->active_element_refreshed = false;
+   
+   if(!context->selected_element_refreshed)
+   {
+      context->selected_element = NULL_INTERACTION;
+   }
+   context->selected_element_refreshed = false;
+   
+   if(context->input_state.left_up && (context->became_selected == NULL_UI_ID))
+   {
+      context->selected_element = NULL_INTERACTION;
+   }
+   context->became_selected = NULL_UI_ID;
+   /**
+      END UI STUFF
+   */
 }

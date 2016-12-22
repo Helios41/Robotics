@@ -250,6 +250,11 @@ inline s32 RoundR32ToS32(r32 real)
    return result;
 }
 
+void Clear(void *memory, size_t size)
+{
+   for(u32 i = 0; i < size; i++) ((u8 *)memory)[i] = 0;
+}
+
 struct MemoryArena
 {
    size_t size;
@@ -264,21 +269,51 @@ void InitMemoryArena(MemoryArena *arena, void *memory, size_t size)
    arena->memory = memory;
 }
 
-void *PushSize(MemoryArena *arena, size_t size)
+struct TemporaryMemoryArena
+{
+   MemoryArena *source;
+   size_t used;
+};
+
+TemporaryMemoryArena BeginTemporaryMemory(MemoryArena *arena)
+{
+   TemporaryMemoryArena result = {};
+   result.source = arena;
+   return result;
+}
+
+void EndTemporaryMemory(TemporaryMemoryArena temp_arena)
+{
+   temp_arena.source->used -= temp_arena.used;
+}
+
+enum ArenaFlags
+{
+   Arena_Clear = (1 << 0)
+};
+
+void *PushSize(MemoryArena *arena, size_t size, u32 flags = 0)
 {
    Assert((arena->used + size) < arena->size);
    void *result = (u8 *)arena->memory + arena->used;
    arena->used += size;
+   
+   if(flags & Arena_Clear)
+   {
+      Clear(result, size);
+   }
+   
    return result;
 }
 
-//TODO: this needs to be removed ASAP, its super prone to error
-//      ATM its only used to deallocate the temp memory when loading the fonts
-//      the arena system needs a proper temp_memory solution
-void PopSize(MemoryArena *arena, size_t size)
+void *PushSize(TemporaryMemoryArena *arena, size_t size, u32 flags = 0)
 {
-   arena->used -= size;
+   arena->used += size;
+   return PushSize(arena->source, size, flags);
 }
+
+#define PushStruct(arena, struct, ...) (struct *) PushSize(arena, sizeof(struct), ##__VA_ARGS__)
+#define PushArray(arena, count, struct, ...) (struct *) PushSize(arena, count * sizeof(struct), ##__VA_ARGS__)
 
 struct EntireFile
 {
@@ -364,6 +399,14 @@ string ToString(string buffer, r32 flt)
    return buffer;
 }
 
+string ToString(r32 flt, TemporaryMemoryArena *temp_memory)
+{
+   string result = String(PushArray(temp_memory, 12, char), 12);
+   _snprintf(result.text, result.length, "%f", flt);
+   for(u32 i = 0; i < result.length; i++) if(result.text[i] == '\0') result.text[i] = ' ';
+   return result;
+}
+
 b32 IsEmpty(string text)
 {
    return (text.length == 0) || (text.text == NULL);
@@ -375,7 +418,7 @@ string EmptyString()
    return result;
 }
 
-void CopyTo(string source, string dest)
+string CopyTo(string source, string dest)
 {
    for(u32 i = 0;
        i < Min(source.length, dest.length);
@@ -383,9 +426,11 @@ void CopyTo(string source, string dest)
    {
       dest.text[i] = source.text[i];
    }
+   
+   return dest;
 }
 
-void Clear(string str)
+string Clear(string str)
 {
    for(u32 i = 0;
        i < str.length;
@@ -393,6 +438,8 @@ void Clear(string str)
    {
       str.text[i] = ' ';
    }
+   
+   return str;
 }
 
 //TODO: make this more robust
@@ -467,156 +514,16 @@ string *Split(string input, char split_char, u32 *array_length)
    return result;
 }
 
-/*
-string Concat(string *strings, u32 count, char concat_char)
+string Concat(string s0, string s1, TemporaryMemoryArena *temp_memory)
 {
-   u32 result_size = count - 1;
+   u32 result_length = s0.length + s1.length;
+   string result = String(PushArray(temp_memory, result_length, char), result_length);
    
-   for(u32 i = 0;
-       i < count;
-       i++)
-   {
-      result_size += strings[i].length;
-   }
-   
-   string result = String((char *) malloc(result_size * sizeof(char)), result_size);
-   
-   u32 index = 0;
-   for(u32 i = 0;
-       i < count;
-       i++)
-   {
-      string *curr_string = strings + i;
-      
-      for(u32 c = 0;
-          c < curr_string->length;
-          c++)
-      {
-         result.text[index] = curr_string->text[c];
-         index++;
-      }
-      
-      if(i != (count - 1))
-      {
-         result.text[index] = concat_char;
-         index++;
-      }
-   }
+   u32 i = 0;
+   for(u32 j = 0; j < s0.length; j++) result.text[i++] = s0.text[j];
+   for(u32 j = 0; j < s1.length; j++) result.text[i++] = s1.text[j];
    
    return result;
-}
-*/
-
-char *ConcatStrings(char *str1, char *str2, char *str)
-{
-   u32 i = 0;
-   while(*str1)
-   {
-      str[i++] = *str1;
-      str1++;
-   }
-   
-   while(*str2)
-   {
-      str[i++] = *str2;
-      str2++;
-   }
-
-   str[i] = '\0';
-   return str;
-}
-
-char *ConcatStrings(char *str1, char *str2, char *str3, char *str)
-{
-   u32 i = 0;
-   while(*str1)
-   {
-      str[i++] = *str1;
-      str1++;
-   }
-   
-   while(*str2)
-   {
-      str[i++] = *str2;
-      str2++;
-   }
-
-   while(*str3)
-   {
-      str[i++] = *str3;
-      str3++;
-   }
-   
-   str[i] = '\0';
-   return str;
-}
-
-char *ConcatStrings(char *str1, char *str2, char *str3, char *str4, char *str)
-{
-	u32 i = 0;
-	while (*str1)
-	{
-		str[i++] = *str1;
-		str1++;
-	}
-
-	while (*str2)
-	{
-		str[i++] = *str2;
-		str2++;
-	}
-
-	while (*str3)
-	{
-		str[i++] = *str3;
-		str3++;
-	}
-
-	while (*str4)
-	{
-		str[i++] = *str4;
-		str4++;
-	}
-
-	str[i] = '\0';
-	return str;
-}
-
-char *ConcatStrings(char *str1, char *str2, char *str3, char *str4, char *str5, char *str)
-{
-	u32 i = 0;
-	while (*str1)
-	{
-		str[i++] = *str1;
-		str1++;
-	}
-
-	while (*str2)
-	{
-		str[i++] = *str2;
-		str2++;
-	}
-
-	while (*str3)
-	{
-		str[i++] = *str3;
-		str3++;
-	}
-
-	while (*str4)
-	{
-		str[i++] = *str4;
-		str4++;
-	}
-
-	while (*str5)
-	{
-		str[i++] = *str5;
-		str5++;
-	}
-
-	str[i] = '\0';
-	return str;
 }
 
 u32 CountChar(string str, char c)
@@ -634,17 +541,47 @@ u32 CountChar(string str, char c)
    return result;
 }
 
-u32 IndexOfFirst(string str, char c)
+u32 IndexOfNth(string str, u32 count, char c)
 {
    u32 result = 0;
    for(u32 i = 0;
        i < str.length;
        i++)
    {
-      if(str.text[i] == c) break;
-      result++;
+      if(str.text[i] == c)
+      {
+         if(count == 0)
+         {
+            result = i;
+            break;
+         }
+         
+         count--;
+      }
    }
    return result;
+}
+
+u32 IndexOfFirst(string str, char c)
+{
+   return IndexOfNth(str, 0, 'c');
+}
+
+void InsertAt(string buffer, string str, u32 at)
+{
+   for(u32 i = buffer.length - 1;
+       i > (at + str.length - 1);
+       i--)
+   {
+      buffer.text[i] = buffer.text[i - str.length];
+   }
+   
+   for(u32 i = 0;
+       i < str.length;
+       i++)
+   {
+      buffer.text[at + i] = str.text[i];
+   }
 }
 
 r32 ToR32(string str)

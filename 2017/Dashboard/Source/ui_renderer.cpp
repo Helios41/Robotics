@@ -140,6 +140,8 @@ RenderContext InitRenderContext(MemoryArena *memory, u32 render_commands_size)
        char_code <= 126;
        char_code++)
    {
+      TemporaryMemoryArena temp_memory = BeginTemporaryMemory(memory);
+      
       char curr_char = (char) char_code;
       CharacterBitmap *char_bitmap = result.characters + (char_code - 33);
 
@@ -155,7 +157,7 @@ RenderContext InitRenderContext(MemoryArena *memory, u32 render_commands_size)
       heightest_above_baseline = Max(heightest_above_baseline, char_bitmap->height_above_baseline);
       lowest_below_baseline = Max(lowest_below_baseline, char_bitmap->height_below_baseline);
 
-      u32 *temp_texture = (u32 *) PushSize(memory, sizeof(u32) * width * height);
+      u32 *temp_texture = (u32 *) PushSize(&temp_memory, sizeof(u32) * width * height);
       
       for(u32 y = 0; y < height; ++y)
       {
@@ -186,7 +188,7 @@ RenderContext InitRenderContext(MemoryArena *memory, u32 render_commands_size)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
       glBindTexture(GL_TEXTURE_2D, 0);
-      PopSize(memory, sizeof(u32) * width * height);
+      EndTemporaryMemory(temp_memory);
    }
    
    glDisable(GL_TEXTURE_2D);
@@ -517,8 +519,15 @@ struct UIContext
 {
    v2 window_size;
    
+   ui_id became_selected;
+   
+   b32 hot_element_refreshed;
    interaction hot_element;
+   
+   b32 active_element_refreshed;
    interaction active_element;
+   
+   b32 selected_element_refreshed;
    interaction selected_element;
    
    RenderContext *render_context;
@@ -558,9 +567,6 @@ struct interaction_state
 interaction_state ClickInteraction(UIContext *context, interaction intrct, b32 trigger_cond, b32 active_cond, b32 hot_cond)
 {
    interaction_state result = {};
-   result.hot = context->hot_element.id == intrct.id;
-   result.active = context->active_element.id == intrct.id;
-   result.selected = context->selected_element.id == intrct.id;
    
    if(context->active_element.id == intrct.id)
    {
@@ -570,6 +576,7 @@ interaction_state ClickInteraction(UIContext *context, interaction intrct, b32 t
          {
             result.became_selected = true;
             context->selected_element = intrct;
+            context->became_selected = intrct.id;
          }
          
          context->active_element = NULL_INTERACTION;
@@ -599,6 +606,14 @@ interaction_state ClickInteraction(UIContext *context, interaction intrct, b32 t
       result.became_hot = true;
       context->hot_element = intrct;
    }
+   
+   result.hot = context->hot_element.id == intrct.id;
+   result.active = context->active_element.id == intrct.id;
+   result.selected = context->selected_element.id == intrct.id;
+   
+   context->hot_element_refreshed = result.hot || context->hot_element_refreshed;
+   context->active_element_refreshed = result.active || context->active_element_refreshed;
+   context->selected_element_refreshed = result.selected || context->selected_element_refreshed;
    
    return result;
 }
@@ -819,7 +834,7 @@ void Text(RenderContext *context, rect2 bounds, string text)
 		{
 			xoffset += context->font.space_width * scale_coeff;
 		}
-		else
+		else if((32 < c) && (c < 127))
 		{
 			CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
 			Bitmap(context, &char_bitmap->bitmap,
@@ -1125,17 +1140,24 @@ void CheckDrawCursor(interaction_state text_box_interact, rect2 textbox_bounds, 
    {
       rect2 cursor_rect;
       
-      if(context->text_box_column == curr_line.length)
-      {
-         rect2 selected_char = GetCharBounds(render_context, textbox_bounds.min,
-                                             curr_line, 20, curr_line.length - 1);
-         cursor_rect = RectMinSize(V2(selected_char.max.x, at.y), V2(cursor_width, line_height));
+      if(curr_line.length > 0)
+      {         
+         if(context->text_box_column == curr_line.length)
+         {
+            rect2 selected_char = GetCharBounds(render_context, textbox_bounds.min,
+                                                curr_line, 20, curr_line.length - 1);
+            cursor_rect = RectMinSize(V2(selected_char.max.x, at.y), V2(cursor_width, line_height));
+         }
+         else
+         {
+            rect2 selected_char = GetCharBounds(render_context, textbox_bounds.min,
+                                                curr_line, 20, context->text_box_column);
+            cursor_rect = RectMinSize(V2(selected_char.min.x - cursor_width, at.y), V2(cursor_width, line_height));
+         }
       }
       else
       {
-         rect2 selected_char = GetCharBounds(render_context, textbox_bounds.min,
-                                             curr_line, 20, context->text_box_column);
-         cursor_rect = RectMinSize(V2(selected_char.min.x - cursor_width, at.y), V2(cursor_width, line_height));
+         cursor_rect = RectMinSize(V2(textbox_bounds.min.x - cursor_width, at.y), V2(cursor_width, line_height));
       }
       
       Rectangle(render_context, cursor_rect, V4(0, 0, 0, 1));                                    
@@ -1200,7 +1222,8 @@ void _TextBox(ui_id id, layout *ui_layout, string buffer, v2 element_size, v2 pa
          TextBoxInsert(buffer, curr_line, context, '\n');
       }
       
-      if(context->input_state.key_backspace && (context->text_box_column > 0))
+      if(context->input_state.key_backspace &&
+         !((context->text_box_line == 0) && (context->text_box_column == 0)))
       {
          for(u32 i = context->text_box_column + (u32)(curr_line.text - buffer.text) - 1;
              i < (buffer.length - 1);
@@ -1210,7 +1233,15 @@ void _TextBox(ui_id id, layout *ui_layout, string buffer, v2 element_size, v2 pa
          }
          
          buffer.text[buffer.length - 1] = ' ';
-         context->text_box_column--;
+         
+         if(context->text_box_column == 0)
+         {
+            context->text_box_line--;
+         }
+         else
+         {
+            context->text_box_column--;
+         }
       }
       
       if(context->input_state.key_up && (context->text_box_line > 0))

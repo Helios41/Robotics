@@ -6,6 +6,7 @@ struct net_main_params
    volatile b32 *reconnect;
    volatile b32 *connect_status;
    volatile DashboardState *dashstate;
+   volatile HANDLE net_semaphore;
 };
 
 void RequestReconnect(network_settings *net_settings, net_main_params *params)
@@ -18,7 +19,65 @@ void RequestReconnect(network_settings *net_settings, net_main_params *params)
       InterlockedExchangePointer((volatile PVOID *) &params->connect_to, connect_to_addr.text);
       InterlockedExchange(params->use_mdns, net_settings->is_mdns);
       InterlockedExchange(params->reconnect, true);
+      ReleaseSemaphore(params->net_semaphore, 1, NULL);
    }
+}
+
+void NetThread_Reconnect(net_main_params *params, Notification *network_notification)
+{  
+   //TODO: make the notification system cache its messages so we dont have
+   //      to worry about the lifetime of the strings we pass
+   AddMessage((Console *) &params->dashstate->console,
+            /*"Attempting to connect to: "*/ Literal((char *) params->connect_to),
+            network_notification);
+   
+   char *host_ip = params->use_mdns ? NULL : (char *) params->connect_to;
+   
+   if(params->use_mdns)
+   {
+      hostent *robot_server = gethostbyname((char *) params->connect_to);
+   
+      if(robot_server)
+      {
+         host_ip = inet_ntoa(*((in_addr *)robot_server->h_addr));
+         
+         AddMessage((Console *) &params->dashstate->console,
+                  /*"MDNS IP: "*/ Literal(host_ip),
+                  network_notification);
+      }
+      else
+      {
+         AddMessage((Console *) &params->dashstate->console, Literal("MDNS IP address lookup FAILED"),
+                  network_notification);
+      }
+   }
+   
+   AddMessage((Console *) &params->dashstate->console,
+            host_ip ? /*concat "Host IP: "*/ Literal(host_ip) : Literal("Address: NULL"),
+            network_notification);
+   
+   if(host_ip)
+   {
+      //NOTE: open a DATAGRAM connection
+      SOCKET server_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+      b32 is_nonblocking = true;
+      ioctlsocket(server_socket, FIONBIO, (u_long *)&is_nonblocking);
+   
+      struct sockaddr_in server;
+      server.sin_family = AF_INET;
+   
+      server.sin_addr.s_addr = inet_addr(host_ip);
+      server.sin_port = htons(8089);
+   
+      connect(server_socket, (struct sockaddr *)&server, sizeof(server));
+   }
+   
+   //NOTE: we're not freeing here because we pass the connect_to string to the console
+   //free((void *) params->connect_to);
+   params->connect_to = NULL;
+   
+   //connect_status = ?;
+   InterlockedExchange(params->reconnect, false);
 }
 
 //TODO: functions that send packets to the connected server
@@ -37,62 +96,25 @@ DWORD NetMain(LPVOID *data)
    
 	while(*params->running)
 	{
-		if(*params->reconnect)
-		{
-         AddMessage((Console *) &params->dashstate->console,
-                    /*"Attempting to connect to: "*/ Literal((char *) params->connect_to),
-                    network_notification);
-         
-			char *host_ip = params->use_mdns ? NULL : (char *) params->connect_to;
-         
-         if(params->use_mdns)
-         {
-            hostent *robot_server = gethostbyname((char *) params->connect_to);
-         
-            if(robot_server)
-            {
-               host_ip = inet_ntoa(*((in_addr *)robot_server->h_addr));
-               
-               AddMessage((Console *) &params->dashstate->console,
-                          /*"MDNS IP: "*/ Literal(host_ip),
-                          network_notification);
-            }
-            else
-            {
-               AddMessage((Console *) &params->dashstate->console, Literal("MDNS IP address lookup FAILED"),
-                          network_notification);
-            }
-         }
-         
-         AddMessage((Console *) &params->dashstate->console,
-                    host_ip ? /*concat "Host IP: "*/ Literal(host_ip) : Literal("Address: NULL"),
-                    network_notification);
-			
-         if(host_ip)
-         {
-            SOCKET server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-            b32 is_nonblocking = true;
-            ioctlsocket(server_socket, FIONBIO, (u_long *)&is_nonblocking);
-
-            struct sockaddr_in server;
-            server.sin_family = AF_INET;
-         
-            server.sin_addr.s_addr = inet_addr(host_ip);
-            server.sin_port = htons(8089);
-         
-            connect(server_socket, (struct sockaddr *)&server, sizeof(server));
-         }
-         
-         //NOTE: we're not freeing here because we pass the connect_to string to the console
-         //free((void *) params->connect_to);
-         params->connect_to = NULL;
-			
-         //connect_status = ?;
-         InterlockedExchange(params->reconnect, false);
-		}
+      AddMessage((Console *) &params->dashstate->console,
+                 Literal("Waiting On Semaphore"), network_notification);
+      WaitForSingleObject(params->net_semaphore, INFINITE);
       
-      //NOTE: this thread just spins atm so this is here until we get an actual thread wake/sleep system
-      break;
+      //TODO: packet send & recieve que
+      /*
+      while(work to do)
+      {
+         switch(work)
+         {
+            */
+            if(*params->reconnect)
+            {
+               NetThread_Reconnect(params, network_notification);
+            }
+            /*
+         }
+      }
+      */
 	}
 
 	return 0;

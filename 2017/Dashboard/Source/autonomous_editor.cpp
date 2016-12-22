@@ -10,7 +10,7 @@ AutonomousBlock MotorBlock(RobotHardware *hardware, r32 motor_state)
 {
    AutonomousBlock result = {};
    result.hardware = hardware;
-   result.motor_state = motor_state;
+   result.state.motor = motor_state;
    return result;
 }
 
@@ -18,7 +18,7 @@ AutonomousBlock SolenoidBlock(RobotHardware *hardware, SolenoidState solenoid_st
 {
    AutonomousBlock result = {};
    result.hardware = hardware;
-   result.solenoid_state = solenoid_state;
+   result.state.solenoid = solenoid_state;
    return result;
 }
 
@@ -26,8 +26,8 @@ AutonomousBlock DriveBlock(RobotHardware *hardware, r32 forward_value, r32 rotat
 {
    AutonomousBlock result = {};
    result.hardware = hardware;
-   result.drive_state.forward_value = forward_value;
-   result.drive_state.rotate_value = rotate_value;
+   result.state.forward = forward_value;
+   result.state.rotate = rotate_value;
    return result;
 }
 
@@ -165,8 +165,8 @@ void DrawEditorBar(layout *editor_bar, AutonomousEditor *auto_editor)
    Button(editor_bar, NULL, EmptyString(), button_size, V2(0, 0), button_margin);
 }
 
-char lua_src_temp[] = "motor.set(1.0)\nmotor.set(0.0)\nsolenoid.set(Extended)";
-string lua_src = Literal(lua_src_temp);
+char lua_src_temp[4096] = {};
+string lua_src = String(lua_src_temp, ArrayCount(lua_src_temp));
 
 void DrawLuaEditor(layout *editor_panel, AutonomousEditor *auto_editor)
 {
@@ -302,7 +302,8 @@ void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
          block_list = temp_block_list;
       }
       
-      interaction_state block_interact = AutonomousBlockUILogic(POINTER_UI_ID(block), &block_list, block, block_element.bounds, auto_editor);
+      ui_id block_ui_id = POINTER_UI_ID(block);
+      interaction_state block_interact = AutonomousBlockUILogic(block_ui_id, &block_list, block, block_element.bounds, auto_editor);
       
       if(!auto_editor->block_grabbed && block_interact.active &&
          (Distance(context->active_element.start_pos, context->input_state.pos) > 10))
@@ -310,7 +311,37 @@ void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
          auto_editor->block_grabbed = true;
          auto_editor->grabbed_block = *block;
         
-         //remove block from list
+         if(auto_editor->selected_block)
+         {
+            if(auto_editor->selected_block == block)
+            {
+               auto_editor->selected_block = NULL;
+            }
+            else if((u32)(auto_editor->selected_block - auto_editor->editor_blocks) > i)
+            {
+               auto_editor->selected_block--;
+            }
+         }
+         
+         for(u32 j = i;
+             j < (auto_editor->editor_block_count - 1);
+             j++)
+         {
+            auto_editor->editor_blocks[j] = auto_editor->editor_blocks[j + 1];
+         }
+         
+         auto_editor->editor_block_count--;
+         
+         //TODO: remove line from lua src
+         
+         //NOTE: this is a total hack until we get proper expiry on interactions
+         context->hot_element = (context->hot_element.id == block_ui_id) ? NULL_INTERACTION : context->hot_element;
+         context->active_element = (context->active_element.id == block_ui_id) ? NULL_INTERACTION : context->active_element;
+         context->selected_element = (context->selected_element.id == block_ui_id) ? NULL_INTERACTION : context->selected_element;
+         
+         //NOTE: this is also a hack, it forces a reloop on index i because index i has now been rewritten
+         i--;
+         continue;
       }
       
       DrawAutonomousBlock(render_context, block, block_element.bounds, auto_editor, block_interact.active, block_interact.hot);
@@ -344,8 +375,29 @@ void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
          }
          
          auto_editor->editor_blocks[grabbed_block_hover_index] = auto_editor->grabbed_block;
+         AutonomousBlock *new_block = auto_editor->editor_blocks + grabbed_block_hover_index;
          
-         //TODO: insert lua src for block that was just added
+         u32 insert_at = 0; //TODO: this
+         
+         if(new_block->is_wait_block)
+         {
+            InsertAt(lua_src, Literal("wait(???)\n"), insert_at);
+         }
+         else
+         {
+            if(new_block->hardware->type == Hardware_Motor)
+            {
+               InsertAt(lua_src, Literal("???.set(???)\n"), insert_at);
+            }
+            else if(new_block->hardware->type == Hardware_Solenoid)
+            {
+               InsertAt(lua_src, Literal("???.set(???)\n"), insert_at);
+            }
+            else if(new_block->hardware->type == Hardware_Drive)
+            {
+               InsertAt(lua_src, Literal("???.set(???, ???)\n"), insert_at);
+            }
+         }
          
          auto_editor->block_grabbed = false;
          auto_editor->grabbed_block = {};
@@ -384,33 +436,33 @@ void DrawBlockDetails(layout *block_details, AutonomousEditor *auto_editor)
          if(block->hardware->type == Hardware_Motor)
          {
             Text(block_details, Literal("State: "), 20, V2(0, 0), V2(0, 5)); 
-            TextBox(block_details, -1, 1, &block->motor_state, V2(100, 40), V2(0, 0), V2(0, 0)); 
+            TextBox(block_details, -1, 1, &block->state.motor, V2(100, 40), V2(0, 0), V2(0, 0)); 
             NextLine(block_details);
-            SliderBar(block_details, -1, 1, &block->motor_state, V2(180, 20), V2(0, 0), V2(0, 0));
+            SliderBar(block_details, -1, 1, &block->state.motor, V2(180, 20), V2(0, 0), V2(0, 0));
          }
          else if(block->hardware->type == Hardware_Solenoid)
          {
-            b32 is_extended = (block->solenoid_state == Solenoid_Extended);
+            b32 is_extended = (block->state.solenoid == Solenoid_Extended);
             
             Text(block_details, is_extended ? Literal("State: Extended") : Literal("State: Retracted"), 20, V2(0, 0), V2(0, 5));
             NextLine(block_details);
             
             ToggleSlider(block_details, &is_extended, Literal("Extended"), Literal("Retracted"), V2(200, 30), V2(0, 0), V2(0, 0));   
-            block->solenoid_state = is_extended ? Solenoid_Extended : Solenoid_Retracted;
+            block->state.solenoid = is_extended ? Solenoid_Extended : Solenoid_Retracted;
          }
          else if(block->hardware->type == Hardware_Drive)
          {
             Text(block_details, Literal("Forward: "), 20, V2(0, 0), V2(0, 5)); 
-            TextBox(block_details, -1, 1, &block->drive_state.forward_value, V2(100, 40), V2(0, 0), V2(0, 0)); 
+            TextBox(block_details, -1, 1, &block->state.forward, V2(100, 40), V2(0, 0), V2(0, 0)); 
             NextLine(block_details);
-            SliderBar(block_details, -1, 1, &block->drive_state.forward_value, V2(180, 20), V2(0, 0), V2(0, 0));
+            SliderBar(block_details, -1, 1, &block->state.forward, V2(180, 20), V2(0, 0), V2(0, 0));
             
             NextLine(block_details);
             
             Text(block_details, Literal("Rotate: "), 20, V2(0, 0), V2(0, 5)); 
-            TextBox(block_details, -1, 1, &block->drive_state.rotate_value, V2(100, 40), V2(0, 0), V2(0, 0)); 
+            TextBox(block_details, -1, 1, &block->state.rotate, V2(100, 40), V2(0, 0), V2(0, 0)); 
             NextLine(block_details);
-            SliderBar(block_details, -1, 1, &block->drive_state.rotate_value, V2(180, 20), V2(0, 0), V2(0, 0));
+            SliderBar(block_details, -1, 1, &block->state.rotate, V2(180, 20), V2(0, 0), V2(0, 0));
          }
       }
    }
