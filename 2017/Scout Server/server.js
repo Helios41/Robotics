@@ -3,13 +3,7 @@ var fs = require('fs');
 var http = require('http');
 var jade = require('jade');
 var cookieParser = require('cookie-parser');
-
-var RenderFunctions = 
-{
-   login: renderLogin,
-   home: renderHome
-};
-Object.freeze(RenderFunctions);
+var csvParse = require('csv-parse/lib/sync');
 
 var app = express();
 app.set('views', './pages');
@@ -36,13 +30,7 @@ function MatchData(match_number, red_alliance, blue_alliance, assigned_team)
    result["red_alliance"] = red_alliance;
    result["blue_alliance"] = blue_alliance;
    result["assigned_team"] = assigned_team;
-   return result;
-}
-
-function UserData(matches_array)
-{
-   var result = {};
-   result["matches"] = matches_array;
+   result["submitted"] = false;
    return result;
 }
 
@@ -54,41 +42,46 @@ function EntryElement(name, type)
    return result;
 }
 
-var scouting_data = {};
-var users = 
+function IngestFormCSV()
 {
-   "test1": UserData([MatchData(10, [1, 2, 3], [4, 5, 6], 2), MatchData(12, [1, 2, 7], [4, 5, 6], 4)]),
-   "test2": UserData([])
-};
-
-function HTTPGet(host, path, callback)
-{
-   var options = {
-      host: host,
-      port: 80,
-      path: path
+   var csvSource = fs.readFileSync("./form.csv");
+   var parsedCSV = csvParse(csvSource);
+   
+   var result = [];
+   
+   for(var i = 0;
+       i < parsedCSV.length;
+       i++)
+   {
+      result.push(EntryElement(parsedCSV[i][0], parsedCSV[i][1]));
    }
    
-   var req = http.request(options, function(res)
-   {
-      var result = "";
-      res.setEncoding('utf8');
-      
-      res.on("data", function(data)
-      {
-         result += data;
-      });      
-      
-      res.on("end", function()
-      {
-         callback(result);
-      });
-   }).end();  
+   return result;
 }
 
-function capitalizeFirstLetter(string)
+function IngestScheduleCSV()
 {
-   return string.charAt(0).toUpperCase() + string.slice(1);
+   var csvSource = fs.readFileSync("./schedule.csv");
+   var parsedCSV = csvParse(csvSource);
+   
+   var result = {};
+   
+   for(var i = 0;
+       i < parsedCSV.length;
+       i++)
+   {
+      var curr_row = parsedCSV[i];
+      var name = curr_row[2];
+      
+      if(result[name] == undefined)
+      {
+         result[name] = {matches: []};
+      }
+      
+      result[name].matches.push(MatchData(curr_row[0], [], [], curr_row[1]));
+   }
+   
+   return result;
 }
 
 function addPortal(render_data, portal_name, portal_link)
@@ -144,7 +137,7 @@ app.get('/', function(req, res)
 
 app.get('/login', function(req, res)
 {
-   if(!HasCreds(req.cookies))
+   if(!HasCreds(req.cookies) || (users[req.cookies.name] == undefined))
    {
       res.send(renderLogin());
    }
@@ -156,7 +149,7 @@ app.get('/login', function(req, res)
 
 app.get('/home', function(req, res)
 {
-   if(HasCreds(req.cookies))
+   if(HasCreds(req.cookies) && (users[req.cookies.name] != undefined))
    {
       res.send(renderHome(req.cookies));
    }
@@ -207,18 +200,13 @@ function renderHome(cookies)
 {
    var render_data = {};
    
-   if(users[cookies.name] != undefined)
-   {
-      render_data["loggedIn"] = true;
-      render_data["name"] = cookies.name;
-      render_data["user_data"] = users[cookies.name];
-      
-      addPortals(render_data);
-      
-      return jadeCompile('home', render_data);
-   }
+   render_data["loggedIn"] = true;
+   render_data["name"] = cookies.name;
+   render_data["user_data"] = users[cookies.name];
    
-   return jadeCompile('invalidpath');
+   addPortals(render_data);
+   
+   return jadeCompile('home', render_data);
 }
 
 function renderTeamEntry(cookies, team_in)
@@ -235,6 +223,7 @@ function renderTeamEntry(cookies, team_in)
       }
       
       render_data["teamid"] = team;
+      render_data["team_data"] = scouting_data[team];
       addPortals(render_data);
    }
    
@@ -266,7 +255,7 @@ function renderTeamEntryForm(cookies, match_number_in)
          }
       }
       
-      render_data["entry_template"] = [EntryElement("Score", "text_box"), EntryElement("Is Good", "check_box")];
+      render_data["entry_template"] = form_definition;
       
       addPortals(render_data);
    }
@@ -284,3 +273,12 @@ server.listen(3000, function()
    
    console.log("Server listening at %s : %s", host, port);
 });
+var socket_io = require('socket.io')(server);
+
+socket_io.on('connection', function(socket){
+  console.log('a user connected');
+});
+
+var form_definition = IngestFormCSV();
+var users = IngestScheduleCSV();
+var scouting_data = {};

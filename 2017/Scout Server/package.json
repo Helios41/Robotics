@@ -7,5 +7,12 @@
     "start": "node server.js"
   },
   "author": "Jonathan Casella (Helios41)",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "cookie-parser": "^1.4.3",
+    "csv-parse": "^1.1.7",
+    "express": "^4.14.0",
+    "jade": "^1.11.0",
+    "socket.io": "^1.7.2"
+  }
 }

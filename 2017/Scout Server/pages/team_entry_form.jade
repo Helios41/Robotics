@@ -10,11 +10,17 @@ block vars
 block content
    p= "Team Entry for Team " + assigned_team + " Match " + match_number
    each entry_element in entry_template
-      p= entry_element.name + ":"
-      if entry_element.type == "text_box"
+      span= entry_element.name + ":"
+      if entry_element.type == "String"
          input(type="text", autocomplete="off")
-      else if entry_element.type == "check_box"
+         br
+      else if entry_element.type == "Boolean"
          input(type="checkbox")
+         br
+      else if entry_element.type == "Number"
+         input(type="number")
+         br
+   button(id="submit_form")= "Submit"
       
 block script
    mixin scoutSearchScript("scout_search_button", "team_box")
@@ -22,4 +28,10 @@ block script
       $(document).ready(function()
       {
          
+      });
+      
+      $("#submit_form").click(function()
+      {
+         var submit_data = {match_number: #{match_number}};
+         socket.emit("submit_form", submit_data);
       });
