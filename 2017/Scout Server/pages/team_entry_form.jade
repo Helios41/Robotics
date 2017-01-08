@@ -12,26 +12,45 @@ block content
    each entry_element in entry_template
       span= entry_element.name + ":"
       if entry_element.type == "String"
-         input(type="text", autocomplete="off")
+         input(type="text", autocomplete="off", id=entry_element.name.replace(" ", "_"))
          br
       else if entry_element.type == "Boolean"
-         input(type="checkbox")
+         input(type="checkbox", id=entry_element.name.replace(" ", "_"))
          br
       else if entry_element.type == "Number"
-         input(type="number")
+         input(type="number", id=entry_element.name.replace(" ", "_"))
          br
    button(id="submit_form")= "Submit"
       
 block script
    mixin scoutSearchScript("scout_search_button", "team_box")
    script.
-      $(document).ready(function()
-      {
-         
-      });
-      
       $("#submit_form").click(function()
       {
-         var submit_data = {match_number: #{match_number}};
+         var submit_data =
+         {
+            match_number: #{match_number},
+            name: Cookies.get("name")
+         };
+         
+         var inputs = $("input");
+         
+         for(var i = 0;
+             i < inputs.length;
+             i++)
+         {
+            var curr_input = inputs[i];
+            
+            if($("#" + curr_input.id).attr('type') == 'checkbox')
+            {
+               submit_data[curr_input.id.replace("_", " ")] = $("#" + curr_input.id).is(':checked');
+            }
+            else
+            {
+               submit_data[curr_input.id.replace("_", " ")] = $("#" + curr_input.id).val(); 
+            }
+         }
+         
          socket.emit("submit_form", submit_data);
+         window.location.href = "home";
       });

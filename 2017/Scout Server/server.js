@@ -123,6 +123,23 @@ function IsNumber(in_value)
    return true;
 }
 
+function GetMatch(user_name, match_number)
+{
+   var user_matches = users[user_name].matches;
+   
+   for(var i = 0;
+       i < user_matches.length;
+       i++)
+   {
+      var curr_match = user_matches[i];
+      
+      if(curr_match.number == match_number)
+      {
+         return curr_match;
+      }
+   }
+}
+
 app.get('/', function(req, res)
 {
    if(HasCreds(req.cookies))
@@ -161,7 +178,10 @@ app.get('/home', function(req, res)
 
 app.get('/team_entry_form:match_number', function(req, res)
 {
-   if(IsNumber(req.params.match_number) && (req.params.match_number > 0))
+   if(IsNumber(req.params.match_number) && (req.params.match_number > 0) &&
+      (users[req.cookies.name] != undefined) && 
+      (GetMatch(req.cookies.name, parseInt(req.params.match_number).toString()) != undefined) &&
+      (!GetMatch(req.cookies.name, parseInt(req.params.match_number).toString()).submitted))
    {
       res.send(renderTeamEntryForm(req.cookies, req.params.match_number));
    }
@@ -235,30 +255,13 @@ function renderTeamEntryForm(cookies, match_number_in)
    var match_number = parseInt(match_number_in).toString();
    var render_data = {};
    
-   if(match_number && match_number_in && (users[cookies.name] != undefined))
-   {
-      render_data["loggedIn"] = true;
-      render_data["name"] = cookies.name;
-      render_data["match_number"] = match_number;
-      
-      var user_matches = users[cookies.name].matches;
-      
-      for(var i = 0;
-          i < user_matches.length;
-          i++)
-      {
-         var curr_match = user_matches[i];
-         
-         if(curr_match.number == match_number)
-         {
-            render_data["assigned_team"] = curr_match.assigned_team;
-         }
-      }
-      
-      render_data["entry_template"] = form_definition;
-      
-      addPortals(render_data);
-   }
+   render_data["loggedIn"] = true;
+   render_data["name"] = cookies.name;
+   render_data["match_number"] = match_number;
+   render_data["assigned_team"] = GetMatch(cookies.name, match_number).assigned_team;
+   render_data["entry_template"] = form_definition;
+   
+   addPortals(render_data);
    
    return jadeCompile('team_entry_form', render_data);
 }
@@ -275,8 +278,21 @@ server.listen(3000, function()
 });
 var socket_io = require('socket.io')(server);
 
-socket_io.on('connection', function(socket){
-  console.log('a user connected');
+socket_io.on('connection', function(socket)
+{
+   socket.on('submit_form', function(msg)
+   {
+      GetMatch(msg.name, msg.match_number).submitted = true;
+      
+      var assigned_team = GetMatch(msg.name, msg.match_number).assigned_team;
+      
+      if(scouting_data[assigned_team] == undefined)
+      {
+         scouting_data[assigned_team] = [];
+      }
+      
+      scouting_data[assigned_team].push(msg);
+   });
 });
 
 var form_definition = IngestFormCSV();
