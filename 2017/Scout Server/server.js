@@ -84,6 +84,36 @@ function IngestScheduleCSV()
    return result;
 }
 
+function DumpDatabase()
+{
+   var team_list = Object.keys(scouting_data);
+   var result = "";
+
+   for(var team_list_index = 0;
+       team_list_index < team_list.length;
+       team_list_index++)
+   {
+      result = result + team_list[team_list_index] + "\n";
+      var team_data = scouting_data[team_list[team_list_index]];
+
+      for(var entry_index = 0;
+          entry_index < team_data.length;
+          entry_index++)
+      {
+         result = result + "   Match " + team_data[entry_index].match_number + "\n";
+
+         for(var form_element_index = 0;
+             form_element_index < form_definition.length;
+             form_element_index++)
+         {
+            result = result + "      " + form_definition[form_element_index].name + ": " + team_data[entry_index][form_definition[form_element_index].name] + "\n";
+         }
+      }
+   }
+
+   return result;
+}
+
 function addPortal(render_data, portal_name, portal_link)
 {
    if(render_data["navPortals"] === undefined)
@@ -225,7 +255,6 @@ function renderHome(cookies)
    render_data["user_data"] = users[cookies.name];
    
    addPortals(render_data);
-   
    return jadeCompile('home', render_data);
 }
 
@@ -244,9 +273,10 @@ function renderTeamEntry(cookies, team_in)
       
       render_data["teamid"] = team;
       render_data["team_data"] = scouting_data[team];
-      addPortals(render_data);
+      render_data["entry_template"] = form_definition;
    }
    
+   addPortals(render_data);
    return jadeCompile('team_entry', render_data);
 }
 
@@ -262,7 +292,6 @@ function renderTeamEntryForm(cookies, match_number_in)
    render_data["entry_template"] = form_definition;
    
    addPortals(render_data);
-   
    return jadeCompile('team_entry_form', render_data);
 }
 
@@ -292,6 +321,7 @@ socket_io.on('connection', function(socket)
       }
       
       scouting_data[assigned_team].push(msg);
+      fs.writeFileSync("./database_dump.txt", DumpDatabase());
    });
 });
 

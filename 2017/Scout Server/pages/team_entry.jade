@@ -15,23 +15,15 @@ block content
       button(id="scout_search_button") Search
    if teamid
       if team_data
-         - var avg_data = {}
-         - for(var i = 0; i < team_data.length; i++)
-            - var keys = Object.keys(team_data[i])
-            - keys.splice(keys.indexOf("name"), 1)
-            - keys.splice(keys.indexOf("match_number"), 1)
-            - for(var j = 0; j < keys.length; j++)
-               - if(!isNaN(parseInt(team_data[i][keys[j]])))
-                  - if(avg_data[keys[j]] == undefined)
-                     - avg_data[keys[j]] = {count: 0, value: 0}
-                  - avg_data[keys[j]].value += parseInt(team_data[i][keys[j]])
-                  - avg_data[keys[j]].count++
-               - else
-                  p= keys[j] + ": " + team_data[i][keys[j]]
-         p Averages
-         - var avg_keys = Object.keys(avg_data)
-         - for(var i = 0; i < avg_keys.length; i++)
-            p= avg_keys[i] + ": " + (avg_data[avg_keys[i]].value / avg_data[avg_keys[i]].count)
+         p= teamid
+         each entry_element in entry_template
+            .block
+               p= entry_element.name
+               if (entry_element.type == "Number") || (entry_element.type == "Boolean")
+                  div(id=entry_element.name.replace(" ", "_"), style="width: 600px;height: 300px;background-color: white;margin: 5px")
+               else if entry_element.type == "String"
+                  each data_entry in team_data
+                     p= data_entry[entry_element.name]
       else
          p= "No Data For This Team"
    else
@@ -39,4 +31,47 @@ block content
       
 block script
    mixin scoutSearchScript("scout_search_button", "team_box")
+   if teamid
+      each entry_element in entry_template
+         script.
+            $(document).ready(function()
+            {
+               var team_data = !{JSON.stringify(team_data)};
+               
+               if(#{entry_element.type == "Number"})
+               {
+                  var plot_points = [];
+                  for(var i = 0;
+                      i < team_data.length;
+                      i++)
+                  {
+                     plot_points.push([team_data[i].match_number, parseInt(team_data[i]["#{entry_element.name}"])]);
+                  }
+                  $.plot("#" + "#{entry_element.name.replace(" ", "_")}", [plot_points]);
+               }
+               else if(#{entry_element.type == "Boolean"})
+               {
+                  var true_count = 0;
+                  var false_count = 0;
+                  for(var i = 0;
+                      i < team_data.length;
+                      i++)
+                  {
+                     if(team_data[i]["#{entry_element.name}"] == true)
+                     {
+                        true_count++;
+                     }
+                     else
+                     {
+                        false_count++;
+                     }
+                  }
+                  $.plot("#" + "#{entry_element.name.replace(" ", "_")}",
+                         [{label: "True", data: true_count, color: "#00FF00"},
+                          {label: "False", data: false_count, color: "#FF0000"}], 
+                         {series: {pie: { show: true }}});
+               }
+            });
+      
+
    

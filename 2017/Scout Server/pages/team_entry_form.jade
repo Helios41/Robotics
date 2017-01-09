@@ -34,7 +34,8 @@ block script
          };
          
          var inputs = $("input");
-         
+         var form_complete = true;
+
          for(var i = 0;
              i < inputs.length;
              i++)
@@ -45,12 +46,25 @@ block script
             {
                submit_data[curr_input.id.replace("_", " ")] = $("#" + curr_input.id).is(':checked');
             }
-            else
+            else if($("#" + curr_input.id).attr('type') == 'number')
+            {
+               var number_box_value = $("#" + curr_input.id).val();
+               if(number_box_value == '') form_complete = false;
+               submit_data[curr_input.id.replace("_", " ")] = number_box_value; 
+            }
+            else if($("#" + curr_input.id).attr('type') == 'text')
             {
                submit_data[curr_input.id.replace("_", " ")] = $("#" + curr_input.id).val(); 
             }
          }
          
-         socket.emit("submit_form", submit_data);
-         window.location.href = "home";
+         if(form_complete)
+         {
+            socket.emit("submit_form", submit_data);
+            window.location.href = "home";
+         }
+         else
+         {
+            alert("Form Not Completely Filled In");
+         }
       });
