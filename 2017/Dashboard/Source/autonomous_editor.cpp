@@ -214,7 +214,7 @@ void DrawAutonomousBlock(RenderContext *render_context, AutonomousBlock *block,
    //      eg. "Motor @ 10%" or "Wait for 10 seconds"
    string text = block->is_wait_block ? Literal("Wait") : (block->hardware ? block->hardware->name : EmptyString());
    
-   TextLabel(render_context, element_bounds, text, 20);
+   TextLabel(render_context, element_bounds, text);
    
    if(block == auto_editor->selected_block)
    {
@@ -225,8 +225,50 @@ void DrawAutonomousBlock(RenderContext *render_context, AutonomousBlock *block,
 
 r32 debug_scroll = 0;
 
+/**
+REWORK BLOCK SYSTEM
+   -VALUE BLOCKS
+   -CONDITIONALS
+*/
+
+string GenerateBlockLua(AutonomousBlock *block, TemporaryMemoryArena *temp_arena)
+{
+   string result = {};
+         
+   if(block->is_wait_block)
+   {
+      string wait_time = ToString(block->wait_duration, temp_arena);
+      result = Concat(Literal("wait("), wait_time, Literal(")\n"), temp_arena);
+   }
+   else
+   {
+      string hardware_id = ToString(block->hardware->id, temp_arena);
+      
+      if(block->hardware->type == Hardware_Motor)
+      {
+         string value = ToString(block->state.motor, temp_arena);
+         result = Concat(Literal("hardware["), hardware_id, Literal("].set("), value, Literal(")\n"), temp_arena);
+      }
+      else if(block->hardware->type == Hardware_Solenoid)
+      {
+         result = Concat(Literal("hardware["), hardware_id,
+                           (block->state.solenoid == Solenoid_Extended) ? Literal("].set(Extended)\n") : Literal("].set(Retracted)\n"),
+                           temp_arena);
+      }
+      else if(block->hardware->type == Hardware_Drive)
+      {
+         string forward_value = ToString(block->state.forward, temp_arena);
+         string rotate_value = ToString(block->state.rotate, temp_arena);
+         result = Concat(Literal("hardware["), hardware_id, Literal("].set("), forward_value, Literal(", "),
+                           rotate_value, Literal(")\n"), temp_arena);
+      }
+   }
+   
+   return result;
+}
+
 //TODO: ability to remove blocks, do this by grabbing a block and dropping it into the selection panel
-void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
+void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor, MemoryArena *generic_arena)
 {
    UIContext *context = block_list_full->context;
    RenderContext *render_context = context->render_context;
@@ -379,25 +421,10 @@ void DrawBlockList(layout *block_list_full, AutonomousEditor *auto_editor)
          
          u32 insert_at = 0; //TODO: this
          
-         if(new_block->is_wait_block)
-         {
-            InsertAt(lua_src, Literal("wait(???)\n"), insert_at);
-         }
-         else
-         {
-            if(new_block->hardware->type == Hardware_Motor)
-            {
-               InsertAt(lua_src, Literal("???.set(???)\n"), insert_at);
-            }
-            else if(new_block->hardware->type == Hardware_Solenoid)
-            {
-               InsertAt(lua_src, Literal("???.set(???)\n"), insert_at);
-            }
-            else if(new_block->hardware->type == Hardware_Drive)
-            {
-               InsertAt(lua_src, Literal("???.set(???, ???)\n"), insert_at);
-            }
-         }
+         TemporaryMemoryArena temp_arena = BeginTemporaryMemory(generic_arena);
+         
+         InsertAt(lua_src, GenerateBlockLua(new_block, &temp_arena), insert_at);
+         EndTemporaryMemory(temp_arena);
          
          auto_editor->block_grabbed = false;
          auto_editor->grabbed_block = {};
@@ -472,7 +499,7 @@ void DrawBlockDetails(layout *block_details, AutonomousEditor *auto_editor)
    }
 }
 
-void DrawBlockEditor(layout *editor_panel, AutonomousEditor *auto_editor)
+void DrawBlockEditor(layout *editor_panel, AutonomousEditor *auto_editor, MemoryArena *generic_arena)
 {
    UIContext *context = editor_panel->context;
    RenderContext *render_context = context->render_context;
@@ -485,11 +512,11 @@ void DrawBlockEditor(layout *editor_panel, AutonomousEditor *auto_editor)
     
    RectangleOutline(render_context, editor_panel->bounds, V4(0, 0, 0, 1), 3);
    
-   DrawBlockList(&block_list, auto_editor);
+   DrawBlockList(&block_list, auto_editor, generic_arena);
    DrawBlockDetails(&block_details, auto_editor);
 }
 
-void DrawEditorPanel(layout *editor_panel, AutonomousEditor *auto_editor)
+void DrawEditorPanel(layout *editor_panel, AutonomousEditor *auto_editor, MemoryArena *generic_arena)
 {
    RenderContext *render_context = editor_panel->context->render_context;
    
@@ -502,7 +529,7 @@ void DrawEditorPanel(layout *editor_panel, AutonomousEditor *auto_editor)
    }
    else
    {
-      DrawBlockEditor(editor_panel, auto_editor);
+      DrawBlockEditor(editor_panel, auto_editor, generic_arena);
    }
 }
 
@@ -525,7 +552,7 @@ void DrawAutonomousEditor(layout *auto_editor, UIContext *context, DashboardStat
    
    DrawGraphView(&graph_view, &dashstate->auto_editor);
    DrawEditorBar(&editor_bar, &dashstate->auto_editor);
-   DrawEditorPanel(&editor_panel, &dashstate->auto_editor);
+   DrawEditorPanel(&editor_panel, &dashstate->auto_editor, dashstate->generic_arena);
    
    if(dashstate->auto_editor.block_grabbed)
    {

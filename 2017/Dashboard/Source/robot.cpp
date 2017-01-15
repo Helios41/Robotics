@@ -43,93 +43,117 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
    
    RobotHardware *selected_hardware = robot->selected_hardware;
    Text(selected_hardware_page, selected_hardware->name, 40,
-        V2((GetSize(selected_hardware_page->bounds).x - GetTextWidth(context->render_context, Literal("Hardware"), 40)) / 2.0f, 0), V2(0, 5)); 
+        V2((GetSize(selected_hardware_page->bounds).x - GetTextWidth(context->render_context, selected_hardware->name, 40)) / 2.0f, 0), V2(0, 5)); 
    
    layout time_graph = Panel(selected_hardware_page, V2(GetSize(selected_hardware_page->bounds).x - 10, GetSize(selected_hardware_page->bounds).y * 0.45), V2(0, 0), V2(5, 5)).lout;
    NextLine(selected_hardware_page);
    
    u32 earliest_sample_index = Min(selected_hardware->at_sample - 1, selected_hardware->sample_count - 1) % selected_hardware->sample_count;
       
-   for(u32 i = selected_hardware->at_sample;
+   u64 earliest_timestamp = MAX_U64;
+   u64 latest_timestamp = MIN_U64;
+      
+   for(u32 i = 0;
        i < selected_hardware->sample_count;
        i++)
    {
-      u32 index = i % selected_hardware->sample_count;
-      RobotHardwareSample *curr = selected_hardware->samples + index;
-      
-      
+      RobotHardwareSample *curr = selected_hardware->samples + i;
+      earliest_timestamp = Min(earliest_timestamp, curr->timestamp);
+      latest_timestamp = Max(latest_timestamp, curr->timestamp);
+   }
+   
+   RobotHardwareState *latest_sample = NULL;
+   
+   for(u32 i = 0;
+       i < selected_hardware->sample_count;
+       i++)
+   {
+      RobotHardwareSample *curr = selected_hardware->samples + i;
+      if(curr->timestamp == latest_timestamp)
+      {
+         latest_sample = &curr->state;
+         break;
+      }
    }
    
    Rectangle(context->render_context, time_graph.bounds, V4(0.3, 0.3, 0.3, 0.6));
    RectangleOutline(context->render_context, time_graph.bounds, V4(0, 0, 0, 1));
    
-   r32 graph_height = GetSize(time_graph.bounds).y;
-   r32 x_axis_interval = GetSize(time_graph.bounds).x / (selected_hardware->sample_count - 1);
-   r32 y_axis_scale = GetSize(time_graph.bounds).y / 2.0f;
-   
-   //TODO: base the x axis placement off of the timestep, not the index
-   
-   for(u32 i = 0;
-       i < (selected_hardware->sample_count - 1);
-       i++)
+   if((latest_timestamp - earliest_timestamp) != 0)
    {
+      r32 graph_height = GetSize(time_graph.bounds).y;
+      r32 x_axis_interval = GetSize(time_graph.bounds).x / (latest_timestamp - earliest_timestamp);
+      r32 y_axis_scale = GetSize(time_graph.bounds).y / 2.0f;
+   
+      for(u32 i = 0;
+          i < (selected_hardware->sample_count - 1);
+          i++)
+      {
+         //TODO: finish this once we have the server so we can test
+#if 0
+         if(selected_hardware->type == Hardware_Motor)
+         {
+            v2 a = V2(i * x_axis_interval, graph_height - (selected_hardware->samples[i].state.motor + 1) * y_axis_scale);
+            v2 b = V2((i + 1) * x_axis_interval, graph_height - (selected_hardware->samples[i + 1].state.motor + 1) * y_axis_scale);
+            Line(context->render_context, time_graph.bounds.min + a, time_graph.bounds.min + b, V4(0, 0, 0, 1), 2);
+         }
+         else if(selected_hardware->type == Hardware_Solenoid)
+         {
+            
+         }
+         else if(selected_hardware->type == Hardware_Drive)
+         {
+            v2 a_rotate = V2(i * x_axis_interval,
+                             graph_height - (selected_hardware->samples[i].state.rotate + 1) * y_axis_scale);
+            v2 b_rotate = V2((i + 1) * x_axis_interval,
+                             graph_height - (selected_hardware->samples[i + 1].state.rotate + 1) * y_axis_scale);
+            Line(context->render_context, time_graph.bounds.min + a_rotate, time_graph.bounds.min + b_rotate, V4(0, 0, 0, 1), 2);
+            
+            v2 a_forward = V2(i * x_axis_interval,
+                              graph_height - (selected_hardware->samples[i].state.forward + 1) * y_axis_scale);
+            v2 b_forward = V2((i + 1) * x_axis_interval,
+                              graph_height - (selected_hardware->samples[i + 1].state.forward + 1) * y_axis_scale);
+            Line(context->render_context, time_graph.bounds.min + a_forward, time_graph.bounds.min + b_forward, V4(1, 1, 1, 1), 2);
+         }
+#endif
+      }
+      
       if(selected_hardware->type == Hardware_Motor)
       {
-         v2 a = V2(i * x_axis_interval, graph_height - (selected_hardware->samples[i].state.motor + 1) * y_axis_scale);
-         v2 b = V2((i + 1) * x_axis_interval, graph_height - (selected_hardware->samples[i + 1].state.motor + 1) * y_axis_scale);
-         Line(context->render_context, time_graph.bounds.min + a, time_graph.bounds.min + b, V4(0, 0, 0, 1), 2);
+         TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
+         
+         Text(selected_hardware_page, 
+              Concat(Literal("State: "), ToString(latest_sample->motor, &temp_memory), &temp_memory),
+              20, V2(0, 0), V2(0, 5));  
+              
+         EndTemporaryMemory(temp_memory);
       }
       else if(selected_hardware->type == Hardware_Solenoid)
       {
-         
+         string solenoid_state_text = (latest_sample->solenoid == Solenoid_Extended) ?
+                                       Literal("State: Extended") : Literal("State: Retracted");
+         Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
       }
       else if(selected_hardware->type == Hardware_Drive)
       {
-         v2 a_rotate = V2(i * x_axis_interval,
-                          graph_height - (selected_hardware->samples[i].state.rotate + 1) * y_axis_scale);
-         v2 b_rotate = V2((i + 1) * x_axis_interval,
-                          graph_height - (selected_hardware->samples[i + 1].state.rotate + 1) * y_axis_scale);
-         Line(context->render_context, time_graph.bounds.min + a_rotate, time_graph.bounds.min + b_rotate, V4(0, 0, 0, 1), 2);
+         TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
          
-         v2 a_forward = V2(i * x_axis_interval,
-                           graph_height - (selected_hardware->samples[i].state.forward + 1) * y_axis_scale);
-         v2 b_forward = V2((i + 1) * x_axis_interval,
-                           graph_height - (selected_hardware->samples[i + 1].state.forward + 1) * y_axis_scale);
-         Line(context->render_context, time_graph.bounds.min + a_forward, time_graph.bounds.min + b_forward, V4(1, 1, 1, 1), 2);
+         Text(selected_hardware_page,
+              Concat(Literal("Forward: "), ToString(latest_sample->forward, &temp_memory), &temp_memory),
+              20, V2(0, 0), V2(0, 5)); 
+         NextLine(selected_hardware_page);
+         Text(selected_hardware_page,
+              Concat(Literal("Rotate: "), ToString(latest_sample->rotate, &temp_memory), &temp_memory),
+              20, V2(0, 0), V2(0, 5)); 
+         
+         EndTemporaryMemory(temp_memory);
       }
    }
-   
-   RobotHardwareState *current_sample = &(selected_hardware->samples + selected_hardware->at_sample)->state;
-   
-   if(selected_hardware->type == Hardware_Motor)
+   else
    {
-      TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
-      
-      Text(selected_hardware_page, 
-           Concat(Literal("State: "), ToString(current_sample->motor, &temp_memory), &temp_memory),
-           20, V2(0, 0), V2(0, 5));  
-           
-      EndTemporaryMemory(temp_memory);
-   }
-   else if(selected_hardware->type == Hardware_Solenoid)
-   {
-      string solenoid_state_text = (current_sample->solenoid == Solenoid_Extended) ?
-                                    Literal("State: Extended") : Literal("State: Retracted");
-      Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
-   }
-   else if(selected_hardware->type == Hardware_Drive)
-   {
-      TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
-      
-      Text(selected_hardware_page,
-           Concat(Literal("Forward: "), ToString(current_sample->forward, &temp_memory), &temp_memory),
-           20, V2(0, 0), V2(0, 5)); 
-      NextLine(selected_hardware_page);
-      Text(selected_hardware_page,
-           Concat(Literal("Rotate: "), ToString(current_sample->rotate, &temp_memory), &temp_memory),
-           20, V2(0, 0), V2(0, 5)); 
-      
-      EndTemporaryMemory(temp_memory);
+      Text(&time_graph, Literal("No Data"), 40,
+           V2((GetSize(time_graph.bounds).x - GetTextWidth(context->render_context, Literal("No Data"), 40)) / 2.0f,
+              (GetSize(time_graph.bounds).y - 40) / 2.0f), V2(0, 0)); 
    }
 }
 

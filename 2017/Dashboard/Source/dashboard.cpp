@@ -148,6 +148,7 @@ struct DashboardState
 {
    MemoryArena *generic_arena;
    
+   b32 competition_mode;
    DashboardPage page;
    ui_window *first_window;
    b32 connected;
@@ -261,7 +262,7 @@ void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
    }
    EndTicketMutex(&dashstate->console.notification_mutex);
              
-   if(Button(&settings_bar, NULL, EmptyString(), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
+   if(Button(&settings_bar, NULL, Literal("Display Settings"), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
    {
       if(!dashstate->display_settings_window)
       {
@@ -274,7 +275,7 @@ void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
       }
    }
    
-   if(Button(&settings_bar, NULL, EmptyString(), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
+   if(Button(&settings_bar, NULL, Literal("Network Settings"), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
    {
       if(!dashstate->network_settings_window)
       {
@@ -297,19 +298,17 @@ void DrawLeftBar(layout *left_bar, UIContext *context, DashboardState *dashstate
    v2 small_button_size = V2(Min(left_bar_size.x * 0.8f, 40), Min(left_bar_size.x * 0.8f, 40));
    v2 small_button_margin = V2(Min(left_bar_size.x * 0.1f, 5), Min(left_bar_size.x * 0.1f, 5));
    
-   if(Button(left_bar, &context->assets->home, EmptyString(), (dashstate->page == Page_Home),
+   if(Button(left_bar, &context->assets->home, Literal("Home"), (dashstate->page == Page_Home),
              small_button_size, V2(0, 0), small_button_margin).state)
    {
       dashstate->page = Page_Home;
    }
    
-   if(Button(left_bar, &context->assets->gear, EmptyString()/*, fullscreen*/,
+   if(Button(left_bar, &context->assets->competition, Literal("Competition Mode"),
              small_button_size, V2(0, 0), small_button_margin).state)
    {
-      /*
-      fullscreen = !fullscreen;
-      SetFullscreen(fullescreen);
-      */
+      //NOTE: this button makes the dashboard go into competition mode
+      dashstate->competition_mode = true;
    }
    
    Button(left_bar, NULL, EmptyString(), small_button_size, V2(0, 0), small_button_margin);

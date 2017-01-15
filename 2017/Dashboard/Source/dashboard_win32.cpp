@@ -69,7 +69,6 @@ r64 GetCounter(s64 *last_timer, r64 frequency)
 
 void SetFullscreen(b32 state)
 {
-   //TODO: fix this
    /*
    if(state)
    {
@@ -208,11 +207,13 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    CopyTo(Literal("roborio-4618-frc.local") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
    dashstate.net_settings.is_mdns = true;
    
+   /*
    InsertAt(lua_src, Literal("test_motor.set(0)\n"), 0);
    InsertAt(lua_src, Literal("test_motor.set(0)\n"), IndexOfNth(lua_src, 0, '\n') + 1);
    InsertAt(lua_src, Literal("test_solenoid.set(Extended)\n"), IndexOfNth(lua_src, 1, '\n') + 1);
    InsertAt(lua_src, Literal("wait(2)\n"), IndexOfNth(lua_src, 2, '\n') + 1);
    InsertAt(lua_src, Literal("test_solenoid.set(Retracted)\n"), IndexOfNth(lua_src, 3, '\n') + 1);
+   */
    
    volatile b32 running = true;
    volatile char *connect_to = NULL;

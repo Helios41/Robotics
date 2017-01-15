@@ -902,61 +902,71 @@ rect2 GetCharBounds(RenderContext *context, v2 pos, string text, u32 scale, u32 
    return GetCharBounds(context, bounds, text, char_index);
 }
 
-r32 TextLabelSuggestScale(RenderContext *render_context, rect2 bounds, string text)
-{
-   //TODO: write and start using this
-   return 0.0f;
-}
-
-void TextLabel(RenderContext *render_context, rect2 bounds, string text, r32 scale)
+//TODO: automatic scale picking based on bounds
+//      pass a "max_scale" and "min_scale" 
+void TextLabel(RenderContext *render_context, rect2 bounds, string text)
 {
    if(!IsEmpty(text))
    {
-      u32 segment_count;
-      string *segments = Split(text, ' ', &segment_count);
-      v2 bounds_size = GetSize(bounds);
-      
-      if(segment_count > 1)
+      if(CountChar(text, ' ') == 0)
       {
-         string curr_line = String(text.text, 0);
-         v2 at = bounds.min;
+         r32 ratio = GetSize(bounds).y / GetTextWidth(render_context, text, GetSize(bounds).y);
+         r32 scale = ratio * GetSize(bounds).x;
          
-         for(u32 i = 0;
-             i < segment_count;
-             i++)
-         {
-            string curr_segment = segments[i];
-            string new_line = String(curr_line.text, curr_line.length + ((i == 0) ? 0 : 1) + curr_segment.length);
-            v2 new_line_size = GetTextSize(render_context, new_line, scale);
-            
-            if(new_line_size.x > bounds_size.x)
-            {
-               r32 curr_line_height = GetTextSize(render_context, curr_line, scale).y;
-               
-               if((at.y + curr_line_height) > bounds.max.y)
-               {
-                  curr_line = EmptyString();
-                  break;
-               }
-                  
-               Text(render_context, at, curr_line, scale);
-               curr_line = curr_segment;
-               at = at + V2(0, curr_line_height);
-            }
-            else
-            {
-               curr_line = new_line;
-            }
-         }
-         
-         Text(render_context, at, curr_line, scale);
+         if((scale > 10) && (GetSize(bounds).x > 10))
+            Text(render_context, bounds.min, text, scale);
       }
       else
       {
-         Text(render_context, bounds.min, text, scale);
+         //TODO: rewrite this codepath
+#if 0
+         u32 segment_count;
+         string *segments = Split(text, ' ', &segment_count);
+         v2 bounds_size = GetSize(bounds);
+         
+         if(segment_count > 1)
+         {
+            string curr_line = String(text.text, 0);
+            v2 at = bounds.min;
+            
+            for(u32 i = 0;
+                i < segment_count;
+                i++)
+            {
+               string curr_segment = segments[i];
+               string new_line = String(curr_line.text, curr_line.length + ((i == 0) ? 0 : 1) + curr_segment.length);
+               v2 new_line_size = GetTextSize(render_context, new_line, scale);
+               
+               if(new_line_size.x > bounds_size.x)
+               {
+                  r32 curr_line_height = GetTextSize(render_context, curr_line, scale).y;
+                  
+                  if((at.y + curr_line_height) > bounds.max.y)
+                  {
+                     curr_line = EmptyString();
+                     break;
+                  }
+                     
+                  Text(render_context, at, curr_line, scale);
+                  curr_line = curr_segment;
+                  at = at + V2(0, curr_line_height);
+               }
+               else
+               {
+                  curr_line = new_line;
+               }
+            }
+            
+            Text(render_context, at, curr_line, scale);
+         }
+         else
+         {
+            Text(render_context, bounds.min, text, scale);
+         }
+         
+         free(segments);
+#endif
       }
-      
-      free(segments);
    }
 }
 
@@ -1029,7 +1039,7 @@ button _Button(ui_id id, layout *ui_layout, LoadedBitmap *icon, string text, v2 
    }
    
    Bitmap(render_context, icon, button_element.bounds.min);
-   TextLabel(render_context, button_element.bounds, text, 20);
+   TextLabel(render_context, button_element.bounds, text);
    
    button result = {};
    result.state = button_interact.became_selected;
@@ -1073,10 +1083,10 @@ element _ToggleSlider(ui_id id, layout *ui_layout, b32 *option, string option1, 
    }
    
    Rectangle(render_context, option1_bounds, (*option) ? V4(1, 0, 0, 1) : V4(0.5, 0, 0, 1));
-   TextLabel(render_context, option1_bounds, option1, 20);
+   TextLabel(render_context, option1_bounds, option1);
    
    Rectangle(render_context, option2_bounds, !(*option) ? V4(1, 0, 0, 1) : V4(0.5, 0, 0, 1));
-   TextLabel(render_context, option2_bounds, option2, 20);
+   TextLabel(render_context, option2_bounds, option2);
    
    if(toggle_interact.active)
    {

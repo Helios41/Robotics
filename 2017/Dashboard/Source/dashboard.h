@@ -25,6 +25,8 @@ typedef uint32_t b32;
 #define Max(a, b) (((a) < (b)) ? (b) : (a))
 #define Clamp(min, max, in) Min(Max(min, in), max)
 #define FLTMAX 3.402823e+38
+#define MIN_U64 0
+#define MAX_U64 0xFFFFFFFFFFFFFFFF
 
 /**
 TODO:
@@ -401,9 +403,37 @@ string ToString(string buffer, r32 flt)
 
 string ToString(r32 flt, TemporaryMemoryArena *temp_memory)
 {
-   string result = String(PushArray(temp_memory, 12, char), 12);
+   string result = String(PushArray(temp_memory, 12, char, Arena_Clear), 12);
    _snprintf(result.text, result.length, "%f", flt);
-   for(u32 i = 0; i < result.length; i++) if(result.text[i] == '\0') result.text[i] = ' ';
+   //for(u32 i = 0; i < result.length; i++) if(result.text[i] == '\0') result.text[i] = ' ';
+   
+   for(u32 i = 0; i < result.length; i++)
+   {
+      if(result.text[i] == '\0')
+      {
+         result.length = i;
+         break;
+      }
+   }
+   
+   return result;
+}
+
+string ToString(u32 flt, TemporaryMemoryArena *temp_memory)
+{
+   string result = String(PushArray(temp_memory, 12, char, Arena_Clear), 12);
+   _snprintf(result.text, result.length, "%u", flt);
+   //for(u32 i = 0; i < result.length; i++) if(result.text[i] == '\0') result.text[i] = ' ';
+   
+   for(u32 i = 0; i < result.length; i++)
+   {
+      if(result.text[i] == '\0')
+      {
+         result.length = i;
+         break;
+      }
+   }
+   
    return result;
 }
 
@@ -442,6 +472,7 @@ string Clear(string str)
    return str;
 }
 
+#if 0
 //TODO: make this more robust
 string *Split(string input, char split_char, u32 *array_length)
 {
@@ -513,15 +544,77 @@ string *Split(string input, char split_char, u32 *array_length)
    
    return result;
 }
+#endif
 
 string Concat(string s0, string s1, TemporaryMemoryArena *temp_memory)
 {
    u32 result_length = s0.length + s1.length;
-   string result = String(PushArray(temp_memory, result_length, char), result_length);
+   string result = String(PushArray(temp_memory, result_length, char, Arena_Clear), result_length);
    
    u32 i = 0;
    for(u32 j = 0; j < s0.length; j++) result.text[i++] = s0.text[j];
    for(u32 j = 0; j < s1.length; j++) result.text[i++] = s1.text[j];
+   
+   return result;
+}
+
+string Concat(string s0, string s1, string s2, TemporaryMemoryArena *temp_memory)
+{
+   u32 result_length = s0.length + s1.length + s2.length;
+   string result = String(PushArray(temp_memory, result_length, char, Arena_Clear), result_length);
+   
+   u32 i = 0;
+   for(u32 j = 0; j < s0.length; j++) result.text[i++] = s0.text[j];
+   for(u32 j = 0; j < s1.length; j++) result.text[i++] = s1.text[j];
+   for(u32 j = 0; j < s2.length; j++) result.text[i++] = s2.text[j];
+   
+   return result;
+}
+
+string Concat(string s0, string s1, string s2, string s3, TemporaryMemoryArena *temp_memory)
+{
+   u32 result_length = s0.length + s1.length + s2.length + s3.length;
+   string result = String(PushArray(temp_memory, result_length, char, Arena_Clear), result_length);
+   
+   u32 i = 0;
+   for(u32 j = 0; j < s0.length; j++) result.text[i++] = s0.text[j];
+   for(u32 j = 0; j < s1.length; j++) result.text[i++] = s1.text[j];
+   for(u32 j = 0; j < s2.length; j++) result.text[i++] = s2.text[j];
+   for(u32 j = 0; j < s3.length; j++) result.text[i++] = s3.text[j];
+   
+   return result;
+}
+
+string Concat(string s0, string s1, string s2, string s3, string s4, TemporaryMemoryArena *temp_memory)
+{
+   u32 result_length = s0.length + s1.length + s2.length + s3.length + s4.length;
+   string result = String(PushArray(temp_memory, result_length, char, Arena_Clear), result_length);
+   
+   u32 i = 0;
+   for(u32 j = 0; j < s0.length; j++) result.text[i++] = s0.text[j];
+   for(u32 j = 0; j < s1.length; j++) result.text[i++] = s1.text[j];
+   for(u32 j = 0; j < s2.length; j++) result.text[i++] = s2.text[j];
+   for(u32 j = 0; j < s3.length; j++) result.text[i++] = s3.text[j];
+   for(u32 j = 0; j < s4.length; j++) result.text[i++] = s4.text[j];
+   
+   return result;
+}
+
+string Concat(string s0, string s1, string s2, string s3, string s4, string s5, string s6,
+              TemporaryMemoryArena *temp_memory)
+{
+   u32 result_length = s0.length + s1.length + s2.length + s3.length + s4.length +
+                       s5.length + s6.length;
+   string result = String(PushArray(temp_memory, result_length, char, Arena_Clear), result_length);
+   
+   u32 i = 0;
+   for(u32 j = 0; j < s0.length; j++) result.text[i++] = s0.text[j];
+   for(u32 j = 0; j < s1.length; j++) result.text[i++] = s1.text[j];
+   for(u32 j = 0; j < s2.length; j++) result.text[i++] = s2.text[j];
+   for(u32 j = 0; j < s3.length; j++) result.text[i++] = s3.text[j];
+   for(u32 j = 0; j < s4.length; j++) result.text[i++] = s4.text[j];
+   for(u32 j = 0; j < s5.length; j++) result.text[i++] = s5.text[j];
+   for(u32 j = 0; j < s6.length; j++) result.text[i++] = s6.text[j];
    
    return result;
 }
@@ -564,7 +657,9 @@ u32 IndexOfNth(string str, u32 count, char c)
 
 u32 IndexOfFirst(string str, char c)
 {
-   return IndexOfNth(str, 0, 'c');
+   //NOTE: for some reason the c param was being passed as 'c'
+   //      guess i was having a bad day when i wrote this ¯\_(ツ)_/¯
+   return IndexOfNth(str, 0, c);
 }
 
 void InsertAt(string buffer, string str, u32 at)
