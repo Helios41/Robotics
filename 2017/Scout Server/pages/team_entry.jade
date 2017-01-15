@@ -15,63 +15,73 @@ block content
       button(id="scout_search_button") Search
    if teamid
       if team_data
-         p= teamid
+         p(align="center", style="font-size: 2em")= teamid
          each entry_element in entry_template
             .block
-               p= entry_element.name
+               p(align="center")= entry_element.name
                if (entry_element.type == "Number") || (entry_element.type == "Boolean")
                   div(id=entry_element.name.replace(" ", "_"), style="width: 600px;height: 300px;background-color: white;margin: 5px")
                else if entry_element.type == "String"
                   each data_entry in team_data
-                     p= data_entry[entry_element.name]
+                     div(style="border: white solid thin")
+                        span= "Match " + data_entry["match_number"]
+                        br
+                        span= "By: " + data_entry["name"]
+                        br
+                        p= data_entry[entry_element.name]
       else
          p= "No Data For This Team"
    else
-      p= "Search for a team"
+      if team_list.length > 0
+         each team_name in team_list
+            a(href="team_entry" + team_name)= team_name
+      else
+         p(align="center", style="font-size: 2em")= "No Team Data Yet ¯\_(ツ)_/¯"
       
 block script
    mixin scoutSearchScript("scout_search_button", "team_box")
    if teamid
       each entry_element in entry_template
-         script.
-            $(document).ready(function()
-            {
-               var team_data = !{JSON.stringify(team_data)};
-               
-               if(#{entry_element.type == "Number"})
+         if (entry_element.type == "Number") || (entry_element.type == "Boolean")
+            script.
+               $(document).ready(function()
                {
-                  var plot_points = [];
-                  for(var i = 0;
-                      i < team_data.length;
-                      i++)
+                  var team_data = !{JSON.stringify(team_data)};
+                  
+                  if(#{entry_element.type == "Number"})
                   {
-                     plot_points.push([team_data[i].match_number, parseInt(team_data[i]["#{entry_element.name}"])]);
+                     var plot_points = [];
+                     for(var i = 0;
+                         i < team_data.length;
+                         i++)
+                     {
+                        plot_points.push([team_data[i].match_number, parseInt(team_data[i]["#{entry_element.name}"])]);
+                     }
+                     $.plot("#" + "#{entry_element.name.replace(" ", "_")}", [plot_points]);
                   }
-                  $.plot("#" + "#{entry_element.name.replace(" ", "_")}", [plot_points]);
-               }
-               else if(#{entry_element.type == "Boolean"})
-               {
-                  var true_count = 0;
-                  var false_count = 0;
-                  for(var i = 0;
-                      i < team_data.length;
-                      i++)
+                  else if(#{entry_element.type == "Boolean"})
                   {
-                     if(team_data[i]["#{entry_element.name}"] == true)
+                     var true_count = 0;
+                     var false_count = 0;
+                     for(var i = 0;
+                         i < team_data.length;
+                         i++)
                      {
-                        true_count++;
+                        if(team_data[i]["#{entry_element.name}"] == true)
+                        {
+                           true_count++;
+                        }
+                        else
+                        {
+                           false_count++;
+                        }
                      }
-                     else
-                     {
-                        false_count++;
-                     }
+                     $.plot("#" + "#{entry_element.name.replace(" ", "_")}",
+                            [{label: "True", data: true_count, color: "#00FF00"},
+                             {label: "False", data: false_count, color: "#FF0000"}], 
+                            {series: {pie: { show: true }}});
                   }
-                  $.plot("#" + "#{entry_element.name.replace(" ", "_")}",
-                         [{label: "True", data: true_count, color: "#00FF00"},
-                          {label: "False", data: false_count, color: "#FF0000"}], 
-                         {series: {pie: { show: true }}});
-               }
-            });
-      
+               });
+         
 
    

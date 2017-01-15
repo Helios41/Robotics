@@ -18,8 +18,6 @@ block content
       each match_data in user_data.matches
          div(style="border: white solid thin")
             p(style="margin-top: 0; margin-bottom: 0")= "Match Number " + match_data.number
-            p(style="margin-top: 0; margin-bottom: 0")= "Red Alliance Teams are " + match_data.red_alliance[0] + ", " + match_data.red_alliance[1] + " and " + match_data.red_alliance[2]
-            p(style="margin-top: 0; margin-bottom: 0")= "Blue Alliance Teams are " + match_data.blue_alliance[0] + ", " + match_data.blue_alliance[1] + " and " + match_data.blue_alliance[2]
             p(style="margin-top: 0; margin-bottom: 0")= "You'll be watching " + match_data.assigned_team
             if !match_data.submitted
                button(id="goto_form_match" + match_data.number)= "Goto Form"

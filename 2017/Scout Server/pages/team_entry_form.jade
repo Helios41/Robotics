@@ -18,7 +18,9 @@ block content
          input(type="checkbox", id=entry_element.name.replace(" ", "_"))
          br
       else if entry_element.type == "Number"
-         input(type="number", id=entry_element.name.replace(" ", "_"))
+         input(type="number", id=entry_element.name.replace(" ", "_"), value=0)
+         button(onclick="$('#" + entry_element.name.replace(" ", "_") + "').val(parseInt($('#" + entry_element.name.replace(" ", "_") + "').val()) + 1)") Increment
+         button(onclick="$('#" + entry_element.name.replace(" ", "_") + "').val(parseInt($('#" + entry_element.name.replace(" ", "_") + "').val()) - 1)") Decrement
          br
    button(id="submit_form")= "Submit"
       
@@ -48,9 +50,7 @@ block script
             }
             else if($("#" + curr_input.id).attr('type') == 'number')
             {
-               var number_box_value = $("#" + curr_input.id).val();
-               if(number_box_value == '') form_complete = false;
-               submit_data[curr_input.id.replace("_", " ")] = number_box_value; 
+               submit_data[curr_input.id.replace("_", " ")] = $("#" + curr_input.id).val(); 
             }
             else if($("#" + curr_input.id).attr('type') == 'text')
             {
@@ -58,13 +58,6 @@ block script
             }
          }
          
-         if(form_complete)
-         {
-            socket.emit("submit_form", submit_data);
-            window.location.href = "home";
-         }
-         else
-         {
-            alert("Form Not Completely Filled In");
-         }
+         socket.emit("submit_form", submit_data);
+         window.location.href = "home";
       });

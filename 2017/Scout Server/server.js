@@ -23,12 +23,10 @@ function jadeCompile(viewname, locals)
    return jade.compileFile(("./pages/" + viewname + ".jade"), {})(render_data);
 }
 
-function MatchData(match_number, red_alliance, blue_alliance, assigned_team)
+function MatchData(match_number, assigned_team)
 {
    var result = {};
    result["number"] = match_number;
-   result["red_alliance"] = red_alliance;
-   result["blue_alliance"] = blue_alliance;
    result["assigned_team"] = assigned_team;
    result["submitted"] = false;
    return result;
@@ -78,7 +76,7 @@ function IngestScheduleCSV()
          result[name] = {matches: []};
       }
       
-      result[name].matches.push(MatchData(curr_row[0], [], [], curr_row[1]));
+      result[name].matches.push(MatchData(curr_row[0], curr_row[1]));
    }
    
    return result;
@@ -101,7 +99,8 @@ function DumpDatabase()
           entry_index++)
       {
          result = result + "   Match " + team_data[entry_index].match_number + "\n";
-
+         result = result + "   By " + team_data[entry_index].name + "\n";
+         
          for(var form_element_index = 0;
              form_element_index < form_definition.length;
              form_element_index++)
@@ -275,6 +274,10 @@ function renderTeamEntry(cookies, team_in)
       render_data["team_data"] = scouting_data[team];
       render_data["entry_template"] = form_definition;
    }
+   else
+   {
+      render_data["team_list"] = Object.keys(scouting_data);
+   }
    
    addPortals(render_data);
    return jadeCompile('team_entry', render_data);
@@ -296,6 +299,7 @@ function renderTeamEntryForm(cookies, match_number_in)
 }
 
 app.use('/assets', express.static("./assets"));
+app.use('/database_dump', express.static("./database_dump.txt"));
 
 var server = http.createServer(app);
 server.listen(3000, function()
