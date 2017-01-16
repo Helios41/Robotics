@@ -480,6 +480,11 @@ b32 operator== (ui_id a, ui_id b)
    return (a.a == b.a) && (a.b == b.b);
 }
 
+b32 operator!= (ui_id a, ui_id b)
+{
+   return (a.a != b.a) && (a.b != b.b);
+}
+
 ui_id UIID(u64 a, u64 b)
 {
    ui_id result = {a, b};
@@ -567,7 +572,7 @@ struct interaction_state
 interaction_state ClickInteraction(UIContext *context, interaction intrct, b32 trigger_cond, b32 active_cond, b32 hot_cond)
 {
    interaction_state result = {};
-   
+
    if(context->active_element.id == intrct.id)
    {
       if(trigger_cond)
@@ -587,19 +592,19 @@ interaction_state ClickInteraction(UIContext *context, interaction intrct, b32 t
    {
       if(active_cond)
       {
-         result.became_active = true;
+         result.became_active = (context->active_element.id != intrct.id);
          context->active_element = intrct;
       }
       
       if(!hot_cond)
          context->hot_element = NULL_INTERACTION;
    }
-
+   
    b32 can_set_hot = ((context->active_element.id == NULL_UI_ID) ||
                      (context->active_element.id == intrct.id)) &&
                      ((context->hot_element.stack_layer < intrct.stack_layer) ||
-                      ((context->hot_element.stack_layer == intrct.stack_layer) &&
-                       (context->hot_element.ui_layer < intrct.ui_layer)));
+                     ((context->hot_element.stack_layer == intrct.stack_layer) &&
+                     (context->hot_element.ui_layer < intrct.ui_layer)));
                      
    if(can_set_hot && hot_cond) 
    {
@@ -1194,18 +1199,20 @@ void _TextBox(ui_id id, layout *ui_layout, string buffer, v2 element_size, v2 pa
    
    if(text_box_interact.selected)
    {
+      u32 line_count = CountChar(buffer, '\n');
       u32 on_line = 0;
       
       for(u32 i = 0;
-          i < buffer.length;
-          i++)
+         i < buffer.length;
+         i++)
       {
          char c = buffer.text[i];
          
          if(on_line == context->text_box_line)
          {
-            curr_line = String(buffer.text + i,
-                               IndexOfFirst(String(buffer.text + i, buffer.length - i), '\n'));
+            string cut_buffer = String(buffer.text + i, buffer.length - i);
+            u32 line_length = (CountChar(cut_buffer, '\n') > 0) ? IndexOfFirst(cut_buffer, '\n') : buffer.length - i;
+            curr_line = String(buffer.text + i, line_length);
             break;
          }
          
@@ -1214,8 +1221,6 @@ void _TextBox(ui_id id, layout *ui_layout, string buffer, v2 element_size, v2 pa
             on_line++;
          }
       }
-      
-      u32 line_count = CountChar(buffer, '\n');
       
       Assert(curr_line.text != NULL);
       context->text_box_column = Clamp(0, curr_line.length, context->text_box_column);

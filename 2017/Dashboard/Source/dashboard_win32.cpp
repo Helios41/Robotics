@@ -161,6 +161,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    HGLRC gl_context = wglCreateContext(device_context);
    wglMakeCurrent(device_context, gl_context);
    
+   //TODO: load wgl vsync extension to enable vsync
+   
    UIAssets ui_assets = {};
    ui_assets.logo = LoadImage("logo.bmp");
    ui_assets.home = LoadImage("home.bmp");
@@ -202,18 +204,20 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    dashstate.robot.hardware_count = ArrayCount(test_hardware);
    dashstate.robot.name = Literal("Bob Ross");
    
+   TeleopDisplayOverlay driver_overlays[] = 
+   {
+      {true},
+      {true},
+      {false}
+   };
+   
+   dashstate.driver_display.overlay_count = ArrayCount(driver_overlays);
+   dashstate.driver_display.overlays = driver_overlays;
+   
    dashstate.net_settings.connect_to = String((char *) malloc(sizeof(char) * 30), 30);
    Clear(dashstate.net_settings.connect_to);
    CopyTo(Literal("roborio-4618-frc.local") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
    dashstate.net_settings.is_mdns = true;
-   
-   /*
-   InsertAt(lua_src, Literal("test_motor.set(0)\n"), 0);
-   InsertAt(lua_src, Literal("test_motor.set(0)\n"), IndexOfNth(lua_src, 0, '\n') + 1);
-   InsertAt(lua_src, Literal("test_solenoid.set(Extended)\n"), IndexOfNth(lua_src, 1, '\n') + 1);
-   InsertAt(lua_src, Literal("wait(2)\n"), IndexOfNth(lua_src, 2, '\n') + 1);
-   InsertAt(lua_src, Literal("test_solenoid.set(Retracted)\n"), IndexOfNth(lua_src, 3, '\n') + 1);
-   */
    
    volatile b32 running = true;
    volatile char *connect_to = NULL;
@@ -369,6 +373,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       
       //connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
 
+      if(dashstate.net_settings.reconnect)
+      {
+         RequestReconnect(&dashstate.net_settings, &net_params);
+         dashstate.net_settings.reconnect = false;
+      }
+      
       frame_length = GetCounter(&last_timer, timer_freq);
       ui_context.curr_time += frame_length / 1000.0f;
 #ifndef NO_FPS_LIMITER

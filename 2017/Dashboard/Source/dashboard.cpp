@@ -15,12 +15,23 @@ struct network_settings
    b32 reconnect;
 };
 
+enum ui_window_flags
+{
+   Flag_CloseRequested = (1 << 0),
+   Flag_TabExpanded = (1 << 1),
+   Flag_Undecorated = (1 << 2)
+};
+
 struct ui_window
 {
    ui_window_type type;
    v2 pos;
    v2 size;
    struct ui_window *next;
+   
+   v2 move_start_pos;
+   
+   u32 flags;
    
    union
    {
@@ -34,7 +45,8 @@ enum DashboardPage
    Page_AutonomousEditor,
    Page_Robot,
    Page_Vision,
-   Page_Console
+   Page_Console,
+   Page_Teleop
 };
 
 enum RobotHardwareType
@@ -83,6 +95,7 @@ struct Robot
    RobotHardware *hardware;
    u32 hardware_count;
    
+   b32 connected;
    string name;
    RobotHardware *selected_hardware;
 };
@@ -144,6 +157,17 @@ struct Console
    Notification *selected_notification;
 };
 
+struct TeleopDisplayOverlay
+{
+   b32 widget;
+};
+
+struct TeleopDisplay
+{
+   u32 overlay_count;
+   TeleopDisplayOverlay *overlays;
+};
+
 struct DashboardState
 {
    MemoryArena *generic_arena;
@@ -160,6 +184,9 @@ struct DashboardState
    Robot robot;
    AutonomousEditor auto_editor;
    Console console;
+   
+   TeleopDisplay driver_display;
+   TeleopDisplay op_display;
 };
 
 ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type type)
@@ -218,6 +245,7 @@ void RemoveWindow(DashboardState *dashstate, ui_window *window)
 #include "autonomous_editor.cpp"
 #include "robot.cpp"
 #include "console.cpp"
+#include "teleop.cpp"
 
 void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
 {
@@ -321,10 +349,13 @@ void DrawLeftBar(layout *left_bar, UIContext *context, DashboardState *dashstate
       dashstate->page = Page_AutonomousEditor;
    }
    
-   if(Button(left_bar, NULL, Literal("Robot"), (dashstate->page == Page_Robot),
-             V2(120, 40), V2(0, 0), V2(5, 5)).state)
+   if(dashstate->robot.connected)
    {
-      dashstate->page = Page_Robot;
+      if(Button(left_bar, NULL, Literal("Robot"), (dashstate->page == Page_Robot),
+                V2(120, 40), V2(0, 0), V2(5, 5)).state)
+      {
+         dashstate->page = Page_Robot;
+      }
    }
    
    if(Button(left_bar, NULL, Literal("Vision"), (dashstate->page == Page_Vision),
@@ -337,6 +368,12 @@ void DrawLeftBar(layout *left_bar, UIContext *context, DashboardState *dashstate
              V2(120, 40), V2(0, 0), V2(5, 5)).state)
    {
       dashstate->page = Page_Console;
+   }
+   
+   if(Button(left_bar, NULL, Literal("Teleop"), (dashstate->page == Page_Teleop),
+             V2(120, 40), V2(0, 0), V2(5, 5)).state)
+   {
+      dashstate->page = Page_Teleop;
    }
 }
 
@@ -409,22 +446,19 @@ void DrawHome(layout *center_area, UIContext *context, DashboardState *dashstate
    
    if(dashstate->connected)
    {
-      /*
-      char text_buffer[512];
-
-      if(robot_state.connected)
+      TemporaryMemoryArena temp_arena = BeginTemporaryMemory(dashstate->generic_arena);
+      if(dashstate->robot.connected)
       {	
-         Text(&context, V2(180, 130),
-            ConcatStrings("Connected To ", robot_state.name, text_buffer),
-            20);
+         Text(&connect_panel, Concat(Literal("Connected To "), dashstate->robot.name, &temp_arena),
+              20, V2(0, 0), V2(0, 5));
       }
       else
       {
-         Text(&context, V2(180, 130),
-            ConcatStrings("Connected To ", SERVER_ADDR, text_buffer),
-            20);
+         //TODO: make a "connected_to" that gets set by the network thread
+         Text(&connect_panel, Concat(Literal("Connected To "), dashstate->net_settings.connect_to, &temp_arena),
+              20, V2(0, 0), V2(0, 5));
       }
-      */
+      EndTemporaryMemory(temp_arena);
    }
    else
    {
@@ -435,17 +469,7 @@ void DrawHome(layout *center_area, UIContext *context, DashboardState *dashstate
    
    if(Button(&connect_panel, NULL, Literal("Reconnect"), V2(100, 40), V2(0, 0), V2(0, 0)).state)
    {
-      /*
-      shutdown(server_socket, SD_BOTH);
-      closesocket(server_socket);
-      server_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-      
-      server.sin_family = AF_INET;
-      server.sin_addr.s_addr = inet_addr(SERVER_ADDR);
-      server.sin_port = htons(SERVER_PORT);
-      
-      connected = (connect(server_socket, (struct sockaddr *)&server, sizeof(server)) == 0);
-      */
+      dashstate->net_settings.reconnect = true;
    }
 }
 
@@ -471,6 +495,10 @@ void DrawCenterArea(layout *center_area, UIContext *context, DashboardState *das
    {
       DrawConsole(center_area, context, dashstate);
    }
+   else if(dashstate->page == Page_Teleop)
+   {
+      DrawTeleop(center_area, context, dashstate);
+   }
 }
 
 void DrawBackground(UIContext *context)
@@ -495,7 +523,7 @@ void DrawNetworkSettings(layout *window_layout, network_settings *net_settings)
    
    if(Button(window_layout, NULL, Literal("Reconnect"), V2(120, 20), V2(0, 0), V2(0, 0)).state)
    {
-      
+      net_settings->reconnect = true;
    }
 }
 
@@ -505,9 +533,10 @@ void DrawWindowTab(layout *tab_layout, ui_window *window)
    
    v2 tab_button_size = V2(GetSize(tab_layout->bounds).y, GetSize(tab_layout->bounds).y);
    Rectangle(tab_layout, V4(0, 0, 0, 0), tab_button_size, V2(0, 0), V2(0, 0));
-   if(Button(tab_layout, NULL, EmptyString(), tab_button_size, V2(0, 0), V2(0, 0)).state)
+   
+   if(Button(tab_layout, NULL, Literal("Close"), tab_button_size, V2(0, 0), V2(0, 0)).state)
    {
-      
+      window->flags |= Flag_CloseRequested;
    }
 }
 
@@ -516,13 +545,22 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
    rect2 window_bounds = RectMinSize(window->pos, window->size);
    Rectangle(context->render_context, window_bounds, V4(0.7f, 0.7f, 0.7f, 1.0f));
    
-   ui_id tab_id = POINTER_UI_ID(window);
-   
    rect2 tab_bounds = RectPosSize(window->pos, V2(10, 10));
-   interaction_state tab_interact = ClickInteraction(context, Interaction(tab_id, 0, stack_layer, context), context->input_state.left_up,
+   interaction_state tab_interact = ClickInteraction(context, Interaction(POINTER_UI_ID(window), 0, stack_layer, context), context->input_state.left_up,
                                                      context->input_state.left_down, Contains(tab_bounds, context->input_state.pos));
    
-   if(tab_interact.selected)
+   if(tab_interact.became_active)
+   {
+      window->move_start_pos = context->input_state.pos;
+   }
+   
+   if(tab_interact.became_selected &&
+      (Distance(window->move_start_pos, context->input_state.pos) < 10))
+   {
+      window->flags = ((~window->flags) & Flag_TabExpanded) | ((~Flag_TabExpanded) & window->flags);
+   }
+   
+   if(window->flags & Flag_TabExpanded)
    {
       layout tab_layout = Layout(RectMinSize(window->pos - V2(7, 7), V2(window->size.x * 0.8, 14)), context, stack_layer);
       DrawWindowTab(&tab_layout, window);
@@ -532,10 +570,23 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
       Rectangle(context->render_context, tab_bounds, V4(0.0f, 0.0f, 0.0f, 1.0f));
    }
    
-   if(tab_interact.active)
+   if(tab_interact.active &&
+      (Distance(window->move_start_pos, context->input_state.pos) > 10))
    {
       window->pos = context->input_state.pos;
    }
+   
+   rect2 resize_tab_bounds = RectPosSize(window->pos + window->size, V2(10, 10));
+   interaction_state resize_tab_interact =
+      ClickInteraction(context, Interaction(POINTER_UI_ID(window), 0, stack_layer, context), context->input_state.left_up,
+                                            context->input_state.left_down, Contains(resize_tab_bounds, context->input_state.pos));
+                                          
+   if(resize_tab_interact.active)
+   {
+      window->size = context->input_state.pos - window->pos;
+   }
+   
+   Rectangle(context->render_context, resize_tab_bounds, V4(0.0f, 0.0f, 0.0f, 1.0f));
    
    layout window_layout = Layout(window_bounds, context, stack_layer);
    
@@ -555,7 +606,25 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
    {
       
    }
+   /*
+   else if(window->type == WindowType_DashboardUI)
+   {
+      
+   }
+   else if(window->type == WindowType_Teleop)
+   {
+      
+   }
+   */
 }
+
+/**
+TODO
+
+RESTRUCTURE THIS TO MAKE IT JUST ANOTHER WINDOW
+   -everything is a window
+   -make the dash ui just a fullscreened window
+*/
 
 //TODO: stop passing UIContext to everything
 void DrawDashboardUI(UIContext *context, DashboardState *dashstate)
@@ -588,6 +657,28 @@ void DrawDashboardUI(UIContext *context, DashboardState *dashstate)
    {
       DrawWindow(curr_window, context, stack_layer);
       stack_layer++;
+   }
+   
+   //NOTE: loop that closes windows that requested a close
+   for(ui_window *curr_window = dashstate->first_window;
+       curr_window;)
+   {
+      ui_window *op_window = curr_window;
+      curr_window = curr_window->next;
+      
+      if(op_window->flags & Flag_CloseRequested)
+      {
+         if(op_window->type == WindowType_DisplaySettings)
+         {
+            dashstate->display_settings_window = NULL;
+         }
+         else if(op_window->type == WindowType_NetworkSettings)
+         {
+            dashstate->network_settings_window = NULL;
+         }
+         
+         RemoveWindow(dashstate, op_window);
+      }
    }
    
    /**

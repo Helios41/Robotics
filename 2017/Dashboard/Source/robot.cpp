@@ -169,4 +169,9 @@ void DrawRobot(layout *robot_ui, UIContext *context, DashboardState *dashstate)
    {
       DrawSelectedHardwarePage(&selected_hardware_page, context, &dashstate->robot, dashstate->generic_arena);
    }
+   else
+   {
+      //TODO: draw a default robot info page (eg. name, game name, etc...)
+      //DrawRobotPage();
+   }
 }
