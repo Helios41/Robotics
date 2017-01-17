@@ -130,8 +130,7 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
       }
       else if(selected_hardware->type == Hardware_Solenoid)
       {
-         string solenoid_state_text = (latest_sample->solenoid == Solenoid_Extended) ?
-                                       Literal("State: Extended") : Literal("State: Retracted");
+         string solenoid_state_text = latest_sample->solenoid ? Literal("State: Extended") : Literal("State: Retracted");
          Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
       }
       else if(selected_hardware->type == Hardware_Drive)

@@ -17,6 +17,18 @@ void DrawDisplayConfig(layout *display_rect, TeleopDisplay *display_config)
    }
 }
 
+enum ControllerType
+{
+   Controller_LogitechF310,
+   Controller_Joystick_____
+};
+
+//NOTE: currently only drawing a list of buttons, will eventually draw a controller graphic
+void DrawController(layout *controller_panel)
+{
+   
+}
+
 //TODO: unify all the random magic numbers
 //      theme system for the colors, way to keep track of text scales, etc...
 void DrawTeleop(layout *teleop_ui, UIContext *context, DashboardState *dashstate)

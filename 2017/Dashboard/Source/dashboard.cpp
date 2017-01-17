@@ -4,8 +4,10 @@ enum ui_window_type
 {
    WindowType_DisplaySettings,
    WindowType_NetworkSettings,
-   WindowType_VideoStream,
-   WindowType_FileSelector
+   //WindowType_VideoStream,
+   //WindowType_FileSelector,
+   WindowType_CreateBlock,
+   WindowType_EditBlock
 };
 
 struct network_settings
@@ -36,6 +38,12 @@ struct ui_window
    union
    {
       network_settings *net_settings;
+      struct
+      {
+         struct CoroutineBlock *coroutine;
+         r32 scroll;
+      };
+      struct FunctionBlock *function;
    };
 };
 
@@ -49,23 +57,10 @@ enum DashboardPage
    Page_Teleop
 };
 
-enum RobotHardwareType
-{
-   Hardware_Motor,
-   Hardware_Solenoid,
-   Hardware_Drive
-};
-
-enum SolenoidState
-{
-   Solenoid_Extended,
-   Solenoid_Retracted
-};
-
 union RobotHardwareState
 {
    r32 motor;
-   SolenoidState solenoid;
+   b32 solenoid;
    struct
    {
       r32 forward;
@@ -79,6 +74,16 @@ struct RobotHardwareSample
    u64 timestamp;
 };
 
+enum RobotHardwareType
+{
+   Hardware_Motor,
+   Hardware_Solenoid,
+   Hardware_Drive, //TODO: special case the drive train, we'll always have one and only one
+   Hardware_Switch
+   //TODO: motor vs. motor + encoder
+   //TODO: camera/vision system
+};
+
 struct RobotHardware
 {
    RobotHardwareType type;
@@ -90,43 +95,109 @@ struct RobotHardware
    RobotHardwareSample *samples;
 };
 
+struct RobotBuiltinFunction
+{
+   string name;
+   u32 id;
+};
+
 struct Robot
 {
    RobotHardware *hardware;
    u32 hardware_count;
+   
+   RobotBuiltinFunction *functions;
+   u32 function_count;
    
    b32 connected;
    string name;
    RobotHardware *selected_hardware;
 };
 
-struct AutonomousBlock
+struct VisionConfig
 {
-   b32 is_wait_block;
+   //NOTE: HSV = Hue Saturation Value
+   v3 hsv_min;
+   v3 hsv_max;
    
+   //TODO: mask
+   
+   u32 camera_id;
+   u32 config_id;
+};
+
+enum ValueBlockType
+{
+   ValueBlock_Constant_Uint,
+   ValueBlock_Constant_Bool,
+   ValueBlock_Constant_Float,
+   ValueBlock_Constant_Vec2,
+   ValueBlock_Controller_Bool,
+   ValueBlock_Controller_Float,
+   ValueBlock_Controller_Vec2,
+   ValueBlock_Sensor_Bool,
+   ValueBlock_Sensor_Float,
+};
+
+struct ValueBlock
+{
+   ValueBlockType type;
    union
    {
-      struct
+      u32 uint_param;
+      b32 bool_param;
+      r32 float_param;
+      v2 vec2_param;
+      
+      //NOTE: ValueBlock_Controller_Bool & ValueBlock_Controller_Float
+      struct controller
       {
-         RobotHardware *hardware;
-         RobotHardwareState state;
+         u32 id;
+         u32 button_or_axis; //NOTE: button for bool, axis for float
       };
       
-      r32 wait_duration;
+      //NOTE: ValueBlock_Controller_Vec2
+      struct twoaxis_controller
+      {
+         u32 id;
+         u32 x_axis;
+         u32 y_axis;
+      };
+      
+      u32 sensor_id;
    };
+};
+
+enum FunctionBlockType 
+{
+   FunctionBlock_Wait,
+   FunctionBlock_Set,
+   FunctionBlock_Builtin,
+   FunctionBlock_Vision,
+   FunctionBlock_Goto
+};
+
+struct FunctionBlock
+{
+   FunctionBlockType type;
+   
+   //NOTE: must be the id of the drive train for FunctionBlock_Goto
+   u32 id; //NOTE: Unused for FunctionBlock_Wait
+   ValueBlock param; //NOTE: currently usused for FunctionBlock_Builtin
+};
+
+struct CoroutineBlock
+{
+   FunctionBlock blocks[4]; //TODO: make this dynamic
+   u32 block_count;
 };
 
 struct AutonomousEditor
 {
-   b32 is_lua_editor;
+   ui_window *create_block_window;
+   ui_window *edit_block_window;
    
-   AutonomousBlock editor_blocks[20];
-   u32 editor_block_count;
-   
-   AutonomousBlock *selected_block;
-   
-   b32 block_grabbed;
-   AutonomousBlock grabbed_block;
+   CoroutineBlock coroutine;
 };
 
 struct Notification
@@ -189,13 +260,14 @@ struct DashboardState
    TeleopDisplay op_display;
 };
 
-ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type type)
+ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type type, u32 flags = 0)
 {
    ui_window *new_window = (ui_window *) malloc(sizeof(ui_window));
    *new_window = {};
    new_window->size = size;
    new_window->pos = pos;
-   new_window->type = type;      
+   new_window->type = type;
+   new_window->flags = flags;
    new_window->next = dashstate->first_window;
    dashstate->first_window = new_window;
    
@@ -207,6 +279,7 @@ ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type 
    {
       new_window->net_settings = &dashstate->net_settings;
    }
+   /*
    else if(new_window->type == WindowType_VideoStream)
    {
       
@@ -215,6 +288,7 @@ ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type 
    {
       
    }
+   */
    
    return new_window;
 }
@@ -349,7 +423,7 @@ void DrawLeftBar(layout *left_bar, UIContext *context, DashboardState *dashstate
       dashstate->page = Page_AutonomousEditor;
    }
    
-   if(dashstate->robot.connected)
+   //if(dashstate->robot.connected)
    {
       if(Button(left_bar, NULL, Literal("Robot"), (dashstate->page == Page_Robot),
                 V2(120, 40), V2(0, 0), V2(5, 5)).state)
@@ -400,6 +474,7 @@ void DrawRightBar(layout *right_bar, UIContext *context, DashboardState *dashsta
             window_name = Literal("Network Settings");
             break;
             
+         /*
          case WindowType_VideoStream:
             window_name = Literal("Video");
             break;
@@ -407,21 +482,13 @@ void DrawRightBar(layout *right_bar, UIContext *context, DashboardState *dashsta
          case WindowType_FileSelector:
             window_name = Literal("File Selector");
             break;
+         */
       }
       
       //TODO: make this cleaner
       if(_Button(POINTER_UI_ID(op_window), right_bar, NULL, window_name, V2(bar_size.x * 0.9, 40), V2(0, 0), V2(bar_size.x * 0.05, 5)).state)
       {
-         if(op_window->type == WindowType_DisplaySettings)
-         {
-            dashstate->display_settings_window = NULL;
-         }
-         else if(op_window->type == WindowType_NetworkSettings)
-         {
-            dashstate->network_settings_window = NULL;
-         }
-         
-         RemoveWindow(dashstate, op_window);
+         op_window->flags |= Flag_CloseRequested;
       }
    }
 }
@@ -540,7 +607,7 @@ void DrawWindowTab(layout *tab_layout, ui_window *window)
    }
 }
 
-void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
+void DrawWindow(ui_window *window, DashboardState *dashstate, UIContext *context, u32 stack_layer)
 {
    rect2 window_bounds = RectMinSize(window->pos, window->size);
    Rectangle(context->render_context, window_bounds, V4(0.7f, 0.7f, 0.7f, 1.0f));
@@ -598,6 +665,7 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
    {
       DrawNetworkSettings(&window_layout, window->net_settings);
    }
+   /*
    else if(window->type == WindowType_VideoStream)
    {
       
@@ -606,6 +674,7 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
    {
       
    }
+   */
    /*
    else if(window->type == WindowType_DashboardUI)
    {
@@ -616,6 +685,14 @@ void DrawWindow(ui_window *window, UIContext *context, u32 stack_layer)
       
    }
    */
+   else if(window->type == WindowType_CreateBlock)
+   {
+      DrawCreateBlock(window, &window_layout, dashstate);
+   }
+   else if(window->type == WindowType_EditBlock)
+   {
+      DrawEditBlock(window, &window_layout, dashstate);
+   }
 }
 
 /**
@@ -655,7 +732,7 @@ void DrawDashboardUI(UIContext *context, DashboardState *dashstate)
        curr_window;
        curr_window = curr_window->next)
    {
-      DrawWindow(curr_window, context, stack_layer);
+      DrawWindow(curr_window, dashstate, context, stack_layer);
       stack_layer++;
    }
    
@@ -675,6 +752,14 @@ void DrawDashboardUI(UIContext *context, DashboardState *dashstate)
          else if(op_window->type == WindowType_NetworkSettings)
          {
             dashstate->network_settings_window = NULL;
+         }
+         else if(op_window->type == WindowType_CreateBlock)
+         {
+            dashstate->auto_editor.create_block_window = NULL;
+         }
+         else if(op_window->type == WindowType_EditBlock)
+         {
+            dashstate->auto_editor.edit_block_window = NULL;
          }
          
          RemoveWindow(dashstate, op_window);

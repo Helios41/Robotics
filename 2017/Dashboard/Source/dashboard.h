@@ -74,6 +74,43 @@ inline v4 V4(r32 x, r32 y, r32 z, r32 w)
    return result;
 }
 
+union v3
+{
+   struct
+   {
+      r32 x;
+      r32 y;
+      r32 z;
+   };
+   
+   struct
+   {
+      r32 r;
+      r32 g;
+      r32 b;
+   };
+   
+   struct
+   {
+      r32 h;
+      r32 s;
+      r32 v;
+   };
+   
+   r32 vs[3];
+};
+
+inline v3 V3(r32 x, r32 y, r32 z)
+{
+   v3 result = {};
+   
+   result.x = x;
+   result.y = y;
+   result.z = z;
+   
+   return result;
+}
+
 union v2
 {
    struct
