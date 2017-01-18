@@ -18,9 +18,9 @@ block content
          input(type="checkbox", id=entry_element.name.replace(" ", "_"))
          br
       else if entry_element.type == "Number"
-         input(type="number", id=entry_element.name.replace(" ", "_"), value=0)
-         button(onclick="$('#" + entry_element.name.replace(" ", "_") + "').val(parseInt($('#" + entry_element.name.replace(" ", "_") + "').val()) + 1)") Increment
-         button(onclick="$('#" + entry_element.name.replace(" ", "_") + "').val(parseInt($('#" + entry_element.name.replace(" ", "_") + "').val()) - 1)") Decrement
+         input(type="number", id=entry_element.name.split(" ").join("_"), value=0)
+         button(onclick="$('#" + entry_element.name.split(" ").join("_") + "').val(parseInt($('#" + entry_element.name.split(" ").join("_") + "').val()) + 1)") Increment
+         button(onclick="$('#" + entry_element.name.split(" ").join("_") + "').val(parseInt($('#" + entry_element.name.split(" ").join("_") + "').val()) - 1)") Decrement
          br
    button(id="submit_form")= "Submit"
       
@@ -46,15 +46,15 @@ block script
             
             if($("#" + curr_input.id).attr('type') == 'checkbox')
             {
-               submit_data[curr_input.id.replace("_", " ")] = $("#" + curr_input.id).is(':checked');
+               submit_data[curr_input.id.split("_").join(" ")] = $("#" + curr_input.id).is(':checked');
             }
             else if($("#" + curr_input.id).attr('type') == 'number')
             {
-               submit_data[curr_input.id.replace("_", " ")] = $("#" + curr_input.id).val(); 
+               submit_data[curr_input.id.split("_").join(" ")] = $("#" + curr_input.id).val(); 
             }
             else if($("#" + curr_input.id).attr('type') == 'text')
             {
-               submit_data[curr_input.id.replace("_", " ")] = $("#" + curr_input.id).val(); 
+               submit_data[curr_input.id.split("_").join(" ")] = $("#" + curr_input.id).val(); 
             }
          }
          

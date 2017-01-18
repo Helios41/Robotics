@@ -1,3 +1,10 @@
-Points,Number
-Is Good,Boolean
+Autonnomous Broke Line,Boolean
+Autonnomous Delivered Gear,Boolean
+Autonnomous High Goals,Number
+Autonnomous Low Goals,Number
+Autonnomous Notes,String
+Teleop High Goals,Number
+Teleop Low Goals,Number
+Number of Gears,Number
+Sucsessfully Climbed,Boolean
 Notes,String

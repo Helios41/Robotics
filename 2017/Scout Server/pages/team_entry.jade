@@ -20,15 +20,16 @@ block content
             .block
                p(align="center")= entry_element.name
                if (entry_element.type == "Number") || (entry_element.type == "Boolean")
-                  div(id=entry_element.name.replace(" ", "_"), style="width: 600px;height: 300px;background-color: white;margin: 5px")
+                  div(id=entry_element.name.split(" ").join("_"), style="width: 600px;height: 300px;background-color: white;margin: 5px")
                else if entry_element.type == "String"
                   each data_entry in team_data
-                     div(style="border: white solid thin")
-                        span= "Match " + data_entry["match_number"]
-                        br
-                        span= "By: " + data_entry["name"]
-                        br
-                        p= data_entry[entry_element.name]
+                     if data_entry[entry_element.name].length > 0
+                        div(style="border: white solid thin")
+                           span= "Match " + data_entry["match_number"]
+                           br
+                           span= "By: " + data_entry["name"]
+                           br
+                           p= data_entry[entry_element.name]
       else
          p= "No Data For This Team"
    else
@@ -57,7 +58,7 @@ block script
                      {
                         plot_points.push([team_data[i].match_number, parseInt(team_data[i]["#{entry_element.name}"])]);
                      }
-                     $.plot("#" + "#{entry_element.name.replace(" ", "_")}", [plot_points]);
+                     $.plot("#" + "#{entry_element.name.split(" ").join("_")}", [plot_points]);
                   }
                   else if(#{entry_element.type == "Boolean"})
                   {
@@ -76,7 +77,7 @@ block script
                            false_count++;
                         }
                      }
-                     $.plot("#" + "#{entry_element.name.replace(" ", "_")}",
+                     $.plot("#" + "#{entry_element.name.split(" ").join("_")}",
                             [{label: "True", data: true_count, color: "#00FF00"},
                              {label: "False", data: false_count, color: "#FF0000"}], 
                             {series: {pie: { show: true }}});
