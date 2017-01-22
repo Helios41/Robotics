@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include "dashboard.h"
-#include "packet_definitions.h"
 #include "dashboard.cpp"
 #include "network_win32.cpp"
 
@@ -391,12 +390,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    //NOTE: release net semaphore to give the net thread a chance to exit
    ReleaseSemaphore(net_semaphore, 1, NULL);
-   
-   /*
-   shutdown(server_socket, SD_BOTH);
-   closesocket(server_socket);
-   */
-   WSACleanup();
  
    WaitForSingleObject(network_thread, INFINITE);
    CloseHandle(network_thread);

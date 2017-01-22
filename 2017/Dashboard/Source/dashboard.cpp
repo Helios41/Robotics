@@ -66,6 +66,8 @@ union RobotHardwareState
       r32 forward;
       r32 rotate;
    };
+   b32 _switch; //switch is used in C so ¯\_(ツ)_/¯
+   r32 distance_sensor;
 };  
 
 struct RobotHardwareSample
@@ -79,9 +81,10 @@ enum RobotHardwareType
    Hardware_Motor,
    Hardware_Solenoid,
    Hardware_Drive, //TODO: special case the drive train, we'll always have one and only one
-   Hardware_Switch
+   Hardware_Switch,
+   Hardware_Camera,
+   Hardware_DistanceSensor
    //TODO: motor vs. motor + encoder
-   //TODO: camera/vision system
 };
 
 struct RobotHardware
@@ -103,14 +106,15 @@ struct RobotBuiltinFunction
 
 struct Robot
 {
+   b32 connected;
+   string name;
+   
    RobotHardware *hardware;
    u32 hardware_count;
    
    RobotBuiltinFunction *functions;
    u32 function_count;
    
-   b32 connected;
-   string name;
    RobotHardware *selected_hardware;
 };
 
@@ -197,6 +201,7 @@ struct AutonomousEditor
    ui_window *create_block_window;
    ui_window *edit_block_window;
    
+   string name;
    CoroutineBlock coroutine;
 };
 
@@ -246,7 +251,6 @@ struct DashboardState
    b32 competition_mode;
    DashboardPage page;
    ui_window *first_window;
-   b32 connected;
    network_settings net_settings;
    
    ui_window *network_settings_window;
@@ -316,6 +320,8 @@ void RemoveWindow(DashboardState *dashstate, ui_window *window)
    free(window);
 }
 
+#include "blocklang.cpp"
+
 #include "autonomous_editor.cpp"
 #include "robot.cpp"
 #include "console.cpp"
@@ -345,7 +351,7 @@ void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
       dashstate->console.selected_notification = NULL;
    }
    
-   Rectangle(&notification_bar, dashstate->connected ? V4(1.0f, 1.0f, 1.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f),
+   Rectangle(&notification_bar, dashstate->robot.connected ? V4(1.0f, 1.0f, 1.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f),
              top_bar_element_size, V2(0, 0), top_bar_element_margin);
              
    BeginTicketMutex(&dashstate->console.notification_mutex);
@@ -511,20 +517,13 @@ void DrawHome(layout *center_area, UIContext *context, DashboardState *dashstate
    RectangleOutline(context->render_context, connect_panel.bounds, V4(0.0f, 0.0f, 0.0f, 1.0f), 3);
    Text(&connect_panel, Literal("Connection"), 20, V2(0, 0), V2(0, 5));
    
-   if(dashstate->connected)
+   if(dashstate->robot.connected)
    {
       TemporaryMemoryArena temp_arena = BeginTemporaryMemory(dashstate->generic_arena);
-      if(dashstate->robot.connected)
-      {	
-         Text(&connect_panel, Concat(Literal("Connected To "), dashstate->robot.name, &temp_arena),
-              20, V2(0, 0), V2(0, 5));
-      }
-      else
-      {
-         //TODO: make a "connected_to" that gets set by the network thread
-         Text(&connect_panel, Concat(Literal("Connected To "), dashstate->net_settings.connect_to, &temp_arena),
-              20, V2(0, 0), V2(0, 5));
-      }
+      
+      Text(&connect_panel, Concat(Literal("Connected To "), dashstate->robot.name, &temp_arena),
+           20, V2(0, 0), V2(0, 5));
+           
       EndTemporaryMemory(temp_arena);
    }
    else

@@ -1,3 +1,5 @@
+#include "packet_definitions.h"
+
 struct net_main_params
 {
 	volatile b32 *running;
@@ -23,7 +25,14 @@ void RequestReconnect(network_settings *net_settings, net_main_params *params)
    }
 }
 
-void NetThread_Reconnect(net_main_params *params, Notification *network_notification)
+struct NetworkState
+{
+   SOCKET socket;
+   struct sockaddr_in server_info;
+};
+
+void NetThread_Reconnect(NetworkState *net_state, net_main_params *params,
+                         Notification *network_notification)
 {  
    //TODO: make the notification system cache its messages so we dont have
    //      to worry about the lifetime of the strings we pass
@@ -31,9 +40,9 @@ void NetThread_Reconnect(net_main_params *params, Notification *network_notifica
             /*"Attempting to connect to: "*/ Literal((char *) params->connect_to),
             network_notification);
    
-   char *host_ip = params->use_mdns ? NULL : (char *) params->connect_to;
+   char *host_ip = *params->use_mdns ? NULL : (char *) params->connect_to;
    
-   if(params->use_mdns)
+   if(*params->use_mdns)
    {
       hostent *robot_server = gethostbyname((char *) params->connect_to);
    
@@ -58,25 +67,23 @@ void NetThread_Reconnect(net_main_params *params, Notification *network_notifica
    
    if(host_ip)
    {
-      //NOTE: open a DATAGRAM connection
-      SOCKET server_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-      b32 is_nonblocking = true;
-      ioctlsocket(server_socket, FIONBIO, (u_long *)&is_nonblocking);
-   
-      struct sockaddr_in server;
-      server.sin_family = AF_INET;
-   
-      server.sin_addr.s_addr = inet_addr(host_ip);
-      server.sin_port = htons(8089);
-   
-      connect(server_socket, (struct sockaddr *)&server, sizeof(server));
+      net_state->server_info.sin_family = AF_INET;
+      net_state->server_info.sin_addr.s_addr = inet_addr(host_ip);
+      net_state->server_info.sin_port = htons(5800);
+      
+      generic_packet_header packet = {};
+      packet.size = sizeof(packet);
+      packet.type = PACKET_TYPE_JOIN;
+      
+      sendto(net_state->socket, (const char *) &packet, sizeof(packet), 0,
+             (struct sockaddr *) &net_state->server_info, sizeof(net_state->server_info));
    }
    
    //NOTE: we're not freeing here because we pass the connect_to string to the console
    //free((void *) params->connect_to);
    params->connect_to = NULL;
    
-   //connect_status = ?;
+   //InterlockedExchange(params->connect_status, ?);
    InterlockedExchange(params->reconnect, false);
 }
 
@@ -94,7 +101,23 @@ DWORD NetMain(LPVOID *data)
    AddMessage((Console *) &params->dashstate->console,
               Literal("Starting Network Thread"), network_notification);
    
-	while(*params->running)
+   u_long non_blocking = true;
+   NetworkState net_state = {};
+   
+   struct sockaddr_in client_info = {};
+   client_info.sin_family = AF_INET;
+   client_info.sin_addr.s_addr = htonl(INADDR_ANY);
+   client_info.sin_port = htons(5800);
+   
+   net_state.socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+   ioctlsocket(net_state.socket, FIONBIO, &non_blocking);
+	if(bind(net_state.socket, (struct sockaddr *) &client_info, sizeof(client_info)) == SOCKET_ERROR)
+   {
+      AddMessage((Console *) &params->dashstate->console,
+              Literal("Bind Failed"), network_notification);
+   }
+   
+   while(*params->running)
 	{
       AddMessage((Console *) &params->dashstate->console,
                  Literal("Waiting On Semaphore"), network_notification);
@@ -109,13 +132,58 @@ DWORD NetMain(LPVOID *data)
             */
             if(*params->reconnect)
             {
-               NetThread_Reconnect(params, network_notification);
+               NetThread_Reconnect(&net_state, params, network_notification);
             }
             /*
          }
       }
       */
+      
+      b32 has_packets = true;
+      
+      while(has_packets)
+      {
+         char buffer[512] = {};
+         
+         struct sockaddr_in sender_info = {};
+         int sender_info_size = sizeof(sender_info);
+         
+         int recv_return = recvfrom(net_state.socket, buffer, sizeof(buffer), 0,
+                                    (struct sockaddr *) &sender_info, &sender_info_size);
+         
+         //TODO: check that sender_info equals net_state.server_info
+         
+         if(recv_return == SOCKET_ERROR)
+         {
+            int wsa_error = WSAGetLastError();
+            
+            if(wsa_error == WSAEWOULDBLOCK)
+            {
+               has_packets = false;
+            }
+            else if(wsa_error != 0)
+            {
+               
+            }
+         }
+         else
+         {
+            generic_packet_header *header = (generic_packet_header *) buffer;
+            
+            if(header->type == PACKET_TYPE_WELCOME)
+            {
+               AddMessage((Console *) &params->dashstate->console,
+                          Literal("Welcome Packet Recieved"), network_notification);
+            }
+         }
+      }
 	}
 
+   /*
+   shutdown(server_socket, SD_BOTH);
+   closesocket(server_socket);
+   */
+   WSACleanup();
+   
 	return 0;
 }

@@ -26,7 +26,7 @@ struct generic_packet_header
 {
    //TODO: maybe switch this back to u32 cuz our video packets may be huge
    //NOTE: bandwith is limited to 7Mbit/sec
-	uint16_t size;
+	uint16_t size; //NOTE: not really needed, we're UDP now, no more working around streaming
 	uint8_t type;
 };
 
