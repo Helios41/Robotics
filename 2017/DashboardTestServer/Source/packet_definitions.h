@@ -121,17 +121,17 @@ struct value_block
          float vec2_param_x;
          float vec2_param_y;
       };
-      struct controller
+      struct
       {
          uint32_t id;
          uint32_t button_or_axis;
-      };
-      struct twoaxis_controller
+      } controller;
+      struct
       {
          uint32_t id;
          uint32_t x_axis;
          uint32_t y_axis;
-      };
+      } twoaxis_controller;
       uint32_t sensor_id;
    };
 };

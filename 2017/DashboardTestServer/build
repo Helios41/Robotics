@@ -1,0 +1,9 @@
+pushd Source > /dev/null
+
+cc dashboard_test_server_linux.cpp -o dashboard_test_server_linux
+cp ./dashboard_test_server_linux ../Build/
+rm dashboard_test_server_linux
+
+popd > /dev/null
+read -rsp $'Press enter to exit...\n'
+exit
