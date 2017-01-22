@@ -117,11 +117,14 @@ DWORD NetMain(LPVOID *data)
               Literal("Bind Failed"), network_notification);
    }
    
+   //TODO: this doesnt need to be multithreaded anymore by the looks of it, switch back to single thread
    while(*params->running)
 	{
+#if 0
       AddMessage((Console *) &params->dashstate->console,
                  Literal("Waiting On Semaphore"), network_notification);
       WaitForSingleObject(params->net_semaphore, INFINITE);
+#endif 
       
       //TODO: packet send & recieve que
       /*
