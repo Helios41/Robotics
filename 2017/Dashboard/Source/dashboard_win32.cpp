@@ -2,13 +2,16 @@
 #include <Ws2tcpip.h>
 #include <windows.h>
 
+#include <gl/gl.h>
+#include "wglext.h"
+
 #include "dashboard.h"
 #include "dashboard.cpp"
 #include "network_win32.cpp"
 
 //NOTE: this disables the fps limiter, remove this on ligit builds
 //      if we're burning core on the main thread
-#define NO_FPS_LIMITER
+//#define NO_FPS_LIMITER
 
 LRESULT CALLBACK WindowMessageEvent(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {	
@@ -160,8 +163,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    HGLRC gl_context = wglCreateContext(device_context);
    wglMakeCurrent(device_context, gl_context);
    
-   //TODO: load wgl vsync extension to enable vsync
-   
+   PFNWGLSWAPINTERVALEXTPROC wglSwapInterval = (PFNWGLSWAPINTERVALEXTPROC) wglGetProcAddress("wglSwapIntervalEXT");
+#ifndef NO_FPS_LIMITER
+   if(wglSwapInterval)
+   {
+      wglSwapInterval(1);
+   }
+#endif
+      
    UIAssets ui_assets = {};
    ui_assets.logo = LoadImage("logo.bmp");
    ui_assets.home = LoadImage("home.bmp");
@@ -366,7 +375,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       char ui_time_buffer[64];
       Rectangle(&context, RectMinSize(V2(200, 80), V2(200, 20)), V4(0, 0, 0, 0.5));
       Text(&context, V2(200, 80), Literal(R64ToString(ui_context.curr_time, frame_time_buffer)), 20);
-      
+
+#ifndef NO_FPS_LIMITER	  
+	  Rectangle(&context, RectMinSize(V2(200, 100), V2(200, 20)), V4(0, 0, 0, 0.5));
+	  Text(&context, V2(200, 100), wglSwapInterval ? Literal("wglSwapInterval") : Literal("Sleep"), 20);
+#endif
+	  
       RenderUI(&context, window_size);
       SwapBuffers(device_context);
       
@@ -381,7 +395,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       frame_length = GetCounter(&last_timer, timer_freq);
       ui_context.curr_time += frame_length / 1000.0f;
 #ifndef NO_FPS_LIMITER
-      if(frame_length < 33.3)
+      if(!wglSwapInterval && (frame_length < 33.3))
       {
          Sleep(33.3 - frame_length);
       }

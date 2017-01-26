@@ -87,6 +87,54 @@ void NetThread_Reconnect(NetworkState *net_state, net_main_params *params,
    InterlockedExchange(params->reconnect, false);
 }
 
+void HandlePacket(u8 *buffer)
+{
+   generic_packet_header *header = (generic_packet_header *) buffer;
+    
+   if(header->type == PACKET_TYPE_WELCOME)
+   {
+      /*
+	  AddMessage((Console *) &params->dashstate->console,
+                 Literal("Welcome Packet Recieved"), network_notification);
+	  */
+   }
+}
+
+void HandlePackets(NetworkState *net_state)
+{
+	b32 has_packets = true;
+    while(has_packets)
+    {
+		char buffer[512] = {};
+         
+        struct sockaddr_in sender_info = {};
+        int sender_info_size = sizeof(sender_info);
+        
+        int recv_return = recvfrom(net_state->socket, buffer, sizeof(buffer), 0,
+                                   (struct sockaddr *) &sender_info, &sender_info_size);
+        
+        //TODO: check that sender_info equals net_state.server_info
+        
+        if(recv_return == SOCKET_ERROR)
+        {
+			int wsa_error = WSAGetLastError();
+           
+			if(wsa_error == WSAEWOULDBLOCK)
+			{
+				has_packets = false;
+			}
+			else if(wsa_error != 0)
+			{
+              
+			}
+        }
+        else
+        {
+			HandlePacket((u8 *)buffer);
+        }
+	}	
+}
+
 //TODO: functions that send packets to the connected server
 
 DWORD NetMain(LPVOID *data)
@@ -141,46 +189,10 @@ DWORD NetMain(LPVOID *data)
          }
       }
       */
-      
-      b32 has_packets = true;
-      
-      while(has_packets)
-      {
-         char buffer[512] = {};
-         
-         struct sockaddr_in sender_info = {};
-         int sender_info_size = sizeof(sender_info);
-         
-         int recv_return = recvfrom(net_state.socket, buffer, sizeof(buffer), 0,
-                                    (struct sockaddr *) &sender_info, &sender_info_size);
-         
-         //TODO: check that sender_info equals net_state.server_info
-         
-         if(recv_return == SOCKET_ERROR)
-         {
-            int wsa_error = WSAGetLastError();
-            
-            if(wsa_error == WSAEWOULDBLOCK)
-            {
-               has_packets = false;
-            }
-            else if(wsa_error != 0)
-            {
-               
-            }
-         }
-         else
-         {
-            generic_packet_header *header = (generic_packet_header *) buffer;
-            
-            if(header->type == PACKET_TYPE_WELCOME)
-            {
-               AddMessage((Console *) &params->dashstate->console,
-                          Literal("Welcome Packet Recieved"), network_notification);
-            }
-         }
-      }
+
+	  HandlePackets(&net_state);
 	}
+      
 
    /*
    shutdown(server_socket, SD_BOTH);
