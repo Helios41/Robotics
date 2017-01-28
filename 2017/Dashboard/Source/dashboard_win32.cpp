@@ -188,6 +188,28 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    WSADATA winsock_data = {};
    WSAStartup(MAKEWORD(2, 2), &winsock_data);
 
+   NetworkState net_state = {};
+   
+   {
+      struct sockaddr_in client_info = {};
+      client_info.sin_family = AF_INET;
+      client_info.sin_addr.s_addr = htonl(INADDR_ANY);
+      client_info.sin_port = htons(5800);
+   
+      net_state.socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+      u_long non_blocking = true;
+      ioctlsocket(net_state.socket, FIONBIO, &non_blocking);
+      net_state.bound = (bind(net_state.socket, (struct sockaddr *) &client_info, sizeof(client_info)) != SOCKET_ERROR);
+   }
+   
+   /*
+   if(!net_state.bound)
+   {
+      AddMessage((Console *) &params->dashstate->console,
+              Literal("Bind Failed"), network_notification);
+   }
+   */
+   
    //TODO: move state initialization out of the platform layer & organize it
    MemoryArena generic_arena = {};
    InitMemoryArena(&generic_arena, VirtualAlloc(0, Megabyte(64), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE), Megabyte(64));
@@ -198,19 +220,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    ui_context.render_context = &context;
    ui_context.assets = &ui_assets;
    
-   RobotHardware test_hardware[] = 
-   {
-      {Hardware_Motor, 0, Literal("Test Motor"), 30, 0, PushArray(&generic_arena, 30, RobotHardwareSample, Arena_Clear)},
-      {Hardware_Solenoid, 1, Literal("Test Solenoid"), 30, 0, PushArray(&generic_arena, 30, RobotHardwareSample, Arena_Clear)},
-      {Hardware_Drive, 2, Literal("Test Drive"), 30, 0, PushArray(&generic_arena, 30, RobotHardwareSample, Arena_Clear)}
-   };
-   
    DashboardState dashstate = {};
-   
    dashstate.generic_arena = &generic_arena;
-   dashstate.robot.hardware = test_hardware;
-   dashstate.robot.hardware_count = ArrayCount(test_hardware);
-   dashstate.robot.name = Literal("Bob Ross");
    
    TeleopDisplayOverlay driver_overlays[] = 
    {
@@ -227,38 +238,23 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    CopyTo(Literal("roborio-4618-frc.local") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
    dashstate.net_settings.is_mdns = true;
    
-   volatile b32 running = true;
-   volatile char *connect_to = NULL;
-   volatile b32 use_mdns = false;
-   volatile b32 reconnect = false;
-   volatile b32 connect_status = false;
-   volatile HANDLE net_semaphore = CreateSemaphore(0, 1, 1, NULL);
-   
-   net_main_params net_params = {};
-   net_params.running = &running;
-   net_params.connect_to = connect_to;
-   net_params.use_mdns = &use_mdns;
-   net_params.reconnect = &reconnect;
-   net_params.connect_status = &connect_status;
-   net_params.dashstate = &dashstate;
-   net_params.net_semaphore = net_semaphore;
-   
-   HANDLE network_thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)NetMain, &net_params, 0, NULL);
-   
-   RequestReconnect(&dashstate.net_settings, &net_params);
+   b32 running = true;
    
    Notification *vision_notification =
       AddNotification((Console *) &dashstate.console, Literal("Vision"));
+   Notification *network_notification =
+      AddNotification((Console *) &dashstate.console, Literal("Network"));
    
    AddMessage((Console *) &dashstate.console,
               Literal("Vision System Not Present XD"), vision_notification);
+   
+   NetworkReconnect(&net_state, &dashstate.net_settings);
    
    b32 update_mouse = true;
    
    ShowWindow(window, nCmdShow);
    UpdateWindow(window);
    
-   //connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
    GetCounter(&last_timer, timer_freq);
    while(running)
    {
@@ -364,6 +360,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       
       DrawDashboardUI(&ui_context, &dashstate);
      
+      HandlePackets(&net_state, &dashstate.robot, ui_context.curr_time);
+	  //dashstate->robot.connected = 1.0f > (net_state->last_packet - ui_context.curr_time);
+	 
       char frame_time_buffer[64];
       Rectangle(&context, RectMinSize(V2(200, 40), V2(200, 20)), V4(0, 0, 0, 0.5));
       Text(&context, V2(200, 40), Literal(R64ToString(frame_length, frame_time_buffer)), 20);
@@ -384,14 +383,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       RenderUI(&context, window_size);
       SwapBuffers(device_context);
       
-      //connected = HandleNetwork(server_socket, &auto_builder_state, &robot_state, &console_state);
-
-      if(dashstate.net_settings.reconnect)
-      {
-         RequestReconnect(&dashstate.net_settings, &net_params);
-         dashstate.net_settings.reconnect = false;
-      }
-      
       frame_length = GetCounter(&last_timer, timer_freq);
       ui_context.curr_time += frame_length / 1000.0f;
 #ifndef NO_FPS_LIMITER
@@ -402,12 +393,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 #endif
    }
    
-   //NOTE: release net semaphore to give the net thread a chance to exit
-   ReleaseSemaphore(net_semaphore, 1, NULL);
- 
-   WaitForSingleObject(network_thread, INFINITE);
-   CloseHandle(network_thread);
-   CloseHandle(net_semaphore);
+   shutdown(net_state.socket, SD_BOTH);
+   closesocket(net_state.socket);
+   WSACleanup();
    
    return 0;
 }

@@ -20,6 +20,7 @@ typedef uint32_t b32;
 #define Gigabyte(BYTE) Megabyte(BYTE) * 1024
 #define Terabyte(BYTE) Gigabyte(BYTE) * 1024
 #define Assert(condition) if(!(condition)){*(u8 *)0 = 0;}
+#define InvalidCodePath Assert(false)
 #define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
 #define Min(a, b) (((a) > (b)) ? (b) : (a))
 #define Max(a, b) (((a) < (b)) ? (b) : (a))

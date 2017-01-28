@@ -22,6 +22,8 @@
 
 #define PACKET_TYPE_DEBUG_MESSAGE 10 //server -> client
 
+#define PACKET_TYPE_PING 11
+
 struct generic_packet_header
 {
    //TODO: maybe switch this back to u32 cuz our video packets may be huge
@@ -49,6 +51,7 @@ struct welcome_packet_header
 #define HARDWARE_TYPE_SWITCH 4
 #define HARDWARE_TYPE_CAMERA 5  
 #define HARDWARE_TYPE_DISTANCE_SENSOR 6
+#define HARDWARE_TYPE_LIGHT 7
 
 struct robot_hardware
 {
@@ -64,31 +67,32 @@ struct robot_function
 };
 
 //NOTE: PACKET_TYPE_HARDWARE_SAMPLE
-struct hardware_sample_header
+struct hardware_sample_packet_header
 {
-	generic_packet_header header;
+   generic_packet_header header;
 	
    uint8_t id;
-	uint8_t type;
+   uint8_t type;
    
    uint64_t timestamp; //NOTE: call time(NULL) and cast to u64
    
-	union
-	{
-		float motor;
-		uint32_t solenoid;
-		struct
-		{
-			float forward;
-			float rotate;
-		};
-		uint32_t _switch;
+   union
+   {
+      float motor;
+	  uint32_t solenoid;
+	  struct
+	  {
+	     float forward;
+		 float rotate;
+	  };
+	  uint32_t _switch;
       float distance_sensor;
+	  uint32_t light;
 	};
 };
 
 //NOTE: PACKET_TYPE_UPLOAD_AUTONOMOUS
-struct upload_autonomous_header
+struct upload_autonomous_packet_header
 {
    generic_packet_header header;
    
@@ -159,7 +163,7 @@ struct function_block
 //NOTE: PACKET_TYPE_REQUEST_UPLOADED_STATE uses generic_packet_header, no additional information
 
 //NOTE: PACKET_TYPE_UPLOADED_STATE
-struct uploaded_state_header
+struct uploaded_state_packet_header
 {
    generic_packet_header header;
    
@@ -176,12 +180,14 @@ struct uploaded_state_header
 //WIP
 
 //NOTE: PACKET_TYPE_DEBUG_MESSAGE
-struct debug_message_header
+struct debug_message_packet_header
 {
 	generic_packet_header header;
    
 	char text[32];
 };
+
+//NOTE: PACKET_TYPE_PING uses generic_packet_header, no additional information
 
 #pragma pack(pop)
 

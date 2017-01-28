@@ -48,13 +48,11 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
    layout time_graph = Panel(selected_hardware_page, V2(GetSize(selected_hardware_page->bounds).x - 10, GetSize(selected_hardware_page->bounds).y * 0.45), V2(0, 0), V2(5, 5)).lout;
    NextLine(selected_hardware_page);
    
-   u32 earliest_sample_index = Min(selected_hardware->at_sample - 1, selected_hardware->sample_count - 1) % selected_hardware->sample_count;
-      
    u64 earliest_timestamp = MAX_U64;
    u64 latest_timestamp = MIN_U64;
       
    for(u32 i = 0;
-       i < selected_hardware->sample_count;
+       i < ArrayCount(selected_hardware->samples);
        i++)
    {
       RobotHardwareSample *curr = selected_hardware->samples + i;
@@ -65,7 +63,7 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
    RobotHardwareState *latest_sample = NULL;
    
    for(u32 i = 0;
-       i < selected_hardware->sample_count;
+       i < ArrayCount(selected_hardware->samples);
        i++)
    {
       RobotHardwareSample *curr = selected_hardware->samples + i;
@@ -86,7 +84,7 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
       r32 y_axis_scale = GetSize(time_graph.bounds).y / 2.0f;
    
       for(u32 i = 0;
-          i < (selected_hardware->sample_count - 1);
+          i < (ArrayCount(selected_hardware->samples) - 1);
           i++)
       {
          //TODO: finish this once we have the server so we can test

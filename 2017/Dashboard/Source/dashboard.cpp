@@ -14,7 +14,6 @@ struct network_settings
 {
    string connect_to;
    b32 is_mdns;
-   b32 reconnect;
 };
 
 enum ui_window_flags
@@ -68,6 +67,7 @@ union RobotHardwareState
    };
    b32 _switch; //switch is used in C so ¯\_(ツ)_/¯
    r32 distance_sensor;
+   b32 light;
 };  
 
 struct RobotHardwareSample
@@ -83,8 +83,8 @@ enum RobotHardwareType
    Hardware_Drive, //TODO: special case the drive train, we'll always have one and only one
    Hardware_Switch,
    Hardware_Camera,
-   Hardware_DistanceSensor
-   //TODO: motor vs. motor + encoder
+   Hardware_DistanceSensor,
+   Hardware_Light
 };
 
 struct RobotHardware
@@ -93,9 +93,8 @@ struct RobotHardware
    u32 id;
    string name;
    
-   u32 sample_count;
    u32 at_sample;
-   RobotHardwareSample *samples;
+   RobotHardwareSample samples[64];
 };
 
 struct RobotBuiltinFunction
@@ -247,6 +246,7 @@ struct TeleopDisplay
 struct DashboardState
 {
    MemoryArena *generic_arena;
+   struct NetworkState *net_state;
    
    b32 competition_mode;
    DashboardPage page;
@@ -499,6 +499,8 @@ void DrawRightBar(layout *right_bar, UIContext *context, DashboardState *dashsta
    }
 }
 
+void NetworkReconnect(NetworkState *net_state, network_settings *net_settings);
+
 void DrawHome(layout *center_area, UIContext *context, DashboardState *dashstate)
 {
    v2 center_area_size = GetSize(center_area->bounds);
@@ -535,7 +537,7 @@ void DrawHome(layout *center_area, UIContext *context, DashboardState *dashstate
    
    if(Button(&connect_panel, NULL, Literal("Reconnect"), V2(100, 40), V2(0, 0), V2(0, 0)).state)
    {
-      dashstate->net_settings.reconnect = true;
+      NetworkReconnect(dashstate->net_state, &dashstate->net_settings);
    }
 }
 
@@ -581,15 +583,17 @@ void DrawDisplaySettings(layout *window_layout)
    Text(window_layout, Literal("Display Settings"), 20, V2(0, 0), V2(0, 0));
 }
 
-void DrawNetworkSettings(layout *window_layout, network_settings *net_settings)
+void DrawNetworkSettings(layout *window_layout, DashboardState *dashstate)
 {
+   network_settings *net_settings = &dashstate->net_settings;
+   
    Text(window_layout, Literal("Network Settings"), 20, V2(0,0), V2(0, 0));
    TextBox(window_layout, net_settings->connect_to, V2(GetSize(window_layout->bounds).x * 0.9, 40), V2(0, 0), V2(0, 0));
    ToggleSlider(window_layout, &net_settings->is_mdns, Literal("mDNS"), Literal("IP"), V2(120, 20), V2(0, 0), V2(0, 0));
    
    if(Button(window_layout, NULL, Literal("Reconnect"), V2(120, 20), V2(0, 0), V2(0, 0)).state)
    {
-      net_settings->reconnect = true;
+      NetworkReconnect(dashstate->net_state, net_settings);
    }
 }
 
@@ -662,7 +666,7 @@ void DrawWindow(ui_window *window, DashboardState *dashstate, UIContext *context
    }
    else if(window->type == WindowType_NetworkSettings)
    {
-      DrawNetworkSettings(&window_layout, window->net_settings);
+      DrawNetworkSettings(&window_layout, dashstate);
    }
    /*
    else if(window->type == WindowType_VideoStream)
