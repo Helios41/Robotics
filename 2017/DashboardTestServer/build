@@ -1,6 +1,6 @@
 pushd Source > /dev/null
 
-cc dashboard_test_server_linux.cpp -o dashboard_test_server_linux
+g++ `pkg-config --cflags opencv` dashboard_test_server_linux.cpp `pkg-config --libs opencv` -o dashboard_test_server_linux
 cp ./dashboard_test_server_linux ../Build/
 rm dashboard_test_server_linux
 
