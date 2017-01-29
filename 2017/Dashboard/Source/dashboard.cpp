@@ -593,7 +593,7 @@ void DrawNetworkSettings(layout *window_layout, DashboardState *dashstate)
    
    if(Button(window_layout, NULL, Literal("Reconnect"), V2(120, 20), V2(0, 0), V2(0, 0)).state)
    {
-      NetworkReconnect(dashstate->net_state, net_settings);
+      NetworkReconnect(dashstate->net_state, &dashstate->net_settings);
    }
 }
 

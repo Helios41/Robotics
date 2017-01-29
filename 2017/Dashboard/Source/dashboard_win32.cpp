@@ -222,6 +222,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    DashboardState dashstate = {};
    dashstate.generic_arena = &generic_arena;
+   dashstate.net_state = &net_state;
    
    TeleopDisplayOverlay driver_overlays[] = 
    {
@@ -235,7 +236,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    dashstate.net_settings.connect_to = String((char *) malloc(sizeof(char) * 30), 30);
    Clear(dashstate.net_settings.connect_to);
-   CopyTo(Literal("roborio-4618-frc.local") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
+   CopyTo(Literal("192.168.0.120") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
    dashstate.net_settings.is_mdns = true;
    
    b32 running = true;
@@ -244,6 +245,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       AddNotification((Console *) &dashstate.console, Literal("Vision"));
    Notification *network_notification =
       AddNotification((Console *) &dashstate.console, Literal("Network"));
+   
+   if(!net_state.bound)
+   {
+      AddMessage((Console *) &dashstate.console,
+                 Literal("Bind Failed"), network_notification);
+   }
    
    AddMessage((Console *) &dashstate.console,
               Literal("Vision System Not Present XD"), vision_notification);

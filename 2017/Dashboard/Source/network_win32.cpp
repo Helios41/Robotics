@@ -52,11 +52,11 @@ void NetworkReconnect(NetworkState *net_state, network_settings *net_settings)
    
    if(host_ip)
    {
-      net_state->server_info.sin_family = AF_INET;
+	  net_state->server_info.sin_family = AF_INET;
       net_state->server_info.sin_addr.s_addr = inet_addr(host_ip);
       net_state->server_info.sin_port = htons(5800);
-      
-      generic_packet_header packet = {};
+    
+	  generic_packet_header packet = {};
       packet.size = sizeof(packet);
       packet.type = PACKET_TYPE_JOIN;
       
@@ -68,7 +68,7 @@ void NetworkReconnect(NetworkState *net_state, network_settings *net_settings)
 RobotHardwareType ConvertType(u8 type)
 {
 	Assert(type != HARDWARE_TYPE_INVALID);
-	
+		
 	switch(type)
 	{
 		case HARDWARE_TYPE_MOTOR:
@@ -106,7 +106,7 @@ void HandlePacket(u8 *buffer, Robot *robot)
    
    if(header->type == PACKET_TYPE_WELCOME)
    {
-      welcome_packet_header *welcome_header = (welcome_packet_header *) header;
+	  welcome_packet_header *welcome_header = (welcome_packet_header *) header;
 	  
 	  robot->name = String((char *) malloc(sizeof(char) * 16), 16);
 	  CopyTo(String(welcome_header->name, 16), robot->name);
@@ -235,12 +235,12 @@ void HandlePackets(NetworkState *net_state, Robot *robot, r64 curr_time)
 	b32 has_packets = true;
     while(has_packets)
     {
-		char buffer[512] = {};
+		char buffer[1024] = {};
          
         struct sockaddr_in sender_info = {};
         int sender_info_size = sizeof(sender_info);
         
-        int recv_return = recvfrom(net_state->socket, buffer, sizeof(buffer), 0,
+        int recv_return = recvfrom(net_state->socket, buffer, 1024, 0,
                                    (struct sockaddr *) &sender_info, &sender_info_size);
         
         //TODO: check that sender_info equals net_state.server_info
