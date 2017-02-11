@@ -13,7 +13,7 @@ struct RobotHardwareSample
        b32 light;
    };
    
-   r32 multipler; //NOTE: currently only used for motor types;
+   r32 multiplier; //NOTE: currently only used for motor types;
    u64 timestamp; //NOTE: call time(NULL) and cast to u64
 };
 
@@ -106,7 +106,7 @@ struct FunctionBlock
 	   struct
 	   {
 		   r32 value;
-	   } set_drive_multipler;
+	   } set_drive_multiplier;
    };
 };
 
@@ -159,6 +159,8 @@ struct welcome_packet_header
    char name[16];
    u8 hardware_count;
    u8 function_count;
+   
+   //TODO: b32 drive_encoder;
 };
 
 struct robot_hardware

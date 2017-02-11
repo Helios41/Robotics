@@ -26,6 +26,26 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
    }
    NextLine(&block_list);
    
+   if(Button(&block_list, NULL, Literal("Arcade Drive"), button_size, V2(0, 0), V2(5, 5)).state)
+   {
+	   //TODO: we removed value blocks, so how do we use controller input?
+	  FunctionBlock block = {};
+	  block.type = FunctionBlock_ArcadeDrive;
+	  block.arcade_drive.power = 0.0f;	
+	  block.arcade_drive.rotate = 0.0f;	
+      coroutine->blocks[coroutine->block_count++] = block;
+   }
+   NextLine(&block_list);
+   
+   if(Button(&block_list, NULL, Literal("Set Drive Multiplier"), button_size, V2(0, 0), V2(5, 5)).state)
+   {
+	  FunctionBlock block = {};
+	  block.type = FunctionBlock_SetDriveMultiplier;
+	  block.set_drive_multiplier.value = 1.0f;	
+      coroutine->blocks[coroutine->block_count++] = block;
+   }
+   NextLine(&block_list);
+   
    for(u32 i = 0;
       i < robot->hardware_count;
       i++)

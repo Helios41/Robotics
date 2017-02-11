@@ -407,15 +407,16 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
      
       HandlePackets(&generic_arena, &net_state,
 					&dashstate.robot, ui_context.curr_time);
-	  //dashstate->robot.connected = 1.0f > (net_state.last_packet_recieved - ui_context.curr_time);
-	 
 	  /*
+	  dashstate->robot.connected = 1.0f > (net_state.last_packet_recieved - ui_context.curr_time);
+	 
 	  if((net_state.last_packet_sent - ui_context.curr_time) > 0.5f)
 	  {
 		  SendPing(&net_state);
 	  }
-	  */
+	 */
 	 
+	 /*
       char frame_time_buffer[64];
       Rectangle(&context, RectMinSize(V2(200, 40), V2(200, 20)), V4(0, 0, 0, 0.5));
       Text(&context, V2(200, 40), Literal(R64ToString(frame_length, frame_time_buffer)), 20);
@@ -432,6 +433,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	  Rectangle(&context, RectMinSize(V2(200, 100), V2(200, 20)), V4(0, 0, 0, 0.5));
 	  Text(&context, V2(200, 100), wglSwapInterval ? Literal("wglSwapInterval") : Literal("Sleep"), 20);
 #endif
+	  */
 	  
       RenderUI(&context, window_size);
       SwapBuffers(device_context);
