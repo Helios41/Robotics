@@ -6,17 +6,6 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "packet_definitions.h"
-
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-
-#include "opencv2/highgui/highgui.hpp"
-#include "opencv/cv.h"
-
-using namespace cv;
-
 #include <stdint.h>
 
 typedef int8_t s8;
@@ -30,6 +19,17 @@ typedef uint64_t u64;
 typedef float r32;
 typedef double r64;
 typedef uint32_t b32;
+
+#include "packet_definitions.h"
+
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv/cv.h"
+
+using namespace cv;
 
 int main()
 {
@@ -56,13 +56,7 @@ int main()
    }
    
    b32 net_running = true;
-   
-   {
-      char address_str[INET_ADDRSTRLEN] = {};
-      inet_ntop(server_info.sin_family, &(server_info.sin_addr), address_str, INET_ADDRSTRLEN);
-      printf("At %s\n", address_str);
-   }
-   
+   struct sockaddr_in connected_client_info = {};
    while(net_running)
    {
       struct sockaddr_in client_info = {};
@@ -97,8 +91,9 @@ int main()
             
             //Add address to list
             printf("Join Request From %s\n", address_str);
+            connected_client_info = client_info;
 
-            u32 hardware_count = 7;
+            u32 hardware_count = 6;
             u32 function_count = 1;
 
             u32 welcome_packet_size = sizeof(welcome_packet_header) +
@@ -117,41 +112,30 @@ int main()
             memcpy(welcome_header->name, robot_name, 16);
             
             robot_hardware *hardware = (robot_hardware *)(welcome_header + 1);
-
-            char hardware0_name[16] = "Drive";
+            
+            char hardware0_name[16] = "Shooter";
             memcpy(hardware[0].name, hardware0_name, 16);
-            hardware[0].type = HARDWARE_TYPE_DRIVE;
-            hardware[0].id = 0;
-            
-            char hardware1_name[16] = "Shooter";
+            hardware[0].type = Hardware_EncoderMotor;
+
+            char hardware1_name[16] = "Indexer";
             memcpy(hardware[1].name, hardware1_name, 16);
-            hardware[1].type = HARDWARE_TYPE_MOTOR;
-            hardware[1].id = 1;
-
-            char hardware2_name[16] = "Indexer";
-            memcpy(hardware[2].name, hardware2_name, 16);
-            hardware[2].type = HARDWARE_TYPE_MOTOR;
-            hardware[2].id = 2;
+            hardware[1].type = Hardware_Motor;
             
-            char hardware3_name[16] = "Turntable";
+            char hardware2_name[16] = "Turntable";
+            memcpy(hardware[2].name, hardware2_name, 16);
+            hardware[2].type = Hardware_LimitMotor;
+
+            char hardware3_name[16] = "Shooter Camera";
             memcpy(hardware[3].name, hardware3_name, 16);
-            hardware[3].type = HARDWARE_TYPE_MOTOR;
-            hardware[3].id = 3;
+            hardware[3].type = Hardware_Camera;
 
-            char hardware4_name[16] = "Shooter Camera";
+            char hardware4_name[16] = "Shooter Base";
             memcpy(hardware[4].name, hardware4_name, 16);
-            hardware[4].type = HARDWARE_TYPE_CAMERA;
-            hardware[4].id = 4;
+            hardware[4].type = Hardware_Motor;
 
-            char hardware5_name[16] = "Shooter Base";
+            char hardware5_name[16] = "SCamera Light";
             memcpy(hardware[5].name, hardware5_name, 16);
-            hardware[5].type = HARDWARE_TYPE_MOTOR;
-            hardware[5].id = 5;
-
-            char hardware6_name[16] = "SCamera Light";
-            memcpy(hardware[6].name, hardware6_name, 16);
-            hardware[6].type = HARDWARE_TYPE_LIGHT;
-            hardware[6].id = 0;
+            hardware[5].type = Hardware_Light;
 
             robot_function *functions = (robot_function *)(hardware + hardware_count);
 
@@ -193,6 +177,21 @@ int main()
       if(key_code == 27)
       {
          net_running = false;
+      }
+      else if(key_code == 'g')
+      {
+         hardware_sample_packet_header hardware_sample_packet = {};
+         hardware_sample_packet.header.size = sizeof(hardware_sample_packet);
+         hardware_sample_packet.header.type = PACKET_TYPE_HARDWARE_SAMPLE;
+
+         hardware_sample_packet.index = 0;
+         hardware_sample_packet.sample.motor = 1300.0f;
+         hardware_sample_packet.sample.multipler = 1.0f; //TODO: fix spelling, multiplier
+         hardware_sample_packet.sample.timestamp = (u64) time(NULL);
+      
+
+         sendto(server_socket, (const char *) &hardware_sample_packet, sizeof(hardware_sample_packet), 0,
+                (struct sockaddr *) &connected_client_info, sizeof(connected_client_info));
       }
    }
    
