@@ -25,6 +25,72 @@ typedef uint32_t b32;
 
 using namespace frc;
 
+struct ErrorFunction
+{
+	int avg_span;
+	float coeff;
+	float dcoeff;
+
+	float target;
+	float acc;
+	int inc;
+	float avg;
+	float speed;
+};
+
+ErrorFunction EFunction(int avg_span, float coeff, float dcoeff)
+{
+	ErrorFunction result = {};
+
+	result.avg_span = avg_span;
+	result.coeff = coeff;
+	result.dcoeff = dcoeff;
+
+	return result;
+}
+
+float Square(float x)
+{
+	return x * x;
+}
+
+float Absolute(float x)
+{
+	return (x < 0.0f) ? -x : x;
+}
+
+float Clamp(float min, float value, float max)
+{
+	float result = value;
+
+	if(result > max)
+		result = max;
+
+	if(result < min)
+		result = min;
+
+	return result;
+}
+
+void Update(ErrorFunction *function, float rate)
+{
+	function->inc++;
+	function->acc += rate;
+
+	if(function->inc >= function->avg_span)
+	{
+		function->avg = function->acc / (float)function->inc;
+
+		float diff = (function->target - function->avg);
+		float c = function->coeff * Square(function->dcoeff * diff);
+		function->speed += c * diff;
+		function->speed = Clamp(-1, function->speed, 1);
+
+		function->acc = 0.0f;
+		function->inc = 0;
+	}
+}
+
 struct RobotHardware
 {
 	RobotHardwareType type;
