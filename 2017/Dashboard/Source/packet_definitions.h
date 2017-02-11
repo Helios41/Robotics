@@ -45,10 +45,9 @@ enum FunctionBlockType
    FunctionBlock_SetFloat = 2, //NOTE: this is for motor types
    FunctionBlock_SetBool = 3,
    FunctionBlock_SetMultiplier = 4,  //NOTE: this is for motor types
-   FunctionBlock_Builtin = 5,
-   FunctionBlock_Vision = 6,
-   FunctionBlock_ArcadeDrive = 7,
-   FunctionBlock_SetDriveMultiplier = 8
+   FunctionBlock_Vision = 5,
+   FunctionBlock_ArcadeDrive = 6,
+   FunctionBlock_SetDriveMultiplier = 7
 };
 
 enum BooleanOperation
@@ -86,11 +85,6 @@ struct FunctionBlock
 		   u32 hardware_index;
 		   r32 value;
 	   } set_multiplier;
-	   
-	   struct
-	   {
-		   u32 index;
-	   } builtin;
 	   
 	   struct
 	   {
@@ -158,7 +152,6 @@ struct welcome_packet_header
    
    char name[16];
    u8 hardware_count;
-   u8 function_count;
    
    //TODO: b32 drive_encoder;
 };

@@ -46,12 +46,17 @@ void DrawBlockEditor(layout *editor_panel, DashboardState *dashstate,
 
 void DrawAutonomousEditor(layout *auto_editor, UIContext *context, DashboardState *dashstate)
 {
+	RenderContext *render_context = context->render_context;
    v2 editor_size = GetSize(auto_editor->bounds);
    
-   layout timeline_view = Panel(auto_editor, V2(editor_size.x * 0.95 - 7.5, editor_size.y * 0.4), V2(0, 0), V2(5, 0)).lout;
-   layout menu_bar = Panel(auto_editor, V2(editor_size.x * 0.05 - 7.5, editor_size.y * 0.4), V2(0, 0), V2(5, 0)).lout;
+   layout timeline_view = Panel(auto_editor, V2(editor_size.x * 0.95 - 7.5, editor_size.y * 0.5), V2(0, 0), V2(5, 0)).lout;
+   layout menu_bar = Panel(auto_editor, V2(editor_size.x * 0.05 - 7.5, editor_size.y * 0.5), V2(0, 0), V2(5, 0)).lout;
    NextLine(auto_editor);
-   layout block_editor = Panel(auto_editor, V2(editor_size.x, editor_size.y * 0.6) - V2(10, 10), V2(0, 0), V2(5, 5)).lout;
+   
+   element title_box = TextBox(auto_editor, dashstate->auto_editor.name, V2(editor_size.x, editor_size.y * 0.1) - V2(10, 10), V2(0, 0), V2(5, 5));
+   Rectangle(render_context, title_box.margin_bounds, V4(0.3, 0.3, 0.3, 0.6));
+   
+   layout block_editor = Panel(auto_editor, V2(editor_size.x, editor_size.y * 0.4) - V2(10, 10), V2(0, 0), V2(5, 5)).lout;
    
    DrawGraphView(&timeline_view, &dashstate->auto_editor);
    DrawEditorMenu(&menu_bar, &dashstate->auto_editor);

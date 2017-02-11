@@ -264,7 +264,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    DashboardState dashstate = {};
    dashstate.generic_arena = &generic_arena;
    dashstate.net_state = &net_state;
-   
+   dashstate.auto_editor.name = String((char *) malloc(16), 16);
    dashstate.controller_type_count = ArrayCount(controller_types);
    dashstate.controller_types = controller_types;
    
@@ -407,14 +407,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
      
       HandlePackets(&generic_arena, &net_state,
 					&dashstate.robot, ui_context.curr_time);
-	  /*
-	  dashstate->robot.connected = 1.0f > (net_state.last_packet_recieved - ui_context.curr_time);
+	  dashstate.robot.connected = 1.0f > (net_state.last_packet_recieved - ui_context.curr_time);
 	 
 	  if((net_state.last_packet_sent - ui_context.curr_time) > 0.5f)
 	  {
 		  SendPing(&net_state);
 	  }
-	 */
 	 
 	 /*
       char frame_time_buffer[64];

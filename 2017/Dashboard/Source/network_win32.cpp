@@ -57,7 +57,7 @@ void UploadAutonomous(NetworkState *net_state, AutonomousEditor *auto_builder)
     upload_auto_header->header.size = packet_size;
     upload_auto_header->header.type = PACKET_TYPE_UPLOAD_AUTONOMOUS;
     upload_auto_header->block_count = auto_builder->coroutine.block_count;
-	//upload_auto_header->name = ;
+	CopyTo(auto_builder->name, String(upload_auto_header->name, 32));
 	
 	FunctionBlock *blocks = (FunctionBlock *)(upload_auto_header + 1);
 	for(u32 i = 0;
@@ -105,10 +105,6 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
 	  robot->hardware = PushArray(arena, robot->hardware_count, RobotHardware, Arena_Clear);
 	  robot_hardware *hardware = (robot_hardware *)(welcome_header + 1);
 	  
-	  robot->function_count = welcome_header->function_count;
-	  robot->functions = PushArray(arena, robot->function_count, RobotBuiltinFunction, Arena_Clear);
-	  robot_function *functions = (robot_function *)(hardware + welcome_header->hardware_count);
-	  
 	  for(u32 i = 0;
 		  i < welcome_header->hardware_count;
 		  i++)
@@ -119,17 +115,6 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
 		 curr_hardware->type = (RobotHardwareType) curr_hardware_in->type;
 		 curr_hardware->name = String((char *) malloc(sizeof(char) * 16), 16);
 		 CopyTo(String(curr_hardware_in->name, 16), curr_hardware->name);
-	  }
-	  
-	  for(u32 i = 0;
-		  i < welcome_header->function_count;
-		  i++)
-	  {
-         robot_function *curr_function_in = functions + i;
-		 RobotBuiltinFunction *curr_function = robot->functions + i;
-		 
-		 curr_function->name = String((char *) malloc(sizeof(char) * 16), 16);
-		 CopyTo(String(curr_function_in->name, 16), curr_function->name);
 	  }
 	  
 	  robot->connected = true;
@@ -165,6 +150,7 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
    }
    else if(header->type == PACKET_TYPE_DEBUG_MESSAGE)
    {
+	   debug_message_packet_header *debug_message_packet  = (debug_message_packet_header *) header;
 	   {
 		   
 	   }

@@ -1179,7 +1179,7 @@ void CheckDrawCursor(interaction_state text_box_interact, rect2 textbox_bounds, 
    }
 }
 
-void _TextBox(ui_id id, layout *ui_layout, string buffer, v2 element_size, v2 padding_size, v2 margin_size)
+element _TextBox(ui_id id, layout *ui_layout, string buffer, v2 element_size, v2 padding_size, v2 margin_size)
 {
    UIContext *context = ui_layout->context;
    RenderContext *render_context = context->render_context;
@@ -1310,6 +1310,8 @@ void _TextBox(ui_id id, layout *ui_layout, string buffer, v2 element_size, v2 pa
    
    CheckDrawCursor(text_box_interact, textbox_element.bounds, curr_draw_line,
                      curr_line, context, cursor_width, line_height, at);
+	
+	return textbox_element;
 }
 
 void _TextBox(ui_id id, layout *ui_layout, r32 *value, v2 element_size, v2 padding_size, v2 margin_size)

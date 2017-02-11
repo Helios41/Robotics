@@ -70,11 +70,6 @@ struct RobotHardware
    RobotHardwareSample samples[64];
 };
 
-struct RobotBuiltinFunction
-{
-   string name;
-};
-
 struct Robot
 {
    b32 connected;
@@ -82,9 +77,6 @@ struct Robot
    
    RobotHardware *hardware;
    u32 hardware_count;
-   
-   RobotBuiltinFunction *functions;
-   u32 function_count;
    
    RobotHardware *selected_hardware;
    
