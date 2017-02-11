@@ -29,6 +29,12 @@ typedef uint32_t b32;
 #define MIN_U64 0
 #define MAX_U64 0xFFFFFFFFFFFFFFFF
 
+//TODO: use 3 font sizes for entire ui
+//		calculate default sizes using monitor's ppi
+
+//TODO: make the notification system cache its messages so we dont have
+//      to worry about the lifetime of the strings we pass   
+
 /**
 TODO:
 	-camera
@@ -725,23 +731,6 @@ r32 ToR32(string str)
    r32 result = atof(buffer.text);
    free(buffer.text);
    return result;
-}
-
-struct ticket_mutex
-{
-   s32 handout;
-   s32 serving;
-};
-
-void BeginTicketMutex(ticket_mutex *mutex)
-{
-   s32 ticket = InterlockedIncrement((long volatile *) &mutex->handout) - 1;
-   while(ticket != mutex->serving);
-}
-
-void EndTicketMutex(ticket_mutex *mutex)
-{
-   InterlockedIncrement((long volatile *) &mutex->serving);
 }
 
 #endif

@@ -1,41 +1,18 @@
-Notification *AddNotification(Console *console, string name)
-{
-   //TODO: switch this to a memory arena & recycle allocator
-   Notification *result = (Notification *) malloc(sizeof(Notification));
-   *result = {};
-   
-   BeginTicketMutex(&console->notification_mutex);
-   result->next = console->top_notification;
-   console->top_notification = result;
-   EndTicketMutex(&console->notification_mutex);
- 
-   result->name = name;
- 
-   return result;
-}
-
-ConsoleMessage *AddMessage(Console *console, string text, Notification *notification = NULL)
+ConsoleMessage *AddMessage(Console *console, string text,
+						   ConsoleCategory category = Category_None)
 {
    //TODO: switch this to a memory arena & recycle allocator
    ConsoleMessage *result = (ConsoleMessage *) malloc(sizeof(ConsoleMessage));
    *result = {};
    
-   BeginTicketMutex(&console->message_mutex);
    result->next = console->top_message;
    console->top_message = result;
-   EndTicketMutex(&console->message_mutex);
- 
+   
+   //TODO: copy text, dont just keep passed string
+   //TODO: string heap
    result->text = text;
- 
-   if(notification)
-   {
-      BeginTicketMutex(&console->notification_mutex);
-      notification->count++;
-      EndTicketMutex(&console->notification_mutex);
- 
-      result->notification = notification;
-   }
- 
+   result->category = category;
+   
    return result;
 }   
 
@@ -57,7 +34,6 @@ void DrawMessageList(layout *message_list, UIContext *context, Console *console)
    v2 button_size = V2(GetSize(message_list->bounds).x * 0.8, 40);
    v2 button_margin = V2(GetSize(message_list->bounds).x * 0.1, 10);
     
-   BeginTicketMutex(&console->message_mutex);
    for(ConsoleMessage *message = console->top_message;
        message;
        message = message->next)
@@ -66,7 +42,8 @@ void DrawMessageList(layout *message_list, UIContext *context, Console *console)
                                       message->text, console->selected_message == message, 
                                       button_size, V2(0, 0), button_margin);
       
-      if(message->notification == console->selected_notification)
+      if((message->category != Category_None) &&
+		 (message->category == console->selected_category))
       {
          RectangleOutline(context->render_context, message_button.elem.bounds, V4(0, 0, 0, 1), 3);
       }
@@ -76,7 +53,6 @@ void DrawMessageList(layout *message_list, UIContext *context, Console *console)
          console->selected_message = (console->selected_message == message) ? NULL : message;
       }
    }
-   EndTicketMutex(&console->message_mutex);
 }
 
 void DrawSelectedMessagePage(layout *selected_message_page, UIContext *context, Console *console)

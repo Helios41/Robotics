@@ -6,6 +6,7 @@
 #include "wglext.h"
 
 #include "dashboard.h"
+#include "packet_definitions.h" //Needs stdint typedefs
 #include "dashboard.cpp"
 #include "network_win32.cpp"
 
@@ -202,15 +203,55 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       net_state.bound = (bind(net_state.socket, (struct sockaddr *) &client_info, sizeof(client_info)) != SOCKET_ERROR);
    }
    
-   /*
-   if(!net_state.bound)
+   string logitech_controller_buttons[] =
    {
-      AddMessage((Console *) &params->dashstate->console,
-              Literal("Bind Failed"), network_notification);
-   }
-   */
+      Literal("A"),
+	  Literal("B"),
+	  Literal("X"),
+	  Literal("Y")
+   };
+
+   string logitech_controller_axes[] =
+   {
+      Literal("Left X"),
+	  Literal("Left Y"),
+	  Literal("Right X"),
+	  Literal("Right Y")
+   };
    
-   //TODO: move state initialization out of the platform layer & organize it
+   string joystick_buttons[] =
+   {
+      Literal("1"),
+	  Literal("2"),
+	  Literal("3"),
+	  Literal("4"),
+	  Literal("5"),
+	  Literal("6"),
+	  Literal("7"),
+	  Literal("8")
+   };
+
+   string joystick_axes[] =
+   {
+      Literal("X"),
+	  Literal("Y"),
+	  Literal("Scroll")
+   };
+   
+   ControllerType controller_types[2] = 
+   {
+	   {
+		   Literal("Ghetto Controller"),
+		   ArrayCount(logitech_controller_buttons), logitech_controller_buttons,
+		   ArrayCount(logitech_controller_axes), logitech_controller_axes
+	   },
+	   {
+		   Literal("Old Joystick"),
+		   ArrayCount(joystick_buttons), joystick_buttons,
+		   ArrayCount(joystick_axes), joystick_axes
+	   }
+   };
+   
    MemoryArena generic_arena = {};
    InitMemoryArena(&generic_arena, VirtualAlloc(0, Megabyte(64), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE), Megabyte(64));
    
@@ -223,6 +264,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    DashboardState dashstate = {};
    dashstate.generic_arena = &generic_arena;
    dashstate.net_state = &net_state;
+   
+   dashstate.controller_type_count = ArrayCount(controller_types);
+   dashstate.controller_types = controller_types;
    
    TeleopDisplayOverlay driver_overlays[] = 
    {
@@ -239,24 +283,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    CopyTo(Literal("192.168.0.120") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
    dashstate.net_settings.is_mdns = true;
    
-   b32 running = true;
-   
-   Notification *vision_notification =
-      AddNotification((Console *) &dashstate.console, Literal("Vision"));
-   Notification *network_notification =
-      AddNotification((Console *) &dashstate.console, Literal("Network"));
-   
    if(!net_state.bound)
    {
       AddMessage((Console *) &dashstate.console,
-                 Literal("Bind Failed"), network_notification);
+                 Literal("Bind Failed"), Category_Network);
    }
    
    AddMessage((Console *) &dashstate.console,
-              Literal("Vision System Not Present XD"), vision_notification);
+              Literal("Vision System Not Present XD"), Category_Vision);
    
    NetworkReconnect(&net_state, &dashstate.net_settings);
    
+   b32 running = true;
    b32 update_mouse = true;
    
    ShowWindow(window, nCmdShow);
@@ -367,8 +405,16 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       
       DrawDashboardUI(&ui_context, &dashstate);
      
-      HandlePackets(&net_state, &dashstate.robot, ui_context.curr_time);
-	  //dashstate->robot.connected = 1.0f > (net_state->last_packet - ui_context.curr_time);
+      HandlePackets(&generic_arena, &net_state,
+					&dashstate.robot, ui_context.curr_time);
+	  //dashstate->robot.connected = 1.0f > (net_state.last_packet_recieved - ui_context.curr_time);
+	 
+	  /*
+	  if((net_state.last_packet_sent - ui_context.curr_time) > 0.5f)
+	  {
+		  SendPing(&net_state);
+	  }
+	  */
 	 
       char frame_time_buffer[64];
       Rectangle(&context, RectMinSize(V2(200, 40), V2(200, 20)), V4(0, 0, 0, 0.5));

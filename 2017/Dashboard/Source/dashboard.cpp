@@ -37,12 +37,17 @@ struct ui_window
    union
    {
       network_settings *net_settings;
-      struct
-      {
-         struct CoroutineBlock *coroutine;
-         r32 scroll;
-      };
-      struct FunctionBlock *function;
+	  struct
+	  {
+	     FunctionBlock *function;
+		 u32 tab; //NOTE: tabs, 0 for function, 1 for hardware, 2 for value
+	  } edit_block;
+	  
+	  struct
+	  {
+	     struct CoroutineBlock *coroutine;
+		 r32 scroll;
+	  } create_block;
    };
 };
 
@@ -56,41 +61,9 @@ enum DashboardPage
    Page_Teleop
 };
 
-union RobotHardwareState
-{
-   r32 motor;
-   b32 solenoid;
-   struct
-   {
-      r32 forward;
-      r32 rotate;
-   };
-   b32 _switch; //switch is used in C so ¯\_(ツ)_/¯
-   r32 distance_sensor;
-   b32 light;
-};  
-
-struct RobotHardwareSample
-{
-   RobotHardwareState state;
-   u64 timestamp;
-};
-
-enum RobotHardwareType
-{
-   Hardware_Motor,
-   Hardware_Solenoid,
-   Hardware_Drive, //TODO: special case the drive train, we'll always have one and only one
-   Hardware_Switch,
-   Hardware_Camera,
-   Hardware_DistanceSensor,
-   Hardware_Light
-};
-
 struct RobotHardware
 {
    RobotHardwareType type;
-   u32 id;
    string name;
    
    u32 at_sample;
@@ -100,7 +73,6 @@ struct RobotHardware
 struct RobotBuiltinFunction
 {
    string name;
-   u32 id;
 };
 
 struct Robot
@@ -115,8 +87,14 @@ struct Robot
    u32 function_count;
    
    RobotHardware *selected_hardware;
+   
+   //NOTE: drive train hardware info
+   b32 drive_encoder;
+   u32 at_sample;
+   RobotDriveSample samples[64];
 };
 
+//NOTE: config index is just the index of this in the vision_configs array
 struct VisionConfig
 {
    //NOTE: HSV = Hue Saturation Value
@@ -125,68 +103,13 @@ struct VisionConfig
    
    //TODO: mask
    
-   u32 camera_id;
-   u32 config_id;
+   u32 camera_index;
 };
 
-enum ValueBlockType
+struct FunctionBlockLink
 {
-   ValueBlock_Constant_Uint,
-   ValueBlock_Constant_Bool,
-   ValueBlock_Constant_Float,
-   ValueBlock_Constant_Vec2,
-   ValueBlock_Controller_Bool,
-   ValueBlock_Controller_Float,
-   ValueBlock_Controller_Vec2,
-   ValueBlock_Sensor_Bool,
-   ValueBlock_Sensor_Float,
-};
-
-struct ValueBlock
-{
-   ValueBlockType type;
-   union
-   {
-      u32 uint_param;
-      b32 bool_param;
-      r32 float_param;
-      v2 vec2_param;
-      
-      //NOTE: ValueBlock_Controller_Bool & ValueBlock_Controller_Float
-      struct controller
-      {
-         u32 id;
-         u32 button_or_axis; //NOTE: button for bool, axis for float
-      };
-      
-      //NOTE: ValueBlock_Controller_Vec2
-      struct twoaxis_controller
-      {
-         u32 id;
-         u32 x_axis;
-         u32 y_axis;
-      };
-      
-      u32 sensor_id;
-   };
-};
-
-enum FunctionBlockType 
-{
-   FunctionBlock_Wait,
-   FunctionBlock_Set,
-   FunctionBlock_Builtin,
-   FunctionBlock_Vision,
-   FunctionBlock_Goto
-};
-
-struct FunctionBlock
-{
-   FunctionBlockType type;
-   
-   //NOTE: must be the id of the drive train for FunctionBlock_Goto
-   u32 id; //NOTE: Unused for FunctionBlock_Wait
-   ValueBlock param; //NOTE: currently usused for FunctionBlock_Builtin
+	FunctionBlock block;
+	FunctionBlockLink *next;
 };
 
 struct CoroutineBlock
@@ -204,32 +127,30 @@ struct AutonomousEditor
    CoroutineBlock coroutine;
 };
 
-struct Notification
+enum ConsoleCategory
 {
-   Notification *next;
-   string name;
-   u32 count;
+	Category_None = 0,
+	Category_Vision,
+	Category_Network,
+	Category_Debug,
+	Category_RobotDebug
 };
 
 struct ConsoleMessage
 {
    ConsoleMessage *next;
-   Notification *notification;
-   
    string text;
+   ConsoleCategory category;
 };
 
 struct Console
 {
-   //TODO: notification/message arena
-   ticket_mutex message_mutex;
-   ticket_mutex notification_mutex;
+   //TODO: message arena
    
    ConsoleMessage *top_message;
    ConsoleMessage *selected_message;
    
-   Notification *top_notification;
-   Notification *selected_notification;
+   ConsoleCategory selected_category;
 };
 
 struct TeleopDisplayOverlay
@@ -241,6 +162,31 @@ struct TeleopDisplay
 {
    u32 overlay_count;
    TeleopDisplayOverlay *overlays;
+};
+
+struct ControllerType
+{
+	string name;
+	
+	u32 button_count;
+	string *buttons;
+	
+	u32 axis_count;
+	string *axes;
+};
+
+//TODO: send axis and button count per controller?
+struct Control
+{
+	ControlType type;
+	u8 button_or_axis;
+	CoroutineBlock coroutine;
+};
+
+struct ControlLink
+{
+	Control control;
+	ControlLink *next;
 };
 
 struct DashboardState
@@ -262,6 +208,9 @@ struct DashboardState
    
    TeleopDisplay driver_display;
    TeleopDisplay op_display;
+   
+   u32 controller_type_count;
+   ControllerType *controller_types;
 };
 
 ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type type, u32 flags = 0)
@@ -327,6 +276,22 @@ void RemoveWindow(DashboardState *dashstate, ui_window *window)
 #include "console.cpp"
 #include "teleop.cpp"
 
+void ConsoleCategoryButton(layout *panel, DashboardState *dashstate,
+						   ConsoleCategory category, string name,
+						   v2 size, v2 margin)
+{
+	button notification_button =
+		_Button(POINTER_UI_ID(category), panel, NULL,
+                name, dashstate->console.selected_category == category,
+                size, V2(0, 0), margin);
+      
+    if(notification_button.state)
+    {
+		dashstate->console.selected_category =
+			(dashstate->console.selected_category == category) ? Category_None : category;
+    }
+}
+
 void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
 {
    Rectangle(context->render_context, top_bar->bounds, V4(1.0f, 0.0f, 0.0f, 1.0f));
@@ -348,28 +313,28 @@ void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
    
    if(notification_bar_interact.became_selected)
    {
-      dashstate->console.selected_notification = NULL;
+      dashstate->console.selected_category = Category_None;
    }
    
    Rectangle(&notification_bar, dashstate->robot.connected ? V4(1.0f, 1.0f, 1.0f, 1.0f) : V4(0.0f, 0.0f, 0.0f, 1.0f),
              top_bar_element_size, V2(0, 0), top_bar_element_margin);
              
-   BeginTicketMutex(&dashstate->console.notification_mutex);
-   for(Notification *notification = dashstate->console.top_notification;
-       notification;
-       notification = notification->next)
-   {
-      button notification_button = _Button(POINTER_UI_ID(notification), &notification_bar, NULL,
-                                           notification->name, dashstate->console.selected_notification == notification,
-                                           top_bar_element_size, V2(0, 0), top_bar_element_margin);
-      
-      if(notification_button.state)
-      {
-         dashstate->console.selected_notification = (dashstate->console.selected_notification == notification) ? NULL : notification;
-      }
-   }
-   EndTicketMutex(&dashstate->console.notification_mutex);
+   ConsoleCategoryButton(&notification_bar, dashstate,
+						 Category_Vision, Literal("Vision"),
+						 top_bar_element_size, top_bar_element_margin);
              
+   ConsoleCategoryButton(&notification_bar, dashstate,
+						 Category_Network, Literal("Network"),
+						 top_bar_element_size, top_bar_element_margin);
+						 
+   ConsoleCategoryButton(&notification_bar, dashstate,
+						 Category_Debug, Literal("Debug"),
+						 top_bar_element_size, top_bar_element_margin);
+			 
+   ConsoleCategoryButton(&notification_bar, dashstate,
+						 Category_RobotDebug, Literal("Robot Debug"),
+						 top_bar_element_size, top_bar_element_margin);
+						 
    if(Button(&settings_bar, NULL, Literal("Display Settings"), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
    {
       if(!dashstate->display_settings_window)
@@ -539,6 +504,10 @@ void DrawHome(layout *center_area, UIContext *context, DashboardState *dashstate
    {
       NetworkReconnect(dashstate->net_state, &dashstate->net_settings);
    }
+   
+   //TODO: info panel (name, year, game name, etc...)
+   
+   //TODO: diagnostic panel (button that runs a system test)
 }
 
 void DrawCenterArea(layout *center_area, UIContext *context, DashboardState *dashstate)

@@ -1,7 +1,121 @@
 #ifndef PACKET_DEFINITIONS_H
 #define PACKET_DEFINITIONS_H
 
-#include "stdint.h"
+//NOTE: not for drive or camera 
+struct RobotHardwareSample
+{
+   union
+   {
+	   r32 motor;
+	   b32 solenoid;
+       b32 _switch; //switch is used in C so ¯\_(ツ)_/¯
+       r32 distance_sensor;
+       b32 light;
+   };
+   
+   r32 multipler; //NOTE: currently only used for motor types;
+   u64 timestamp; //NOTE: call time(NULL) and cast to u64
+};
+
+//NOTE: for drive, duh
+struct RobotDriveSample
+{
+	r32 forward;
+	r32 rotate;
+	r32 multiplier;
+	
+	u64 timestamp;
+};
+
+enum RobotHardwareType
+{
+   Hardware_Motor = 1,
+   Hardware_EncoderMotor = 2,
+   Hardware_LimitMotor = 3,
+   Hardware_Solenoid = 4,
+   Hardware_Switch = 5,
+   Hardware_Camera = 6,
+   Hardware_DistanceSensor = 7,
+   Hardware_Light = 8
+};
+
+enum FunctionBlockType 
+{
+   FunctionBlock_Wait = 1,
+   FunctionBlock_SetFloat = 2, //NOTE: this is for motor types
+   FunctionBlock_SetBool = 3,
+   FunctionBlock_SetMultiplier = 4,  //NOTE: this is for motor types
+   FunctionBlock_Builtin = 5,
+   FunctionBlock_Vision = 6,
+   FunctionBlock_ArcadeDrive = 7,
+   FunctionBlock_SetDriveMultiplier = 8
+};
+
+enum BooleanOperation
+{
+	BooleanOp_True = 1,
+	BooleanOp_False = 2,
+	BooleanOp_Not = 3
+};
+
+struct FunctionBlock
+{
+   FunctionBlockType type;
+   
+   union
+   {
+	   struct
+	   {
+		   r32 duration;
+	   } wait;
+	   
+	   struct
+	   {
+		   u32 hardware_index;
+		   r32 value;
+	   } set_float;
+	   
+	   struct
+	   {
+		   u32 hardware_index;
+		   BooleanOperation op;
+	   } set_bool;
+	   
+	   struct
+	   {
+		   u32 hardware_index;
+		   r32 value;
+	   } set_multiplier;
+	   
+	   struct
+	   {
+		   u32 index;
+	   } builtin;
+	   
+	   struct
+	   {
+		   u32 index;
+	   } vision;
+	   
+	   struct
+	   {
+		   r32 power;
+		   r32 rotate;
+	   } arcade_drive;
+	   
+	   struct
+	   {
+		   r32 value;
+	   } set_drive_multipler;
+   };
+};
+
+enum ControlType
+{
+	Control_ButtonUp = 1,
+	Control_ButtonDown = 2,
+	Control_Axis = 3
+};
 
 #pragma pack(push, 1)
 
@@ -22,14 +136,17 @@
 
 #define PACKET_TYPE_DEBUG_MESSAGE 10 //server -> client
 
-#define PACKET_TYPE_PING 11
+#define PACKET_TYPE_SET_FLOAT 11 //client -> server
+#define PACKET_TYPE_SET_MULTIPLIER 12 //client -> server
+
+#define PACKET_TYPE_PING 13
 
 struct generic_packet_header
 {
    //TODO: maybe switch this back to u32 cuz our video packets may be huge
    //NOTE: bandwith is limited to 7Mbit/sec
-	uint16_t size;
-	uint8_t type;
+	u16 size;
+	u8 type;
 };
 
 //NOTE: PACKET_TYPE_JOIN uses generic_packet_header, no additional information
@@ -40,55 +157,28 @@ struct welcome_packet_header
    generic_packet_header header;
    
    char name[16];
-   uint8_t hardware_count;
-   uint8_t function_count;
+   u8 hardware_count;
+   u8 function_count;
 };
-
-#define HARDWARE_TYPE_INVALID 0
-#define HARDWARE_TYPE_MOTOR 1
-#define HARDWARE_TYPE_SOLENOID 2
-#define HARDWARE_TYPE_DRIVE 3
-#define HARDWARE_TYPE_SWITCH 4
-#define HARDWARE_TYPE_CAMERA 5  
-#define HARDWARE_TYPE_DISTANCE_SENSOR 6
-#define HARDWARE_TYPE_LIGHT 7
 
 struct robot_hardware
 {
    char name[16];
-	uint8_t id;
-	uint8_t type;
+   u8 type; //Cast to RobotHardwareType
 };
 
 struct robot_function
 {
    char name[16];
-	uint8_t id;
 };
 
 //NOTE: PACKET_TYPE_HARDWARE_SAMPLE
 struct hardware_sample_packet_header
 {
    generic_packet_header header;
-	
-   uint8_t id;
-   uint8_t type;
+   u8 index;
    
-   uint64_t timestamp; //NOTE: call time(NULL) and cast to u64
-   
-   union
-   {
-      float motor;
-	  uint32_t solenoid;
-	  struct
-	  {
-	     float forward;
-		 float rotate;
-	  };
-	  uint32_t _switch;
-      float distance_sensor;
-	  uint32_t light;
-	};
+   RobotHardwareSample sample;
 };
 
 //NOTE: PACKET_TYPE_UPLOAD_AUTONOMOUS
@@ -97,65 +187,24 @@ struct upload_autonomous_packet_header
    generic_packet_header header;
    
    char name[32];
-   uint8_t block_count;
-};
-
-#define VALUE_BLOCK_INVALID 0
-#define VALUE_BLOCK_CONSTANT_UINT 1
-#define VALUE_BLOCK_CONSTANT_BOOL 2
-#define VALUE_BLOCK_CONSTANT_FLOAT 3
-#define VALUE_BLOCK_CONSTANT_VEC2 4
-#define VALUE_BLOCK_CONTROLLER_BOOL 5
-#define VALUE_BLOCK_CONTROLLER_FLOAT 6
-#define VALUE_BLOCK_CONTROLLER_VEC2 7
-#define VALUE_BLOCK_SENSOR_BOOL 8
-#define VALUE_BLOCK_SENSOR_FLOAT 9
-
-struct value_block
-{
-   uint8_t type;
-   
-   union
-   {
-      uint32_t uint_param;
-      uint32_t bool_param;
-      float float_param;
-      struct
-      {
-         float vec2_param_x;
-         float vec2_param_y;
-      };
-      struct controller
-      {
-         uint32_t id;
-         uint32_t button_or_axis;
-      };
-      struct twoaxis_controller
-      {
-         uint32_t id;
-         uint32_t x_axis;
-         uint32_t y_axis;
-      };
-      uint32_t sensor_id;
-   };
-};
-
-#define FUNCTION_BLOCK_INVALID 0
-#define FUNCTION_BLOCK_WAIT 1
-#define FUNCTION_BLOCK_SET 2
-#define FUNCTION_BLOCK_BUILTIN 3
-#define FUNCTION_BLOCK_VISION 4
-#define FUNCTION_BLOCK_GOTO 5
-
-struct function_block
-{
-   uint8_t type;
-   uint8_t id; //NOTE: unused for wait and maybe soon goto 
-   value_block param;
+   u8 block_count;
 };
 
 //NOTE: PACKET_TYPE_UPLOAD_CONTROLS
-//WIP
+struct upload_controls_packet_header
+{
+   generic_packet_header header;
+   u8 driver; //NOTE: if true controls for driver, if false controls for operator
+   
+   u8 control_count;
+};
+
+struct control_config
+{
+	u8 type; //Cast to ControlType
+	u8 button_or_axis;
+	u8 block_count;
+};
 
 //NOTE: PACKET_TYPE_UPLOAD_VISION_CONFIG
 //WIP
@@ -167,7 +216,7 @@ struct uploaded_state_packet_header
 {
    generic_packet_header header;
    
-   uint8_t has_autonomous;
+   u8 has_autonomous;
    char autonomous_name[32];
    
    //TODO: data currently on the robot for controls

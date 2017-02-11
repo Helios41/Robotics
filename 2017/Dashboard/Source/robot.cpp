@@ -60,7 +60,7 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
       latest_timestamp = Max(latest_timestamp, curr->timestamp);
    }
    
-   RobotHardwareState *latest_sample = NULL;
+   RobotHardwareSample *latest_sample = NULL;
    
    for(u32 i = 0;
        i < ArrayCount(selected_hardware->samples);
@@ -69,7 +69,7 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
       RobotHardwareSample *curr = selected_hardware->samples + i;
       if(curr->timestamp == latest_timestamp)
       {
-         latest_sample = &curr->state;
+         latest_sample = curr;
          break;
       }
    }
@@ -79,6 +79,7 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
    
    if((latest_timestamp - earliest_timestamp) != 0)
    {
+	   /*
       r32 graph_height = GetSize(time_graph.bounds).y;
       r32 x_axis_interval = GetSize(time_graph.bounds).x / (latest_timestamp - earliest_timestamp);
       r32 y_axis_scale = GetSize(time_graph.bounds).y / 2.0f;
@@ -87,8 +88,6 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
           i < (ArrayCount(selected_hardware->samples) - 1);
           i++)
       {
-         //TODO: finish this once we have the server so we can test
-#if 0
          if(selected_hardware->type == Hardware_Motor)
          {
             v2 a = V2(i * x_axis_interval, graph_height - (selected_hardware->samples[i].state.motor + 1) * y_axis_scale);
@@ -113,10 +112,11 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
                               graph_height - (selected_hardware->samples[i + 1].state.forward + 1) * y_axis_scale);
             Line(context->render_context, time_graph.bounds.min + a_forward, time_graph.bounds.min + b_forward, V4(1, 1, 1, 1), 2);
          }
-#endif
       }
-      
-      if(selected_hardware->type == Hardware_Motor)
+      */
+	  
+      if((selected_hardware->type == Hardware_Motor) &&
+		 (selected_hardware->type == Hardware_LimitMotor))
       {
          TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
          
@@ -126,24 +126,45 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
               
          EndTemporaryMemory(temp_memory);
       }
+	  else if(selected_hardware->type == Hardware_EncoderMotor)
+      {
+         TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
+         
+         Text(selected_hardware_page, 
+              Concat(Literal("State: "), ToString(latest_sample->motor, &temp_memory), Literal("RPM"), &temp_memory),
+              20, V2(0, 0), V2(0, 5));  
+              
+         EndTemporaryMemory(temp_memory);
+      }
       else if(selected_hardware->type == Hardware_Solenoid)
       {
          string solenoid_state_text = latest_sample->solenoid ? Literal("State: Extended") : Literal("State: Retracted");
          Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
       }
-      else if(selected_hardware->type == Hardware_Drive)
+	  else if(selected_hardware->type == Hardware_Switch)
+      {
+         string solenoid_state_text = latest_sample->_switch ? Literal("State: Pressed") : Literal("State: Released");
+         Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
+      }
+	  else if(selected_hardware->type == Hardware_Camera)
+      {
+         string solenoid_state_text = latest_sample->_switch ? Literal("State: Pressed") : Literal("State: Released");
+         Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
+      }
+	  else if(selected_hardware->type == Hardware_DistanceSensor)
       {
          TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
          
-         Text(selected_hardware_page,
-              Concat(Literal("Forward: "), ToString(latest_sample->forward, &temp_memory), &temp_memory),
-              20, V2(0, 0), V2(0, 5)); 
-         NextLine(selected_hardware_page);
-         Text(selected_hardware_page,
-              Concat(Literal("Rotate: "), ToString(latest_sample->rotate, &temp_memory), &temp_memory),
-              20, V2(0, 0), V2(0, 5)); 
-         
+         Text(selected_hardware_page, 
+              Concat(Literal("State: "), ToString(latest_sample->distance_sensor, &temp_memory), &temp_memory),
+              20, V2(0, 0), V2(0, 5));  
+              
          EndTemporaryMemory(temp_memory);
+      }
+	  else if(selected_hardware->type == Hardware_Light)
+      {
+         string solenoid_state_text = latest_sample->light ? Literal("State: On") : Literal("State: Off");
+         Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
       }
    }
    else
@@ -156,19 +177,32 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
 
 void DrawRobot(layout *robot_ui, UIContext *context, DashboardState *dashstate)
 {
+   Robot *robot = &dashstate->robot;
    v2 robot_ui_size = GetSize(robot_ui->bounds);
    layout hardware_list = Panel(robot_ui, V2(robot_ui_size.x * 0.2, robot_ui_size.y) - V2(10, 10), V2(0, 0), V2(5, 5)).lout;
    layout selected_hardware_page = Panel(robot_ui, V2(robot_ui_size.x * 0.8, robot_ui_size.y) - V2(5, 10), V2(0, 0), V2(5, 5)).lout;
    
-   DrawHardwareList(&hardware_list, context, &dashstate->robot);
+   DrawHardwareList(&hardware_list, context, robot);
    
-   if(dashstate->robot.selected_hardware)
+   if(robot->selected_hardware)
    {
-      DrawSelectedHardwarePage(&selected_hardware_page, context, &dashstate->robot, dashstate->generic_arena);
+      DrawSelectedHardwarePage(&selected_hardware_page, context, robot, dashstate->generic_arena);
    }
    else
    {
-      //TODO: draw a default robot info page (eg. name, game name, etc...)
-      //DrawRobotPage();
+	   
+	   /*
+	  TemporaryMemoryArena temp_memory = BeginTemporaryMemory(dashstate->generic_arena);
+       
+      Text(selected_hardware_page,
+           Concat(Literal("Forward: "), ToString(latest_sample->forward, &temp_memory), &temp_memory),
+           20, V2(0, 0), V2(0, 5)); 
+      NextLine(selected_hardware_page);
+      Text(selected_hardware_page,
+           Concat(Literal("Rotate: "), ToString(latest_sample->rotate, &temp_memory), &temp_memory),
+           20, V2(0, 0), V2(0, 5)); 
+       
+      EndTemporaryMemory(temp_memory);
+	  */
    }
 }

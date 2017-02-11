@@ -1,65 +1,3 @@
-FunctionBlock WaitBlock()
-{
-   FunctionBlock result = {};
-   result.type = FunctionBlock_Wait;
-   result.param.type = ValueBlock_Constant_Float;
-   return result;
-}
-
-FunctionBlock SetBlock(RobotHardware *hardware)
-{
-   FunctionBlock result = {};
-   result.type = FunctionBlock_Set;
-   result.id = hardware->id;
-   
-   switch(hardware->type)
-   {
-      case Hardware_Motor:
-         result.param.type = ValueBlock_Constant_Float;
-         break;
-         
-      case Hardware_Solenoid:
-         result.param.type = ValueBlock_Constant_Bool;
-         break;
-         
-      case Hardware_Drive:
-         result.param.type = ValueBlock_Constant_Vec2;
-         break;
-   }
-   
-   return result;
-}
-
-FunctionBlock BuiltinBlock(RobotBuiltinFunction *builtin_function)
-{
-   FunctionBlock result = {};
-   result.type = FunctionBlock_Builtin;
-   result.id = builtin_function->id;
-   return result;
-}
-
-FunctionBlock VisionBlock(VisionConfig *vision_config)
-{
-   FunctionBlock result = {};
-   result.type = FunctionBlock_Vision;
-   result.id = vision_config->camera_id;
-   result.param.type = ValueBlock_Constant_Uint;
-   result.param.uint_param = vision_config->config_id;
-   return result;
-}
-
-//TODO: pass the drive train
-/*
-FunctionBlock GotoBlock()
-{
-   FunctionBlock result = {};
-   result.type = FunctionBlock_Goto;
-   result.id = drive->id;
-   result.param.type = ValueBlock_Constant_Vec2;
-   return result;
-}
-*/
-
 void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *dashstate)
 {
    UIContext *context = window_layout->context;
@@ -71,33 +9,20 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
    NextLine(window_layout);
    
    layout scroll_bar = Panel(window_layout, V2(window_size.x * 0.1, window_size.y - GetSize(title_text.bounds).y), V2(0, 0), V2(0, 0)).lout;
-   SliderBar(&scroll_bar, -100, 0, &window->scroll, GetSize(scroll_bar.bounds), V2(0, 0), V2(0, 0));
+   SliderBar(&scroll_bar, -100, 0, &window->create_block.scroll, GetSize(scroll_bar.bounds), V2(0, 0), V2(0, 0));
    
-   layout block_list = Panel(window_layout, V2(window_size.x * 0.9, window_size.y - GetSize(title_text.bounds).y), V2(0, 0), V2(0, 0), window->scroll).lout;
+   layout block_list = Panel(window_layout, V2(window_size.x * 0.9, window_size.y - GetSize(title_text.bounds).y), V2(0, 0), V2(0, 0), window->create_block.scroll).lout;
    
    Robot *robot = &dashstate->robot;
    v2 button_size = V2(GetSize(block_list.bounds).x * 0.9, 30);
-   CoroutineBlock *coroutine = window->coroutine;
+   CoroutineBlock *coroutine = window->create_block.coroutine;
    
    if(Button(&block_list, NULL, Literal("Wait"), button_size, V2(0, 0), V2(5, 5)).state)
    {
-      coroutine->blocks[coroutine->block_count++] = WaitBlock();
-      
-      if(coroutine->block_count == ArrayCount(coroutine->blocks))
-      {
-         window->flags |= Flag_CloseRequested;
-      }
-   }
-   NextLine(&block_list);
-   
-   if(Button(&block_list, NULL, Literal("Goto"), button_size, V2(0, 0), V2(5, 5)).state)
-   {
-      //coroutine->blocks[coroutine->block_count++] = GotoBlock();
-      
-      if(coroutine->block_count == ArrayCount(coroutine->blocks))
-      {
-         window->flags |= Flag_CloseRequested;
-      }
+	  FunctionBlock block = {};
+	  block.type = FunctionBlock_Wait;
+	  block.wait.duration = 0.0f;	
+      coroutine->blocks[coroutine->block_count++] = block;
    }
    NextLine(&block_list);
    
@@ -106,21 +31,44 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
       i++)
    {
       RobotHardware *curr_hardware = robot->hardware + i;
-      if((curr_hardware->type == Hardware_Motor) ||
-         (curr_hardware->type == Hardware_Solenoid) ||
-         (curr_hardware->type == Hardware_Drive))
+      
+	  if((curr_hardware->type == Hardware_Motor) ||
+		 (curr_hardware->type == Hardware_EncoderMotor) ||
+		 (curr_hardware->type == Hardware_LimitMotor))
       {
          if(_Button(POINTER_UI_ID(curr_hardware), &block_list, NULL, curr_hardware->name, button_size, V2(0, 0), V2(5, 5)).state)
          {
-            coroutine->blocks[coroutine->block_count++] = SetBlock(curr_hardware);
-            
-            if(coroutine->block_count == ArrayCount(coroutine->blocks))
-            {
-               window->flags |= Flag_CloseRequested;
-            }
+			FunctionBlock block = {};
+			block.type = FunctionBlock_SetFloat;
+			block.set_float.hardware_index = i;
+			block.set_float.value = 0.0f;
+            coroutine->blocks[coroutine->block_count++] = block;
+         }
+         NextLine(&block_list);
+		 
+		 if(_Button(POINTER_UI_ID(curr_hardware), &block_list, NULL, curr_hardware->name, button_size, V2(0, 0), V2(5, 5)).state)
+         {
+			FunctionBlock block = {};
+			block.type = FunctionBlock_SetMultiplier;
+			block.set_multiplier.hardware_index = i;
+			block.set_multiplier.value = 1.0f;
+            coroutine->blocks[coroutine->block_count++] = block;
          }
          NextLine(&block_list);
       }
+	  else if((curr_hardware->type == Hardware_Solenoid) ||
+			  (curr_hardware->type == Hardware_Light))
+	  {
+		 if(_Button(POINTER_UI_ID(curr_hardware), &block_list, NULL, curr_hardware->name, button_size, V2(0, 0), V2(5, 5)).state)
+         {
+			FunctionBlock block = {};
+			block.type = FunctionBlock_SetBool;
+			block.set_bool.hardware_index = i;
+			block.set_bool.op = BooleanOp_False;
+            coroutine->blocks[coroutine->block_count++] = block;
+		 }
+         NextLine(&block_list);
+	  }
    }
    
    for(u32 i = 0;
@@ -130,12 +78,10 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
       RobotBuiltinFunction *curr_function = robot->functions + i;
       if(_Button(POINTER_UI_ID(curr_function), &block_list, NULL, curr_function->name, button_size, V2(0, 0), V2(5, 5)).state)
       {
-         coroutine->blocks[coroutine->block_count++] = BuiltinBlock(curr_function);
-            
-         if(coroutine->block_count == ArrayCount(coroutine->blocks))
-         {
-            window->flags |= Flag_CloseRequested;
-         }
+		 FunctionBlock block = {};
+		 block.type = FunctionBlock_Builtin;
+		 block.builtin.index = i;
+         coroutine->blocks[coroutine->block_count++] = block;      
       }
       NextLine(&block_list);
    }
@@ -146,76 +92,18 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
       i++)
    {
       VisionConfig *curr_config = vision->configs + i;
-      
       if(_Button(POINTER_UI_ID(curr_config), &block_list, NULL, Literal("*"), button_size, V2(0, 0), V2(5, 5)).state)
       {
          coroutine->blocks[coroutine->block_count++] = VisionBlock(curr_config);
-            
-         if(coroutine->block_count == ArrayCount(coroutine->blocks))
-         {
-            window->flags |= Flag_CloseRequested;
-         }
-      }
+	  }
       NextLine(&block_list);
    }
    */
-}
-
-void DrawValueBlock(ValueBlock *block, layout *window_layout)
-{
-   if(block->type == ValueBlock_Constant_Float)
-   {
-      Text(window_layout, Literal("Float Param: "), 20, V2(0, 0), V2(0, 5)); 
-      TextBox(window_layout, 0, 15, &block->float_param, V2(100, 40), V2(0, 0), V2(0, 5)); 
-      NextLine(window_layout);
-      SliderBar(window_layout, 0, 15, &block->float_param, V2(180, 20), V2(0, 0), V2(0, 0));
-   }
-   else if(block->type == ValueBlock_Constant_Bool)
-   {
-      Text(window_layout, block->bool_param ? Literal("Bool Param: True") : Literal("Bool Param: False"),
-           20, V2(0, 0), V2(0, 5)); 
-      NextLine(window_layout);
-      ToggleSlider(window_layout, &block->bool_param, Literal("True"), Literal("False"),
-                   V2(200, 30), V2(0, 0), V2(0, 0));  
-   }
-   else if(block->type == ValueBlock_Constant_Vec2)
-   {
-      Text(window_layout, Literal("X: "), 20, V2(0, 0), V2(0, 5)); 
-      TextBox(window_layout, 0, 15, &block->vec2_param.x, V2(100, 40), V2(0, 0), V2(0, 5)); 
-      NextLine(window_layout);
-      SliderBar(window_layout, 0, 15, &block->vec2_param.x, V2(180, 20), V2(0, 0), V2(0, 0));
-      NextLine(window_layout);
-      
-      Text(window_layout, Literal("Y: "), 20, V2(0, 0), V2(0, 5)); 
-      TextBox(window_layout, 0, 15, &block->vec2_param.y, V2(100, 40), V2(0, 0), V2(0, 5)); 
-      NextLine(window_layout);
-      SliderBar(window_layout, 0, 15, &block->vec2_param.y, V2(180, 20), V2(0, 0), V2(0, 0));
-   }
-}
-
-b32 IsBool(ValueBlockType type)
-{
-   return (type == ValueBlock_Constant_Bool) ||
-          (type == ValueBlock_Controller_Bool) ||
-          (type == ValueBlock_Sensor_Bool);
-}
-
-b32 IsFloat(ValueBlockType type)
-{
-   return (type == ValueBlock_Constant_Float) ||
-          (type == ValueBlock_Controller_Float) ||
-          (type == ValueBlock_Sensor_Float);
-}
-
-b32 IsUint(ValueBlockType type)
-{
-   return type == ValueBlock_Constant_Uint;
-}
    
-b32 IsVec2(ValueBlockType type)
-{
-   return (type == ValueBlock_Constant_Vec2) ||
-          (type == ValueBlock_Controller_Vec2);
+    if(coroutine->block_count == ArrayCount(coroutine->blocks))
+    {
+		window->flags |= Flag_CloseRequested;
+    }
 }
 
 void DrawEditBlock(ui_window *window, layout *window_layout, DashboardState *dashstate)
@@ -228,106 +116,19 @@ void DrawEditBlock(ui_window *window, layout *window_layout, DashboardState *das
       V2(0, 0)); 
    NextLine(window_layout);
      
-   FunctionBlock *function = window->function;
-   
-   ValueBlockType param_type = function->param.type;
-   ValueBlockType new_param_type = param_type;
-   
-   if(IsBool(param_type))
-   {
-      if(Button(window_layout, NULL, Literal("Constant"), (param_type == ValueBlock_Constant_Bool),
-                V2(60, 20), V2(0, 0), V2(5, 5)).state)
-      {
-         new_param_type = ValueBlock_Constant_Bool;
-      }
-      
-      if(Button(window_layout, NULL, Literal("Controller"), (param_type == ValueBlock_Controller_Bool),
-                V2(60, 20), V2(0, 0), V2(5, 5)).state)
-      {
-         new_param_type = ValueBlock_Controller_Bool;
-      }
-      
-      if(Button(window_layout, NULL, Literal("Sensor"), (param_type == ValueBlock_Sensor_Bool),
-                V2(60, 20), V2(0, 0), V2(5, 5)).state)
-      {
-         new_param_type = ValueBlock_Sensor_Bool;
-      }    
-   }
-   else if(IsFloat(param_type))
-   {
-      if(Button(window_layout, NULL, Literal("Constant"), (param_type == ValueBlock_Constant_Float),
-                V2(60, 20), V2(0, 0), V2(5, 5)).state)
-      {
-         new_param_type = ValueBlock_Constant_Float;
-      }
-      
-      if(Button(window_layout, NULL, Literal("Controller"), (param_type == ValueBlock_Controller_Float),
-                V2(60, 20), V2(0, 0), V2(5, 5)).state)
-      {
-         new_param_type = ValueBlock_Controller_Float;
-      }
-      
-      if(Button(window_layout, NULL, Literal("Sensor"), (param_type == ValueBlock_Sensor_Float),
-                V2(60, 20), V2(0, 0), V2(5, 5)).state)
-      {
-         new_param_type = ValueBlock_Sensor_Float;
-      }
-      
-      NextLine(window_layout);
-   }
-   else if(IsUint(param_type))
-   {
-      //NOTE: uint can only be constant ¯\_(?)_/¯
-   }
-   else if(IsVec2(param_type))
-   {
-      if(Button(window_layout, NULL, Literal("Constant"), (param_type == ValueBlock_Constant_Vec2),
-                V2(60, 20), V2(0, 0), V2(5, 5)).state)
-      {
-         new_param_type = ValueBlock_Constant_Vec2;
-      }
-      
-      if(Button(window_layout, NULL, Literal("Controller"), (param_type == ValueBlock_Controller_Vec2),
-                V2(60, 20), V2(0, 0), V2(5, 5)).state)
-      {
-         new_param_type = ValueBlock_Controller_Vec2;
-      }
-      
-      NextLine(window_layout);
-   }
-   
-   if(new_param_type != param_type)
-   {
-      function->param = {};
-      function->param.type = new_param_type;
-   }  
+   FunctionBlock *function = window->edit_block.function;
    
    switch(function->type)
    {
-      case FunctionBlock_Set:
-      case FunctionBlock_Wait:
-      {
-         //TODO: a way to provice a range for the float param
-         //TODO: provide a better name for the params?
-         DrawValueBlock(&function->param, window_layout/*, Literal("Duration: ")*/);
-         NextLine(window_layout);
-      }
-      break;
-         
-      case FunctionBlock_Builtin:
-         //NOTE: no params as of yet, maybe one day
-         break;
-      
-      case FunctionBlock_Vision:
-         //TODO: vision callback!!!!!
-         //NOTE: vision configs are setup in the vision tab
-         //TODO: button to take you the vision tab
-         break;
-         
-      /*
-      case FunctionBlock_Goto:
-         break;
-      */
+	   case FunctionBlock_Wait:
+	   case FunctionBlock_SetFloat:
+       case FunctionBlock_SetBool:
+	   case FunctionBlock_SetMultiplier:
+	   case FunctionBlock_Builtin:
+	   case FunctionBlock_Vision:
+	   case FunctionBlock_ArcadeDrive:
+	   case FunctionBlock_SetDriveMultiplier:
+	      break;
    }
    
    if(Button(window_layout, NULL, Literal("Delete"), V2(60, 20), V2(0, 0), V2(5, 5)).state)
@@ -353,13 +154,13 @@ void DrawFunctionBlock(FunctionBlock *block, rect2 bounds, layout *editor_panel,
          auto_editor->edit_block_window = AddWindow(dashstate, V2(250, 300), context->input_state.pos, WindowType_EditBlock);
       }
       
-      auto_editor->edit_block_window->function = block;
+      auto_editor->edit_block_window->edit_block.function = block;
    }
    
    Rectangle(render_context, bounds, block_interact.hot ? V4(1, 0, 0, 0.8) : V4(1, 0, 0, 0.6));
    
    if(auto_editor->edit_block_window && 
-      (auto_editor->edit_block_window->function == block))
+      (auto_editor->edit_block_window->edit_block.function == block))
    {
       RectangleOutline(render_context, bounds, V4(0, 0, 0, 1), 2);
    }
@@ -371,7 +172,7 @@ void DrawFunctionBlock(FunctionBlock *block, rect2 bounds, layout *editor_panel,
          Text(render_context, bounds, Literal("Wait"));
          break;
       
-      case FunctionBlock_Set:
+      case FunctionBlock_SetFloat:
          Text(render_context, bounds, Literal("*"));
          break;
          
@@ -429,7 +230,7 @@ void DrawCoroutine(CoroutineBlock *coroutine, DashboardState *dashstate,
             auto_editor->create_block_window = AddWindow(dashstate, V2(200, 100), context->input_state.pos, WindowType_CreateBlock);
          }
          
-         auto_editor->create_block_window->coroutine = coroutine;
+         auto_editor->create_block_window->create_block.coroutine = coroutine;
       }
    }
 }

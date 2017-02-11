@@ -1,25 +1,26 @@
-#include "packet_definitions.h"
-
 struct NetworkState
 {
    SOCKET socket;
    struct sockaddr_in server_info;
    b32 bound;
-   r64 last_packet;
+   r64 last_packet_recieved;
+   r64 last_packet_sent;
 };
+
+void SendGenericPacket(NetworkState *net_state, u8 type)
+{
+	generic_packet_header packet = {};
+    packet.size = sizeof(packet);
+    packet.type = type;
+      
+    sendto(net_state->socket, (const char *) &packet, sizeof(packet), 0,
+           (struct sockaddr *) &net_state->server_info, sizeof(net_state->server_info));
+}
 
 void NetworkReconnect(NetworkState *net_state, network_settings *net_settings)
 {  
-   //TODO: make the notification system cache its messages so we dont have
-   //      to worry about the lifetime of the strings we pass
-   /*
-   AddMessage((Console *) &params->dashstate->console,
-            "Attempting to connect to: " Literal((char *) params->connect_to),
-            network_notification);
-   */
-   
-   char *host_ip = net_settings->is_mdns ? NULL : net_settings->connect_to.text;
    //TODO: this is super unsafe, our strings DO NOT need to end in a \0 so we need a proper convert to CString function
+   char *host_ip = net_settings->is_mdns ? NULL : net_settings->connect_to.text;
    
    if(net_settings->is_mdns)
    {
@@ -27,28 +28,9 @@ void NetworkReconnect(NetworkState *net_state, network_settings *net_settings)
    
       if(robot_server)
       {
-         host_ip = inet_ntoa(*((in_addr *)robot_server->h_addr));
-         
-		 /*
-         AddMessage((Console *) &params->dashstate->console,
-                  "MDNS IP: " Literal(host_ip),
-                  network_notification);
-		 */
-      }
-      else
-      {
-		  /*
-         AddMessage((Console *) &params->dashstate->console, Literal("MDNS IP address lookup FAILED"),
-                  network_notification);
-				  */
-      }
+         host_ip = inet_ntoa(*((in_addr *)robot_server->h_addr));   
+	  }
    }
-   
-   /*
-   AddMessage((Console *) &params->dashstate->console,
-            host_ip ? concat "Host IP: " Literal(host_ip) : Literal("Address: NULL"),
-            network_notification);
-   */
    
    if(host_ip)
    {
@@ -56,50 +38,57 @@ void NetworkReconnect(NetworkState *net_state, network_settings *net_settings)
       net_state->server_info.sin_addr.s_addr = inet_addr(host_ip);
       net_state->server_info.sin_port = htons(5800);
     
-	  generic_packet_header packet = {};
-      packet.size = sizeof(packet);
-      packet.type = PACKET_TYPE_JOIN;
-      
-      sendto(net_state->socket, (const char *) &packet, sizeof(packet), 0,
-             (struct sockaddr *) &net_state->server_info, sizeof(net_state->server_info));
+	  SendGenericPacket(net_state, PACKET_TYPE_JOIN);
    }
 }
 
-RobotHardwareType ConvertType(u8 type)
+void SendPing(NetworkState *net_state)
 {
-	Assert(type != HARDWARE_TYPE_INVALID);
-		
-	switch(type)
-	{
-		case HARDWARE_TYPE_MOTOR:
-			return Hardware_Motor;
-		
-		case HARDWARE_TYPE_SOLENOID:
-			return Hardware_Solenoid;
-		
-		case HARDWARE_TYPE_DRIVE:
-			return Hardware_Drive;
-		
-		case HARDWARE_TYPE_SWITCH:
-			return Hardware_Switch;
-		
-		case HARDWARE_TYPE_CAMERA:
-			return Hardware_Camera;
-			
-		case HARDWARE_TYPE_DISTANCE_SENSOR:
-			return Hardware_DistanceSensor;
-			
-		case HARDWARE_TYPE_LIGHT:
-			return Hardware_Light;
-		
-		default:
-			InvalidCodePath;
-	}
-	
-	return (RobotHardwareType)0;
+	SendGenericPacket(net_state, PACKET_TYPE_PING);
 }
 
-void HandlePacket(u8 *buffer, Robot *robot)
+void UploadAutonomous(NetworkState *net_state, AutonomousEditor *auto_builder)
+{
+	u32 packet_size = sizeof(upload_autonomous_packet_header) +
+					  sizeof(FunctionBlock) * auto_builder->coroutine.block_count;
+	u8 *packet = (u8 *) malloc(packet_size);
+	
+	upload_autonomous_packet_header *upload_auto_header = (upload_autonomous_packet_header *) packet;
+    upload_auto_header->header.size = packet_size;
+    upload_auto_header->header.type = PACKET_TYPE_UPLOAD_AUTONOMOUS;
+    upload_auto_header->block_count = auto_builder->coroutine.block_count;
+	//upload_auto_header->name = ;
+	
+	FunctionBlock *blocks = (FunctionBlock *)(upload_auto_header + 1);
+	for(u32 i = 0;
+		i < upload_auto_header->block_count;
+		i++)
+	{
+		blocks[i] = auto_builder->coroutine.blocks[i];
+	}
+	  
+    sendto(net_state->socket, (const char *) &packet, sizeof(packet), 0,
+           (struct sockaddr *) &net_state->server_info, sizeof(net_state->server_info));
+		   
+	free(packet);
+}
+
+void UploadControls(NetworkState *net_state)
+{
+	
+}
+
+void UploadVisionConfig(NetworkState *net_state)
+{
+
+}
+
+void RequestUploadedState(NetworkState *net_state)
+{
+	SendGenericPacket(net_state, PACKET_TYPE_REQUEST_UPLOADED_STATE);
+}
+
+void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
 {
    generic_packet_header *header = (generic_packet_header *) buffer;
    Assert(header->type != PACKET_TYPE_INVALID);
@@ -111,15 +100,13 @@ void HandlePacket(u8 *buffer, Robot *robot)
 	  robot->name = String((char *) malloc(sizeof(char) * 16), 16);
 	  CopyTo(String(welcome_header->name, 16), robot->name);
       
-	  robot->hardware = (RobotHardware *) malloc(sizeof(RobotHardware) * welcome_header->hardware_count);
+	  //TODO: way to deallocate these on resend?
 	  robot->hardware_count = welcome_header->hardware_count;
-	  Clear(robot->hardware, sizeof(RobotHardware) * welcome_header->hardware_count);
-	  
-	  robot->functions = (RobotBuiltinFunction *) malloc(sizeof(RobotBuiltinFunction) * welcome_header->function_count);
-	  robot->function_count = welcome_header->function_count;
-	  Clear(robot->functions, sizeof(RobotBuiltinFunction) * welcome_header->function_count);
-	  
+	  robot->hardware = PushArray(arena, robot->hardware_count, RobotHardware, Arena_Clear);
 	  robot_hardware *hardware = (robot_hardware *)(welcome_header + 1);
+	  
+	  robot->function_count = welcome_header->function_count;
+	  robot->functions = PushArray(arena, robot->function_count, RobotBuiltinFunction, Arena_Clear);
 	  robot_function *functions = (robot_function *)(hardware + welcome_header->hardware_count);
 	  
 	  for(u32 i = 0;
@@ -129,8 +116,7 @@ void HandlePacket(u8 *buffer, Robot *robot)
          robot_hardware *curr_hardware_in = hardware + i;
 		 RobotHardware *curr_hardware = robot->hardware + i;
 		 
-		 curr_hardware->type = ConvertType(curr_hardware_in->type);
-		 curr_hardware->id = curr_hardware_in->id;
+		 curr_hardware->type = (RobotHardwareType) curr_hardware_in->type;
 		 curr_hardware->name = String((char *) malloc(sizeof(char) * 16), 16);
 		 CopyTo(String(curr_hardware_in->name, 16), curr_hardware->name);
 	  }
@@ -142,7 +128,6 @@ void HandlePacket(u8 *buffer, Robot *robot)
          robot_function *curr_function_in = functions + i;
 		 RobotBuiltinFunction *curr_function = robot->functions + i;
 		 
-		 curr_function->id = curr_function_in->id;
 		 curr_function->name = String((char *) malloc(sizeof(char) * 16), 16);
 		 CopyTo(String(curr_function_in->name, 16), curr_function->name);
 	  }
@@ -152,55 +137,11 @@ void HandlePacket(u8 *buffer, Robot *robot)
    else if(header->type == PACKET_TYPE_HARDWARE_SAMPLE)
    {
 	   hardware_sample_packet_header *hardware_sample_header = (hardware_sample_packet_header *) header;
-	   RobotHardware *hardware = NULL;
 	   
-	   for(u32 i = 0;
-		   i < robot->hardware_count;
-		   i++)
+	   if(hardware_sample_header->index < robot->hardware_count)
 	   {
-		   RobotHardware *curr_hardware = robot->hardware + i;
-		   if(curr_hardware->id == hardware_sample_header->id)
-		   {
-			   hardware = curr_hardware ;
-			   break;
-		   }
-	   }
-	   
-	   if(hardware)
-	   {
-		   RobotHardwareSample sample = {};
-		   sample.timestamp = hardware_sample_header->timestamp;
-		   
-		   Assert((hardware_sample_header->type != HARDWARE_TYPE_INVALID) &&
-				  (hardware_sample_header->type != HARDWARE_TYPE_CAMERA));
-		   
-		   switch(hardware->type)
-		   {
-			     case Hardware_Motor:
-					sample.state.motor = hardware_sample_header->motor;
-					break;
-				 
-				 case Hardware_Solenoid:
-					sample.state.solenoid = hardware_sample_header->solenoid;
-					break;
-				 
-				 case Hardware_Drive:
-					sample.state.forward = hardware_sample_header->forward;
-					sample.state.rotate = hardware_sample_header->rotate;
-					break;
-				 
-				 case Hardware_Switch:
-					sample.state._switch = hardware_sample_header->_switch;
-					break;
-				 
-				 case Hardware_DistanceSensor:
-					sample.state.distance_sensor = hardware_sample_header->distance_sensor;
-					break;
-				 
-				 case Hardware_Light:
-					sample.state.light = hardware_sample_header->light;
-					break;
-		   }
+		   RobotHardware *hardware = robot->hardware + hardware_sample_header->index;
+		   RobotHardwareSample sample = hardware_sample_header->sample;
 		   
 		   if(sample.timestamp > hardware->samples[(hardware->at_sample - 1) % 64].timestamp)
 		   {
@@ -230,7 +171,8 @@ void HandlePacket(u8 *buffer, Robot *robot)
    }
 }
 
-void HandlePackets(NetworkState *net_state, Robot *robot, r64 curr_time)
+void HandlePackets(MemoryArena *arena, NetworkState *net_state,
+				   Robot *robot, r64 curr_time)
 {
 	b32 has_packets = true;
     while(has_packets)
@@ -260,8 +202,8 @@ void HandlePackets(NetworkState *net_state, Robot *robot, r64 curr_time)
         }
         else
         {
-			net_state->last_packet = curr_time;
-			HandlePacket((u8 *)buffer, robot);
+			net_state->last_packet_recieved = curr_time;
+			HandlePacket(arena, (u8 *)buffer, robot);
         }
 	}	
 }
