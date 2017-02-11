@@ -149,7 +149,7 @@ struct welcome_packet_header
    char name[16];
    u8 hardware_count;
    
-   //TODO: b32 drive_encoder;
+   b32 drive_encoder;
 };
 
 struct robot_hardware

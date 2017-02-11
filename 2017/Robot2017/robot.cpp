@@ -114,8 +114,15 @@ struct RobotHardware
 
 #define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
 
+struct ButtonState
+{
+	b32 up;
+	b32 down;
+};
+
 class TestRobot : public SampleRobot
 {
+public:
 	Joystick driver_controller { 0 };
 	Joystick op_controller { 0 };
 	
@@ -135,19 +142,18 @@ class TestRobot : public SampleRobot
 	
 	int server_socket;
 	
-public:
 	void RobotInit();
 	void Autonomous();
 	void OperatorControl();
 };
 
-#include "dashcode.cpp"
+#include <dashcode.h>
 
 void TestRobot::RobotInit()
 {
 	hardware[0] = HWMotor(6, "Intake");
 	hardware[1] = HWMotor(8, "Climber");
-	hardware[2] = HWMotor(0, 1, "Shifter");
+	hardware[2] = HWSolenoid(0, 1, "Shifter");
 	
 	struct sockaddr_in server_info = {};
 	server_info.sin_family = AF_INET;
@@ -155,17 +161,19 @@ void TestRobot::RobotInit()
 	server_info.sin_port = htons(5800);
    
 	server_socket = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+
+	bind(server_socket, (struct sockaddr *) &server_info, sizeof(server_info));
 }
 
 void TestRobot::Autonomous()
 {
-	if(autonomous_program)
+	if(auto_program)
 	{
 		
 	}
 }
 
-void HandlePackets(int server_socket)
+void HandlePackets(int server_socket, RobotHardware *hardware, u32 hardware_count)
 {
 	b32 has_packets = true;
     while(has_packets)
@@ -197,7 +205,7 @@ void HandlePackets(int server_socket)
 				inet_ntop(client_info.sin_family, &(client_info.sin_addr), address_str, INET_ADDRSTRLEN);
             
 				u32 welcome_packet_size = sizeof(welcome_packet_header) +
-										  sizeof(robot_hardware) * ArrayCount(hardware);
+										  sizeof(robot_hardware) * hardware_count;
 				u8 *welcome_packet = (u8 *) malloc(welcome_packet_size); 
 				memset(welcome_packet, 0, welcome_packet_size);
 
@@ -205,10 +213,19 @@ void HandlePackets(int server_socket)
 				welcome_header->header.size = welcome_packet_size;
 				welcome_header->header.type = PACKET_TYPE_WELCOME;
 				welcome_header->hardware_count = hardware_count;
+				welcome_header->drive_encoder = false;
 				strcpy(welcome_header->name, "ToasterOven");
 				
-				robot_hardware *hardware = (robot_hardware *)(welcome_header + 1);
+				robot_hardware *send_hardware = (robot_hardware *)(welcome_header + 1);
             
+				for(u32 i = 0;
+					i < hardware_count;
+					i++)
+				{
+					strcpy(send_hardware[0].name, hardware[0].name);
+					send_hardware[0].type = (u8) hardware[0].type;
+				}
+
 				sendto(server_socket, (const char *) welcome_packet, welcome_packet_size, 0,
 					   (struct sockaddr *) &client_info, client_info_size);
             
@@ -220,8 +237,41 @@ void HandlePackets(int server_socket)
 
 void TestRobot::OperatorControl()
 {
+	ButtonState buttons = {};
+
 	while(IsOperatorControl() && IsEnabled())
 	{
-		HandlePackets(server_socket);
+		buttons.up = buttons.up && !driver_controller.GetRawButton(2);
+		buttons.down = driver_controller.GetRawButton(2);
+
+		FunctionBlock drive = {};
+		drive.type = FunctionBlock_ArcadeDrive;
+		drive.arcade_drive.power = driver_controller.GetRawAxis(1);
+		drive.arcade_drive.rotate = driver_controller.GetRawAxis(4);
+		ExecuteBlocklangFunction(&drive, this);
+
+		FunctionBlock intake = {};
+		intake.type = FunctionBlock_SetFloat;
+		intake.set_float.value = op_controller.GetRawButton(3) ? 1.0f : (op_controller.GetRawButton(2) ? -1.0f : 0.0f);
+		intake.set_float.hardware_index = 0;
+		ExecuteBlocklangFunction(&intake, this);
+
+		FunctionBlock climber = {};
+		climber.type = FunctionBlock_SetFloat;
+		climber.set_float.value = op_controller.GetRawAxis(1);
+		climber.set_float.hardware_index = 1;
+		ExecuteBlocklangFunction(&climber, this);
+
+		if(buttons/*[2]*/.up)
+		{
+			FunctionBlock ball_shifter = {};
+			ball_shifter.type = FunctionBlock_SetBool;
+			ball_shifter.set_float.value = BooleanOp_Not;
+			ball_shifter.set_float.hardware_index = 2;
+			ExecuteBlocklangFunction(&ball_shifter, this);
+		}
+
+		HandlePackets(server_socket, hardware, ArrayCount(hardware));
+		Wait(0.05f);
 	}
 }
