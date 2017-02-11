@@ -19,7 +19,7 @@ RobotHardware HWSolenoid(u32 fport, u32 rport, char *name)
 
 void ExecuteBlocklangFunction(FunctionBlock *function, TestRobot *robot)
 {
-	RobotHardware *robot_hardware = robot->hardware;
+	RobotHardware *hardware_array = robot->hardware;
 	switch(function->type)
 	{
 		case FunctionBlock_Wait:
@@ -82,14 +82,23 @@ void ExecuteBlocklangFunction(FunctionBlock *function, TestRobot *robot)
 		
 		case FunctionBlock_ArcadeDrive:
 		{
-			robot->drive.ArcadeDrive(robot->drive_multiplier * function->arcade_drive.power,
-									 robot->drive_multiplier * function->arcade_drive.rotate);
+			r32 right_speed = function->arcade_drive.power + function->arcade_drive.rotate;
+			r32 left_speed = function->arcade_drive.power - function->arcade_drive.rotate;
+			
+			right_speed = Clamp(-1, robot->drive_multiplier * right_speed, 1);
+			left_speed = Clamp(-1, robot->drive_multiplier * left_speed, 1);
+			
+			robot->right_front.Set(right_speed);
+			robot->right_front.Set(right_speed);
+			
+			robot->right_front.Set(-left_speed);
+			robot->right_front.Set(-left_speed);
 		}
 		break;
 		
 		case FunctionBlock_SetDriveMultiplier:
 		{
-			robot->drive_multiplier = function->set_drive_multipler.value;
+			robot->drive_multiplier = function->set_drive_multiplier.value;
 		}
 		break;
 	}

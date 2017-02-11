@@ -9,8 +9,6 @@ struct RobotHardwareSample
 	   r32 motor;
 	   b32 solenoid;
        b32 _switch; //switch is used in C so ¯\_(ツ)_/¯
-       r32 distance_sensor;
-       b32 light;
    };
    
    r32 multiplier; //NOTE: currently only used for motor types;
@@ -31,12 +29,9 @@ enum RobotHardwareType
 {
    Hardware_Motor = 1,
    Hardware_EncoderMotor = 2,
-   Hardware_LimitMotor = 3,
-   Hardware_Solenoid = 4,
-   Hardware_Switch = 5,
-   Hardware_Camera = 6,
-   Hardware_DistanceSensor = 7,
-   Hardware_Light = 8
+   Hardware_Solenoid = 3,
+   Hardware_Switch = 4,
+   Hardware_Camera = 5
 };
 
 enum FunctionBlockType 
@@ -118,22 +113,23 @@ enum ControlType
 #define PACKET_TYPE_JOIN 1 //client -> server
 #define PACKET_TYPE_WELCOME 2 //server -> client
 #define PACKET_TYPE_HARDWARE_SAMPLE 3 //server -> client
+#define PACKET_TYPE_DRIVE_SAMPLE 4 //server -> client
 
-#define PACKET_TYPE_UPLOAD_AUTONOMOUS 4 //client -> server
-#define PACKET_TYPE_UPLOAD_CONTROLS 5 //client -> server
-#define PACKET_TYPE_UPLOAD_VISION_CONFIG 6 //client -> server
+#define PACKET_TYPE_UPLOAD_AUTONOMOUS 5 //client -> server
+#define PACKET_TYPE_UPLOAD_CONTROLS 6 //client -> server
+#define PACKET_TYPE_UPLOAD_VISION_CONFIG 7 //client -> server
 
-#define PACKET_TYPE_REQUEST_UPLOADED_STATE 7 //client -> server
-#define PACKET_TYPE_UPLOADED_STATE 8 //server -> client 
+#define PACKET_TYPE_REQUEST_UPLOADED_STATE 8 //client -> server
+#define PACKET_TYPE_UPLOADED_STATE 9 //server -> client 
 
-#define PACKET_TYPE_CAMERA_FEED 9 //server -> client 
+#define PACKET_TYPE_CAMERA_FEED 10 //server -> client 
 
-#define PACKET_TYPE_DEBUG_MESSAGE 10 //server -> client
+#define PACKET_TYPE_DEBUG_MESSAGE 11 //server -> client
 
-#define PACKET_TYPE_SET_FLOAT 11 //client -> server
-#define PACKET_TYPE_SET_MULTIPLIER 12 //client -> server
+#define PACKET_TYPE_SET_FLOAT 12 //client -> server
+#define PACKET_TYPE_SET_MULTIPLIER 13 //client -> server
 
-#define PACKET_TYPE_PING 13
+#define PACKET_TYPE_PING 14
 
 struct generic_packet_header
 {
@@ -160,11 +156,6 @@ struct robot_hardware
 {
    char name[16];
    u8 type; //Cast to RobotHardwareType
-};
-
-struct robot_function
-{
-   char name[16];
 };
 
 //NOTE: PACKET_TYPE_HARDWARE_SAMPLE

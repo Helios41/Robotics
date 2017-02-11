@@ -28,7 +28,7 @@ struct RobotDriveSample
 enum RobotHardwareType
 {
    Hardware_Motor = 1,
-   Hardware_EncoderMotor = 2
+   Hardware_EncoderMotor = 2,
    Hardware_Solenoid = 3,
    Hardware_Switch = 4,
    Hardware_Camera = 5

@@ -115,8 +115,7 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
       }
       */
 	  
-      if((selected_hardware->type == Hardware_Motor) &&
-		 (selected_hardware->type == Hardware_LimitMotor))
+      if(selected_hardware->type == Hardware_Motor)
       {
          TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
          
@@ -149,21 +148,6 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
 	  else if(selected_hardware->type == Hardware_Camera)
       {
          string solenoid_state_text = latest_sample->_switch ? Literal("State: Pressed") : Literal("State: Released");
-         Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
-      }
-	  else if(selected_hardware->type == Hardware_DistanceSensor)
-      {
-         TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
-         
-         Text(selected_hardware_page, 
-              Concat(Literal("State: "), ToString(latest_sample->distance_sensor, &temp_memory), &temp_memory),
-              20, V2(0, 0), V2(0, 5));  
-              
-         EndTemporaryMemory(temp_memory);
-      }
-	  else if(selected_hardware->type == Hardware_Light)
-      {
-         string solenoid_state_text = latest_sample->light ? Literal("State: On") : Literal("State: Off");
          Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
       }
    }

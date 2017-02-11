@@ -22,10 +22,8 @@ typedef uint32_t b32;
 
 #include "packet_definitions.h"
 #include "WPILib.h"
-#include "opencv/cv.h"
 
 using namespace frc;
-using namespace cv;
 
 struct RobotHardware
 {
@@ -75,7 +73,7 @@ public:
 	void RobotInit();
 	void Autonomous();
 	void OperatorControl();
-}
+};
 
 #include "dashcode.cpp"
 
@@ -141,7 +139,7 @@ void HandlePackets(int server_socket)
 				welcome_header->header.size = welcome_packet_size;
 				welcome_header->header.type = PACKET_TYPE_WELCOME;
 				welcome_header->hardware_count = hardware_count;
-				welcome_header->name = "ToasterOven";
+				strcpy(welcome_header->name, "ToasterOven");
 				
 				robot_hardware *hardware = (robot_hardware *)(welcome_header + 1);
             

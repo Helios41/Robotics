@@ -53,8 +53,7 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
       RobotHardware *curr_hardware = robot->hardware + i;
       
 	  if((curr_hardware->type == Hardware_Motor) ||
-		 (curr_hardware->type == Hardware_EncoderMotor) ||
-		 (curr_hardware->type == Hardware_LimitMotor))
+		 (curr_hardware->type == Hardware_EncoderMotor))
       {
          if(_Button(POINTER_UI_ID(curr_hardware), &block_list, NULL, curr_hardware->name, button_size, V2(0, 0), V2(5, 5)).state)
          {
@@ -76,8 +75,7 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
          }
          NextLine(&block_list);
       }
-	  else if((curr_hardware->type == Hardware_Solenoid) ||
-			  (curr_hardware->type == Hardware_Light))
+	  else if(curr_hardware->type == Hardware_Solenoid)
 	  {
 		 if(_Button(POINTER_UI_ID(curr_hardware), &block_list, NULL, curr_hardware->name, button_size, V2(0, 0), V2(5, 5)).state)
          {
