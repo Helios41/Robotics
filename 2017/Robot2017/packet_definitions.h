@@ -222,6 +222,24 @@ struct debug_message_packet_header
 	char text[32];
 };
 
+//NOTE: PACKET_TYPE_SET_FLOAT
+struct set_float_packet_header
+{
+	generic_packet_header header;
+
+	u32 index;
+	r32 value;
+};
+
+//NOTE: PACKET_TYPE_SET_MULTIPLIER
+struct set_multiplier_packet_header
+{
+	generic_packet_header header;
+
+	u32 index;
+	r32 multiplier;
+};
+
 //NOTE: PACKET_TYPE_PING uses generic_packet_header, no additional information
 
 #pragma pack(pop)

@@ -120,6 +120,13 @@ struct ButtonState
 	b32 down;
 };
 
+struct network_state
+{
+	int socket;
+	struct sockaddr_in client_info;
+	socklen_t client_info_size;
+};
+
 class TestRobot : public SampleRobot
 {
 public:
@@ -140,7 +147,7 @@ public:
 	u32 auto_length = 0;
 	FunctionBlock *auto_program = NULL;
 	
-	int server_socket;
+	network_state net_state = {};
 	
 	void RobotInit();
 	void Autonomous();
@@ -160,9 +167,9 @@ void TestRobot::RobotInit()
 	server_info.sin_addr.s_addr = htonl(INADDR_ANY);
 	server_info.sin_port = htons(5800);
    
-	server_socket = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
+	net_state.socket = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0);
 
-	bind(server_socket, (struct sockaddr *) &server_info, sizeof(server_info));
+	bind(net_state.socket, (struct sockaddr *) &server_info, sizeof(server_info));
 }
 
 void TestRobot::Autonomous()
@@ -173,7 +180,37 @@ void TestRobot::Autonomous()
 	}
 }
 
-void HandlePackets(int server_socket, RobotHardware *hardware, u32 hardware_count)
+void SendWelcomePacket(network_state *net_state, RobotHardware *hardware, u32 hardware_count)
+{
+	u32 welcome_packet_size = sizeof(welcome_packet_header) +
+							  sizeof(robot_hardware) * hardware_count;
+	u8 *welcome_packet = (u8 *) malloc(welcome_packet_size);
+	memset(welcome_packet, 0, welcome_packet_size);
+
+	welcome_packet_header *welcome_header = (welcome_packet_header *) welcome_packet;
+	welcome_header->header.size = welcome_packet_size;
+	welcome_header->header.type = PACKET_TYPE_WELCOME;
+	welcome_header->hardware_count = hardware_count;
+	welcome_header->drive_encoder = false;
+	strcpy(welcome_header->name, "ToasterOven");
+
+	robot_hardware *send_hardware = (robot_hardware *)(welcome_header + 1);
+
+	for(u32 i = 0;
+		i < hardware_count;
+		i++)
+	{
+		strcpy(send_hardware[0].name, hardware[0].name);
+		send_hardware[0].type = (u8) hardware[0].type;
+	}
+
+	sendto(net_state->socket, (const char *) welcome_packet, welcome_packet_size, 0,
+		   (struct sockaddr *) &net_state->client_info, net_state->client_info_size);
+
+	free(welcome_packet);
+}
+
+void HandlePackets(network_state *net_state, TestRobot *robot)
 {
 	b32 has_packets = true;
     while(has_packets)
@@ -183,7 +220,7 @@ void HandlePackets(int server_socket, RobotHardware *hardware, u32 hardware_coun
       
 		char buffer[512] = {};
       
-		int recv_return = recvfrom(server_socket, buffer, sizeof(buffer), 0,
+		int recv_return = recvfrom(net_state->socket, buffer, sizeof(buffer), 0,
                                    (struct sockaddr *) &client_info, &client_info_size);
       
 		if(recv_return == -1)
@@ -201,35 +238,30 @@ void HandlePackets(int server_socket, RobotHardware *hardware, u32 hardware_coun
          
 			if(header->type == PACKET_TYPE_JOIN)
 			{
-				char address_str[INET_ADDRSTRLEN] = {};
-				inet_ntop(client_info.sin_family, &(client_info.sin_addr), address_str, INET_ADDRSTRLEN);
-            
-				u32 welcome_packet_size = sizeof(welcome_packet_header) +
-										  sizeof(robot_hardware) * hardware_count;
-				u8 *welcome_packet = (u8 *) malloc(welcome_packet_size); 
-				memset(welcome_packet, 0, welcome_packet_size);
+				net_state->client_info = client_info;
+				net_state->client_info_size = client_info_size;
 
-				welcome_packet_header *welcome_header = (welcome_packet_header *) welcome_packet;
-				welcome_header->header.size = welcome_packet_size;
-				welcome_header->header.type = PACKET_TYPE_WELCOME;
-				welcome_header->hardware_count = hardware_count;
-				welcome_header->drive_encoder = false;
-				strcpy(welcome_header->name, "ToasterOven");
-				
-				robot_hardware *send_hardware = (robot_hardware *)(welcome_header + 1);
-            
-				for(u32 i = 0;
-					i < hardware_count;
-					i++)
-				{
-					strcpy(send_hardware[0].name, hardware[0].name);
-					send_hardware[0].type = (u8) hardware[0].type;
-				}
+				SendWelcomePacket(net_state, robot->hardware, ArrayCount(robot->hardware));
+			}
+			else if(header->type == PACKET_TYPE_SET_FLOAT)
+			{
+				set_float_packet_header *set_float = (set_float_packet_header *) header;
 
-				sendto(server_socket, (const char *) welcome_packet, welcome_packet_size, 0,
-					   (struct sockaddr *) &client_info, client_info_size);
-            
-				free(welcome_packet);
+				FunctionBlock set_float_function = {};
+				set_float_function.type = FunctionBlock_SetFloat;
+				set_float_function.set_float.value = set_float->value;
+				set_float_function.set_float.hardware_index = set_float->index;
+				ExecuteBlocklangFunction(&set_float_function, robot);
+			}
+			else if(header->type == PACKET_TYPE_SET_MULTIPLIER)
+			{
+				set_multiplier_packet_header *set_multiplier = (set_multiplier_packet_header *) header;
+
+				FunctionBlock set_multiplier_function = {};
+				set_multiplier_function.type = FunctionBlock_SetMultiplier;
+				set_multiplier_function.set_multiplier.value = set_multiplier->multiplier;
+				set_multiplier_function.set_multiplier.hardware_index = set_multiplier->index;
+				ExecuteBlocklangFunction(&set_multiplier_function, robot);
 			}
 		}
 	}
@@ -238,6 +270,7 @@ void HandlePackets(int server_socket, RobotHardware *hardware, u32 hardware_coun
 void TestRobot::OperatorControl()
 {
 	ButtonState buttons = {};
+
 
 	while(IsOperatorControl() && IsEnabled())
 	{
@@ -271,7 +304,9 @@ void TestRobot::OperatorControl()
 			ExecuteBlocklangFunction(&ball_shifter, this);
 		}
 
-		HandlePackets(server_socket, hardware, ArrayCount(hardware));
+		HandlePackets(&net_state, this);
 		Wait(0.05f);
 	}
 }
+
+START_ROBOT_CLASS(TestRobot);
