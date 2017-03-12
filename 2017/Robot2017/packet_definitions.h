@@ -9,6 +9,7 @@ struct RobotHardwareSample
 	   r32 motor;
 	   b32 solenoid;
        b32 _switch; //switch is used in C so ¯\_(ツ)_/¯
+	   r32 potentiometer;
    };
    
    r32 multiplier; //NOTE: currently only used for motor types;

@@ -145,11 +145,16 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
          string solenoid_state_text = latest_sample->_switch ? Literal("State: Pressed") : Literal("State: Released");
          Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
       }
-	  else if(selected_hardware->type == Hardware_Camera)
-      {
-         string solenoid_state_text = latest_sample->_switch ? Literal("State: Pressed") : Literal("State: Released");
-         Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
-      }
+	  else if(selected_hardware->type == Hardware_Potentiometer)
+	  {
+		  TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
+         
+         Text(selected_hardware_page, 
+              Concat(Literal("State: "), ToString(latest_sample->potentiometer, &temp_memory), &temp_memory),
+              20, V2(0, 0), V2(0, 5));  
+              
+         EndTemporaryMemory(temp_memory);
+	  }
    }
    else
    {

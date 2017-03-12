@@ -142,12 +142,6 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
 		   
 	   }
    }
-   else if(header->type == PACKET_TYPE_CAMERA_FEED)
-   {
-	   {
-		   
-	   }
-   }
    else if(header->type == PACKET_TYPE_DEBUG_MESSAGE)
    {
 	   debug_message_packet_header *debug_message_packet  = (debug_message_packet_header *) header;

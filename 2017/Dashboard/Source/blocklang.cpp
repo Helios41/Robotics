@@ -28,11 +28,10 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
    
    if(Button(&block_list, NULL, Literal("Arcade Drive"), button_size, V2(0, 0), V2(5, 5)).state)
    {
-	   //TODO: we removed value blocks, so how do we use controller input?
 	  FunctionBlock block = {};
-	  block.type = FunctionBlock_ArcadeDrive;
-	  block.arcade_drive.power = 0.0f;	
-	  block.arcade_drive.rotate = 0.0f;	
+	  block.type = FunctionBlock_ArcadeDriveConst;
+	  block.arcade_drive_const.power = 0.0f;	
+	  block.arcade_drive_const.rotate = 0.0f;	
       coroutine->blocks[coroutine->block_count++] = block;
    }
    NextLine(&block_list);
@@ -58,9 +57,9 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
          if(_Button(POINTER_UI_ID(curr_hardware), &block_list, NULL, curr_hardware->name, button_size, V2(0, 0), V2(5, 5)).state)
          {
 			FunctionBlock block = {};
-			block.type = FunctionBlock_SetFloat;
-			block.set_float.hardware_index = i;
-			block.set_float.value = 0.0f;
+			block.type = FunctionBlock_SetFloatConst;
+			block.set_float_const.hardware_index = i;
+			block.set_float_const.value = 0.0f;
             coroutine->blocks[coroutine->block_count++] = block;
          }
          NextLine(&block_list);
@@ -89,20 +88,6 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
 	  }
    }
    
-   /*
-   for(u32 i = 0;
-      i < vision->config_count;
-      i++)
-   {
-      VisionConfig *curr_config = vision->configs + i;
-      if(_Button(POINTER_UI_ID(curr_config), &block_list, NULL, Literal("*"), button_size, V2(0, 0), V2(5, 5)).state)
-      {
-         coroutine->blocks[coroutine->block_count++] = VisionBlock(curr_config);
-	  }
-      NextLine(&block_list);
-   }
-   */
-   
     if(coroutine->block_count == ArrayCount(coroutine->blocks))
     {
 		window->flags |= Flag_CloseRequested;
@@ -121,17 +106,20 @@ void DrawEditBlock(ui_window *window, layout *window_layout, DashboardState *das
      
    FunctionBlock *function = window->edit_block.function;
    
-   switch(function->type)
-   {
-	   case FunctionBlock_Wait:
-	   case FunctionBlock_SetFloat:
-       case FunctionBlock_SetBool:
-	   case FunctionBlock_SetMultiplier:
-	   case FunctionBlock_Vision:
-	   case FunctionBlock_ArcadeDrive:
-	   case FunctionBlock_SetDriveMultiplier:
-	      break;
-   }
+	switch(function->type)
+	{
+		case FunctionBlock_Wait:
+		case FunctionBlock_SetFloatConst:
+		case FunctionBlock_SetFloatController:
+		case FunctionBlock_SetMultiplier:
+		case FunctionBlock_SetBool:
+		case FunctionBlock_ArcadeDriveConst:
+		case FunctionBlock_ArcadeDriveController:
+		case FunctionBlock_SetDriveMultiplier:
+		case FunctionBlock_DriveDistance:
+		case FunctionBlock_GotoPosition:
+			break;
+	}
    
    if(Button(window_layout, NULL, Literal("Delete"), V2(60, 20), V2(0, 0), V2(5, 5)).state)
    {
@@ -174,12 +162,8 @@ void DrawFunctionBlock(FunctionBlock *block, rect2 bounds, layout *editor_panel,
          Text(render_context, bounds, Literal("Wait"));
          break;
       
-      case FunctionBlock_SetFloat:
+      case FunctionBlock_SetFloatConst:
          Text(render_context, bounds, Literal("*"));
-         break;
-         
-      case FunctionBlock_Vision:
-         Text(render_context, bounds, Literal("Vision"));
          break;
    
       default:
