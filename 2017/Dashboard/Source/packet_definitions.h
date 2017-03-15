@@ -265,7 +265,7 @@ struct set_multiplier_packet_header
 	r32 multiplier;
 };
 
-//NOTE: PACKET_TYPE_SET_FLOAT
+//NOTE: PACKET_TYPE_ARCADE_DRIVE
 struct arcade_drive_packet_header
 {
 	generic_packet_header header;
@@ -274,7 +274,7 @@ struct arcade_drive_packet_header
 	r32 rotate;
 };
 
-//NOTE: PACKET_TYPE_SET_MULTIPLIER
+//NOTE: PACKET_TYPE_SET_DRIVE_MULTIPLIER
 struct set_drive_multiplier_packet_header
 {
 	generic_packet_header header;

@@ -12,7 +12,7 @@
 
 //NOTE: this disables the fps limiter, remove this on ligit builds
 //      if we're burning core on the main thread
-//#define NO_FPS_LIMITER
+#define NO_FPS_LIMITER
 
 LRESULT CALLBACK WindowMessageEvent(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {	
@@ -117,6 +117,8 @@ void UpdateInputState(InputState *input, HWND window, b32 update_mouse)
    input->key_left = false;
    input->key_right = false;
 }
+
+#include "vision_test.cpp"
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {  
@@ -280,8 +282,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    dashstate.net_settings.connect_to = String((char *) malloc(sizeof(char) * 30), 30);
    Clear(dashstate.net_settings.connect_to);
-   CopyTo(Literal("192.168.0.120") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
-   dashstate.net_settings.is_mdns = true;
+   CopyTo(Literal("10.46.18.33") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
+   dashstate.net_settings.is_mdns = false;
    
    if(!net_state.bound)
    {
@@ -289,8 +291,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                  Literal("Bind Failed"), Category_Network);
    }
    
-   AddMessage((Console *) &dashstate.console,
-              Literal("Vision System Not Present XD"), Category_Vision);
+   s32 brightness = 20;
+   cv::Rect top_reference(326, 348, 40, 12);
+   cv::Rect bottom_reference(324, 324, 38, 17);
+   
+   cv::VideoCapture cap("http://10.46.18.11:80/mjpg/video.mjpg");
+   AddMessage(&dashstate.console, cap.isOpened() ? Literal("Camera Found") : Literal("Camera Not Found"), Category_Vision);
    
    NetworkReconnect(&net_state, &dashstate.net_settings);
    
@@ -299,6 +305,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    ShowWindow(window, nCmdShow);
    UpdateWindow(window);
+   
+   r32 last_track_time = 0.0f;
+   r32 vision_movement = 0.0f;
    
    GetCounter(&last_timer, timer_freq);
    while(running)
@@ -415,8 +424,31 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 		  SendPing(&net_state);
 	  }
 	 */
-	 
-	 /*
+	  
+	  u32 tracks_per_second = 5;
+	  if((ui_context.curr_time - last_track_time) > (1.0 / (r32)tracks_per_second))
+	  {
+		vision_movement = VisionTest(cap, brightness, top_reference, bottom_reference);
+		
+		if(Absolute(vision_movement) > 50)
+		{
+			SendSetFloat(&net_state, 5,
+						 (vision_movement / Absolute(vision_movement)) * 0.25);
+		}
+		else if((50 > Absolute(vision_movement)) &&
+				(Absolute(vision_movement) > 20))
+		{
+			SendSetFloat(&net_state, 5,
+						 (vision_movement / Absolute(vision_movement)) * 0.16);
+		}
+		else if(20 > Absolute(vision_movement))
+		{
+			SendSetFloat(&net_state, 5, 0.0f);
+		}
+		
+		last_track_time = ui_context.curr_time;
+	  }
+	  
       char frame_time_buffer[64];
       Rectangle(&context, RectMinSize(V2(200, 40), V2(200, 20)), V4(0, 0, 0, 0.5));
       Text(&context, V2(200, 40), Literal(R64ToString(frame_length, frame_time_buffer)), 20);
@@ -433,11 +465,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	  Rectangle(&context, RectMinSize(V2(200, 100), V2(200, 20)), V4(0, 0, 0, 0.5));
 	  Text(&context, V2(200, 100), wglSwapInterval ? Literal("wglSwapInterval") : Literal("Sleep"), 20);
 #endif
-	  */
 	  
-      RenderUI(&context, window_size);
+	  char vision_movement_buffer[64];
+      Rectangle(&context, RectMinSize(V2(200, 120), V2(200, 20)), V4(0, 0, 0, 0.5));
+      Text(&context, V2(200, 120), Literal(R64ToString(vision_movement, vision_movement_buffer)), 20);
+	  
+	  RenderUI(&context, window_size);
       SwapBuffers(device_context);
-      
+	  
       frame_length = GetCounter(&last_timer, timer_freq);
       ui_context.curr_time += frame_length / 1000.0f;
 #ifndef NO_FPS_LIMITER

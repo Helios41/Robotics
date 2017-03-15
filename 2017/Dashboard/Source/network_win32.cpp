@@ -78,14 +78,56 @@ void UploadControls(NetworkState *net_state)
 	
 }
 
-void UploadVisionConfig(NetworkState *net_state)
-{
-
-}
-
 void RequestUploadedState(NetworkState *net_state)
 {
 	SendGenericPacket(net_state, PACKET_TYPE_REQUEST_UPLOADED_STATE);
+}
+
+void SendSetFloat(NetworkState *net_state, u32 hardware_index, r32 value)
+{
+	set_float_packet_header packet = {};
+	packet.header.size = sizeof(packet);
+	packet.header.type = PACKET_TYPE_SET_FLOAT;
+	packet.index = hardware_index;
+	packet.value = value;
+	
+	sendto(net_state->socket, (const char *) &packet, sizeof(packet), 0,
+           (struct sockaddr *) &net_state->server_info, sizeof(net_state->server_info));
+}
+
+void SendSetMultiplier(NetworkState *net_state, u32 hardware_index, r32 multiplier)
+{
+	set_multiplier_packet_header packet = {};
+	packet.header.size = sizeof(packet);
+	packet.header.type = PACKET_TYPE_SET_MULTIPLIER;
+	packet.index = hardware_index;
+	packet.multiplier = multiplier;
+	
+	sendto(net_state->socket, (const char *) &packet, sizeof(packet), 0,
+           (struct sockaddr *) &net_state->server_info, sizeof(net_state->server_info));
+}
+
+void SendArcadeDrive(NetworkState *net_state, r32 power, r32 rotate)
+{
+	arcade_drive_packet_header packet = {};
+	packet.header.size = sizeof(packet);
+	packet.header.type = PACKET_TYPE_ARCADE_DRIVE;
+	packet.power = power;
+	packet.rotate = rotate;
+	
+	sendto(net_state->socket, (const char *) &packet, sizeof(packet), 0,
+           (struct sockaddr *) &net_state->server_info, sizeof(net_state->server_info));
+}
+
+void SendSetDriveMultiplier(NetworkState *net_state, r32 multiplier)
+{
+	set_drive_multiplier_packet_header packet = {};
+	packet.header.size = sizeof(packet);
+	packet.header.type = PACKET_TYPE_SET_DRIVE_MULTIPLIER;
+	packet.multiplier = multiplier;
+	
+	sendto(net_state->socket, (const char *) &packet, sizeof(packet), 0,
+           (struct sockaddr *) &net_state->server_info, sizeof(net_state->server_info));
 }
 
 void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
@@ -97,8 +139,8 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
    {
 	  welcome_packet_header *welcome_header = (welcome_packet_header *) header;
 	  
-	  robot->name = String((char *) malloc(sizeof(char) * 16), 16);
-	  CopyTo(String(welcome_header->name, 16), robot->name);
+	  robot->name = String((char *) malloc(sizeof(char) * strlen(welcome_header->name)), strlen(welcome_header->name));
+	  CopyTo(String(welcome_header->name, strlen(welcome_header->name)), robot->name);
       
 	  //TODO: way to deallocate these on resend?
 	  robot->hardware_count = welcome_header->hardware_count;
@@ -113,8 +155,8 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
 		 RobotHardware *curr_hardware = robot->hardware + i;
 		 
 		 curr_hardware->type = (RobotHardwareType) curr_hardware_in->type;
-		 curr_hardware->name = String((char *) malloc(sizeof(char) * 16), 16);
-		 CopyTo(String(curr_hardware_in->name, 16), curr_hardware->name);
+		 curr_hardware->name = String((char *) malloc(sizeof(char) * strlen(curr_hardware_in->name)), strlen(curr_hardware_in->name));
+		 CopyTo(String(curr_hardware_in->name, strlen(curr_hardware_in->name)), curr_hardware->name);
 	  }
 	  
 	  robot->connected = true;
