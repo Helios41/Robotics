@@ -198,8 +198,10 @@ struct DashboardState
 		r32 right_limit;
 		
 		b32 frame_grab_success;
-		cv::Mat grabbed_frame;
+		cv::Mat *grabbed_frame;
 		
+		r32 sweep_speed;
+	
 		r32 last_track_time;
 		r32 movement;
 	} vision;

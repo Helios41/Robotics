@@ -81,7 +81,7 @@ r32 VisionTest(cv::VideoCapture *cap, s32 brightness,
 	if(frame_success)
 	{
 		frame = frame + cv::Scalar(brightness, brightness, brightness);
-		dashstate->vision.grabbed_frame = frame.clone();
+		frame.copyTo(*dashstate->vision.grabbed_frame);
 		
 		cv::Mat masked = process(frame);
 		Target target = track(masked);
@@ -125,7 +125,7 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 			dashstate->vision.turret_speed = 0.0f;
 		}
 		
-		//SendSetFloat(dashstate->net_state, 5, dashstate->vision.turret_speed);
+		SendSetFloat(dashstate->net_state, 5, dashstate->vision.turret_speed);
 		dashstate->vision.last_track_time = context->curr_time;
 	}
 }
@@ -237,6 +237,23 @@ void DrawVision(layout *vision_ui, UIContext *context, DashboardState *dashstate
 	
 		Text(&vision_info_page, Concat(Literal("Potentiometer: "), ToString(potentiometer_reading, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
 		NextLine(&vision_info_page);
+		
+		if(!dashstate->vision.target_hit && dashstate->vision.enabled)
+		{
+			if(dashstate->vision.left_limit > potentiometer_reading)
+			{
+				dashstate->vision.sweep_speed = -0.2;
+			}
+			else if(potentiometer_reading > dashstate->vision.right_limit)
+			{
+				dashstate->vision.sweep_speed = 0.2;
+			}
+			
+			SendSetFloat(dashstate->net_state, 5, dashstate->vision.sweep_speed);
+		}
+		
+		Text(&vision_info_page, Concat(Literal("Swivel Speed: "), ToString(dashstate->vision.sweep_speed, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
+		NextLine(&vision_info_page);
 	}
 	
 	if(dashstate->vision.camera->isOpened())
@@ -246,7 +263,7 @@ void DrawVision(layout *vision_ui, UIContext *context, DashboardState *dashstate
 		
 		if(dashstate->vision.frame_grab_success)
 		{
-			DrawMat(render_context, camera_view.bounds.min, &dashstate->vision.grabbed_frame);
+			DrawMat(render_context, camera_view.bounds.min, dashstate->vision.grabbed_frame);
 		}
 		else
 		{

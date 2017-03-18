@@ -310,14 +310,7 @@ void DrawRobot(layout *robot_ui, UIContext *context, DashboardState *dashstate)
 			Text(&selected_hardware_page,
 				 Concat(Literal("Right: "), ToString(latest_sample->right, &temp_memory), robot->drive_encoder ? Literal("RPM") : Literal(""), &temp_memory),
 				 20, V2(0, 0), V2(0, 5)); 
-       	
-			NextLine(&selected_hardware_page);
-			
-			Text(&selected_hardware_page,
-				 Concat(Literal("Diff: "), ToString(value_difference, &temp_memory), &temp_memory),
-				 20, V2(0, 0), V2(0, 5)); 
-			NextLine(&selected_hardware_page);
-			
+				 
 			EndTemporaryMemory(temp_memory);
 		}
 		else

@@ -255,7 +255,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    };
    
    MemoryArena generic_arena = {};
-   InitMemoryArena(&generic_arena, VirtualAlloc(0, Megabyte(64), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE), Megabyte(64));
+   InitMemoryArena(&generic_arena, VirtualAlloc(0, Megabyte(64), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE), Megabyte(64));
    
    RenderContext context = InitRenderContext(&generic_arena, Megabyte(12));
    
@@ -276,6 +276,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    dashstate.vision.brightness = 20;
    dashstate.vision.top_reference = RectMinSize(V2(250, 300), V2(70, 18));
    dashstate.vision.bottom_reference = RectMinSize(V2(250, 264), V2(68, 28));
+   
+   dashstate.vision.grabbed_frame = new cv::Mat(dashstate.vision.camera->get(CV_CAP_PROP_FRAME_WIDTH),
+												dashstate.vision.camera->get(CV_CAP_PROP_FRAME_HEIGHT),
+												CV_32F);
    
    dashstate.net_settings.connect_to = String((char *) malloc(sizeof(char) * 30), 30);
    Clear(dashstate.net_settings.connect_to);
@@ -406,8 +410,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       DrawDashboardUI(&ui_context, &dashstate);
 	  RunVision(&ui_context, &dashstate);
 	 
-      HandlePackets(&generic_arena, &net_state,
+	  HandlePackets(&generic_arena, &net_state,
 					&dashstate.robot, ui_context.curr_time);
+	
 	/*
 	  dashstate.robot.connected = 1.0f > (net_state.last_packet_recieved - ui_context.curr_time);
 	 

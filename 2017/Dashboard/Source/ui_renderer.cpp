@@ -210,6 +210,16 @@ RenderContext InitRenderContext(MemoryArena *memory, u32 render_commands_size)
    result.font.baseline_from_height = heightest_above_baseline / result.font.native_height;
    result.font.space_width = result.font.native_height * 0.4f;
    
+   	glEnable(GL_TEXTURE_2D);
+	glGenTextures(1, &result.mat_texture);
+	glBindTexture(GL_TEXTURE_2D, result.mat_texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glDisable(GL_TEXTURE_2D);
+   
    return result;
 }
 
@@ -356,16 +366,6 @@ void RenderUI(RenderContext *context, v2 window_size)
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glOrtho(0.0f, window_width, window_height, 0.0f, -10.0f, 10.0f);
-
-	glEnable(GL_TEXTURE_2D);
-	glGenTextures(1, &context->mat_texture);
-	glBindTexture(GL_TEXTURE_2D, context->mat_texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	glDisable(GL_TEXTURE_2D);
 	
 	//TODO: radix sort 
    
