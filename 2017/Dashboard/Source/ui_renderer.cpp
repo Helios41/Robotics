@@ -24,8 +24,9 @@ enum RenderCommandType
 {
 	RenderCommandType_DrawRectangle,
 	RenderCommandType_DrawBitmap,
-   RenderCommandType_DrawRectangleOutline,
-   RenderCommandType_DrawLine
+	RenderCommandType_DrawRectangleOutline,
+	RenderCommandType_DrawLine,
+	RenderCommandType_DrawMat
 };
 
 struct RenderCommandHeader
@@ -66,11 +67,20 @@ struct DrawLineCommand
    u32 thickness;
 };
 
+struct DrawMatCommand
+{
+	RenderCommandHeader header;
+	v2 pos;
+	cv::Mat *mat;
+};
+
 struct RenderContext
 {
    u32 render_commands_size;
    u8 *render_commands_at;
    u8 *render_commands;
+   
+   u32 mat_texture;
    
    struct
    {
@@ -298,16 +308,37 @@ DrawLineCommand *Line(RenderContext *context, v2 a, v2 b, v4 color, u32 thicknes
 		draw_rectangle_outline->header.size = sizeof(DrawLineCommand);
 		draw_rectangle_outline->header.type = RenderCommandType_DrawLine;
 		draw_rectangle_outline->a = a;
-      draw_rectangle_outline->b = b;
+		draw_rectangle_outline->b = b;
 		draw_rectangle_outline->color = color;
-      draw_rectangle_outline->thickness = thickness;
+		draw_rectangle_outline->thickness = thickness;
       
 		context->render_commands_at += sizeof(DrawLineCommand);
-      return draw_rectangle_outline;
+		return draw_rectangle_outline;
 	}
    
    return NULL;
 }
+
+DrawMatCommand *DrawMat(RenderContext *context, v2 pos, cv::Mat *mat)
+{
+	DrawMatCommand *draw_mat = (DrawMatCommand *) context->render_commands_at;
+   
+	if((context->render_commands_at + sizeof(DrawMatCommand)) < 
+      (context->render_commands + context->render_commands_size))
+	{
+		draw_mat->header.size = sizeof(DrawMatCommand);
+		draw_mat->header.type = RenderCommandType_DrawMat;
+		draw_mat->pos = pos;
+		draw_mat->mat = mat;
+		
+		context->render_commands_at += sizeof(DrawMatCommand);
+		return draw_mat;
+	}
+   
+   return NULL;
+}
+
+#define GL_BGR 0x80E0
 
 //TODO: shader support (eg. guassian blured tiles), Opengl 3 & a layer based sort (radix sort)
 void RenderUI(RenderContext *context, v2 window_size)
@@ -316,7 +347,6 @@ void RenderUI(RenderContext *context, v2 window_size)
 	r32 window_height = window_size.y;
 	glViewport(0.0f, 0.0f, window_width, window_height);
 
-	glEnable(GL_TEXTURE_2D);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -327,12 +357,22 @@ void RenderUI(RenderContext *context, v2 window_size)
 	glLoadIdentity();
 	glOrtho(0.0f, window_width, window_height, 0.0f, -10.0f, 10.0f);
 
-   //TODO: radix sort 
+	glEnable(GL_TEXTURE_2D);
+	glGenTextures(1, &context->mat_texture);
+	glBindTexture(GL_TEXTURE_2D, context->mat_texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glDisable(GL_TEXTURE_2D);
+	
+	//TODO: radix sort 
    
 	RenderCommandHeader *render_command = (RenderCommandHeader *) context->render_commands;
 	while((u8 *)render_command != context->render_commands_at)
 	{  
-      //TODO: setup glScissor region
+		//TODO: setup glScissor region
 
 		switch (render_command->type)
 		{
@@ -357,6 +397,7 @@ void RenderUI(RenderContext *context, v2 window_size)
 				DrawBitmapCommand *draw_bitmap = (DrawBitmapCommand *) render_command;
 				rect2 area = RectMinSize(draw_bitmap->pos, draw_bitmap->size);
 
+				glEnable(GL_TEXTURE_2D);
 				glBindTexture(GL_TEXTURE_2D, draw_bitmap->bitmap->gl_texture);
 
 				glBegin(GL_QUADS);
@@ -378,61 +419,100 @@ void RenderUI(RenderContext *context, v2 window_size)
 				glEnd();
 
 				glBindTexture(GL_TEXTURE_2D, 0);
+				glDisable(GL_TEXTURE_2D);
 			}
 			break;
          
-         case RenderCommandType_DrawRectangleOutline:
-         {
-            DrawRectangleOutlineCommand *draw_rectangle_outline = (DrawRectangleOutlineCommand *) render_command;
+			case RenderCommandType_DrawRectangleOutline:
+			{
+				DrawRectangleOutlineCommand *draw_rectangle_outline = (DrawRectangleOutlineCommand *) render_command;
+					
+				v2 min = draw_rectangle_outline->area.min;
+				v2 max = draw_rectangle_outline->area.max;
 				
-            v2 min = draw_rectangle_outline->area.min;
-            v2 max = draw_rectangle_outline->area.max;
-            
-            glLineWidth(draw_rectangle_outline->thickness);
-            
+				glLineWidth(draw_rectangle_outline->thickness);
+				
 				glBegin(GL_LINES);
 				{
 					glColor4fv(draw_rectangle_outline->color.vs);
 					
-               glVertex2f(min.x, min.y);
+					glVertex2f(min.x, min.y);
 					glVertex2f(max.x, min.y);
 					
-               glVertex2f(max.x, min.y);
+					glVertex2f(max.x, min.y);
 					glVertex2f(max.x, max.y);
-               
-               glVertex2f(max.x, max.y);
+				
+					glVertex2f(max.x, max.y);
 					glVertex2f(min.x, max.y);
-               
-               glVertex2f(min.x, max.y);
+				
+					glVertex2f(min.x, max.y);
 					glVertex2f(min.x, min.y);
 				}
 				glEnd();
-            
-            glLineWidth(1);
-         }
-         break;
-         
-         case RenderCommandType_DrawLine:
-         {
-            DrawLineCommand *draw_line = (DrawLineCommand *) render_command;
 				
-            v2 a = draw_line->a;
-            v2 b = draw_line->b;
-            
-            glLineWidth(draw_line->thickness);
-            
+				glLineWidth(1);
+			}
+			break;
+         
+			case RenderCommandType_DrawLine:
+			{
+				DrawLineCommand *draw_line = (DrawLineCommand *) render_command;
+					
+				v2 a = draw_line->a;
+				v2 b = draw_line->b;
+				
+				glLineWidth(draw_line->thickness);
+				
 				glBegin(GL_LINES);
 				{
 					glColor4fv(draw_line->color.vs);
-					
-               glVertex2f(a.x, a.y);
+						
+					glVertex2f(a.x, a.y);
 					glVertex2f(b.x, b.y);
 				}
 				glEnd();
-            
-            glLineWidth(1);
-         }
-         break;
+				
+				glLineWidth(1);
+			}
+			break;
+			
+			case RenderCommandType_DrawMat:
+			{
+				DrawMatCommand *draw_mat = (DrawMatCommand *) render_command;
+				u32 width = draw_mat->mat->cols;
+				u32 height = draw_mat->mat->rows;
+				rect2 area = RectMinSize(draw_mat->pos, V2(width, height));
+				
+				glEnable(GL_TEXTURE_2D);
+				glBindTexture(GL_TEXTURE_2D, context->mat_texture);
+
+				glPixelStorei(GL_UNPACK_ALIGNMENT, (draw_mat->mat->step & 3) ? 1 : 4);
+				glPixelStorei(GL_UNPACK_ROW_LENGTH, draw_mat->mat->step / draw_mat->mat->elemSize());
+				
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_BGR, GL_UNSIGNED_BYTE, draw_mat->mat->data);
+				
+				glBegin(GL_QUADS);
+				{
+					glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+	
+					glTexCoord2f(0.0f, 0.0f);
+					glVertex2f(area.min.x, area.min.y);
+
+					glTexCoord2f(1.0f, 0.0f);
+					glVertex2f(area.max.x, area.min.y);
+
+					glTexCoord2f(1.0f, 1.0f);
+					glVertex2f(area.max.x, area.max.y);
+
+					glTexCoord2f(0.0f, 1.0f);
+					glVertex2f(area.min.x, area.max.y);
+				}
+				glEnd();
+				
+				glBindTexture(GL_TEXTURE_2D, 0);
+				glDisable(GL_TEXTURE_2D);
+			}
+			break;
 		}
 
 		render_command = (RenderCommandHeader *) ((u8 *) render_command + render_command->size);
@@ -821,31 +901,42 @@ v2 GetTextSize(RenderContext *context, string text, u32 scale)
 
 void Text(RenderContext *context, rect2 bounds, string text)
 {  
-   r32 baseline = GetSize(bounds).y * context->font.baseline_from_height;
-   v2 origin = bounds.min;
-   r32 scale_coeff = GetSize(bounds).y / context->font.native_height;
-   
-   RectangleOutline(context, bounds, V4(0, 0, 0, 1));
-   Line(context, V2(bounds.min.x, bounds.min.y + baseline), V2(bounds.max.x, bounds.min.y + baseline), V4(0, 0, 0, 1));
-   
-	u32 xoffset = 0;
-	for(u32 i = 0;
-       i < text.length;
-       i++)
+	r32 bound_height = GetSize(bounds).y;
+	r32 default_size_width = GetTextWidth(context, text, bound_height);
+	
+	if(default_size_width > GetSize(bounds).x)
 	{
-      char c = text.text[i];
-      
-		if (c == ' ')
+		bound_height = (GetSize(bounds).y * GetSize(bounds).x) / default_size_width;
+	}
+
+	if(bound_height > 10)
+	{
+		r32 baseline = bound_height * context->font.baseline_from_height;
+		v2 origin = bounds.min;
+		r32 scale_coeff = bound_height / context->font.native_height;
+		
+		RectangleOutline(context, bounds, V4(0, 0, 0, 1));
+		Line(context, V2(bounds.min.x, bounds.min.y + baseline), V2(bounds.max.x, bounds.min.y + baseline), V4(0, 0, 0, 1));
+		
+		u32 xoffset = 0;
+		for(u32 i = 0;
+			i < text.length;
+			i++)
 		{
-			xoffset += context->font.space_width * scale_coeff;
-		}
-		else if((32 < c) && (c < 127))
-		{
-			CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
-			Bitmap(context, &char_bitmap->bitmap,
-                V2(origin.x + xoffset, origin.y + (baseline - char_bitmap->height_above_baseline * scale_coeff)),
-                V2(char_bitmap->bitmap.width, char_bitmap->bitmap.height) * scale_coeff);
-			xoffset += char_bitmap->bitmap.width * scale_coeff + Min(char_bitmap->bitmap.width * scale_coeff / 2, scale_coeff * 10);
+			char c = text.text[i];
+		
+			if (c == ' ')
+			{
+				xoffset += context->font.space_width * scale_coeff;
+			}
+			else if((32 < c) && (c < 127))
+			{
+				CharacterBitmap *char_bitmap = context->characters + ((u32)c - 33);
+				Bitmap(context, &char_bitmap->bitmap,
+					   V2(origin.x + xoffset, origin.y + (baseline - char_bitmap->height_above_baseline * scale_coeff)),
+					   V2(char_bitmap->bitmap.width, char_bitmap->bitmap.height) * scale_coeff);
+				xoffset += char_bitmap->bitmap.width * scale_coeff + Min(char_bitmap->bitmap.width * scale_coeff / 2, scale_coeff * 10);
+			}
 		}
 	}
 }
@@ -907,72 +998,13 @@ rect2 GetCharBounds(RenderContext *context, v2 pos, string text, u32 scale, u32 
    return GetCharBounds(context, bounds, text, char_index);
 }
 
-//TODO: automatic scale picking based on bounds
-//      pass a "max_scale" and "min_scale" 
+//TODO: rewrite this using a finite set (3) of text sizes 
 void TextLabel(RenderContext *render_context, rect2 bounds, string text)
 {
-   if(!IsEmpty(text))
-   {
-      if(CountChar(text, ' ') == 0)
-      {
-         r32 ratio = GetSize(bounds).y / GetTextWidth(render_context, text, GetSize(bounds).y);
-         r32 scale = ratio * GetSize(bounds).x;
-         
-         if((scale > 10) && (GetSize(bounds).x > 10))
-            Text(render_context, bounds.min, text, scale);
-      }
-      else
-      {
-         //TODO: rewrite this codepath
-#if 0
-         u32 segment_count;
-         string *segments = Split(text, ' ', &segment_count);
-         v2 bounds_size = GetSize(bounds);
-         
-         if(segment_count > 1)
-         {
-            string curr_line = String(text.text, 0);
-            v2 at = bounds.min;
-            
-            for(u32 i = 0;
-                i < segment_count;
-                i++)
-            {
-               string curr_segment = segments[i];
-               string new_line = String(curr_line.text, curr_line.length + ((i == 0) ? 0 : 1) + curr_segment.length);
-               v2 new_line_size = GetTextSize(render_context, new_line, scale);
-               
-               if(new_line_size.x > bounds_size.x)
-               {
-                  r32 curr_line_height = GetTextSize(render_context, curr_line, scale).y;
-                  
-                  if((at.y + curr_line_height) > bounds.max.y)
-                  {
-                     curr_line = EmptyString();
-                     break;
-                  }
-                     
-                  Text(render_context, at, curr_line, scale);
-                  curr_line = curr_segment;
-                  at = at + V2(0, curr_line_height);
-               }
-               else
-               {
-                  curr_line = new_line;
-               }
-            }
-            
-            Text(render_context, at, curr_line, scale);
-         }
-         else
-         {
-            Text(render_context, bounds.min, text, scale);
-         }
-         
-         free(segments);
-#endif
-      }
-   }
+	if(!IsEmpty(text))
+	{
+	   Text(render_context, bounds, text);
+	}
 }
 
 element Rectangle(layout *ui_layout, v4 color, v2 element_size, v2 padding_size, v2 margin_size)
@@ -1408,6 +1440,13 @@ void _TextBox(ui_id id, layout *ui_layout, u32 min, u32 *value, v2 element_size,
    *value = Max(min, *value);
 }
 
+void _TextBox(ui_id id, layout *ui_layout, s32 min, s32 max, s32 *value, v2 element_size, v2 padding_size, v2 margin_size)
+{
+	r32 float_value = (r32) *value;
+   _TextBox(id, ui_layout, &float_value, element_size, padding_size, margin_size);
+   *value = (s32)Clamp(min, max, float_value);
+}
+
 #define TextBox(...) _TextBox(GEN_UI_ID, __VA_ARGS__)
 
 void _SliderBar(ui_id id, layout *ui_layout, r32 min, r32 max, r32 *value, v2 element_size, v2 padding_size, v2 margin_size)
@@ -1474,6 +1513,20 @@ void _SliderBar(ui_id id, layout *ui_layout, r32 min, r32 max, r32 *value, v2 el
    {
       Rectangle(render_context, tab_bounds, V4(0.5f, 0.0f, 0.0f, 1.0f));
    }
+}
+
+void _SliderBar(ui_id id, layout *ui_layout, s32 min, s32 max, s32 *value, v2 element_size, v2 padding_size, v2 margin_size)
+{
+	r32 float_value = (r32) *value;
+	_SliderBar(id, ui_layout, min, max, &float_value, element_size, padding_size, margin_size);
+	*value = (s32)float_value;
+}
+
+void _SliderBar(ui_id id, layout *ui_layout, u32 min, u32 max, u32 *value, v2 element_size, v2 padding_size, v2 margin_size)
+{
+	r32 float_value = (r32) *value;
+	_SliderBar(id, ui_layout, min, max, &float_value, element_size, padding_size, margin_size);
+	*value = (u32)float_value;
 }
 
 #define SliderBar(...) _SliderBar(GEN_UI_ID, __VA_ARGS__)

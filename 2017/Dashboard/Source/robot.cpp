@@ -35,163 +35,294 @@ void DrawHardwareList(layout *hardware_list, UIContext *context, Robot *robot)
    }
 }
 
+RobotHardwareSample *GetLatestSample(RobotHardware *hardware)
+{
+	u64 latest_timestamp = MIN_U64;
+	RobotHardwareSample *latest_sample = NULL;
+   
+	for(u32 i = 0;
+		i < ArrayCount(hardware->samples);
+		i++)
+	{
+		RobotHardwareSample *curr = hardware->samples + i;
+		latest_timestamp = Max(latest_timestamp, curr->timestamp);
+	
+		if(curr->timestamp == latest_timestamp)
+		{
+			latest_sample = curr;
+		}
+	}
+	
+	return latest_sample;
+}
+
 void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context,
                               Robot *robot, MemoryArena *generic_arena)
 {
-   Rectangle(context->render_context, selected_hardware_page->bounds, V4(0.3, 0.3, 0.3, 0.6));
-   RectangleOutline(context->render_context, selected_hardware_page->bounds, V4(0, 0, 0, 1));
+	Rectangle(context->render_context, selected_hardware_page->bounds, V4(0.3, 0.3, 0.3, 0.6));
+	RectangleOutline(context->render_context, selected_hardware_page->bounds, V4(0, 0, 0, 1));
    
-   RobotHardware *selected_hardware = robot->selected_hardware;
-   Text(selected_hardware_page, selected_hardware->name, 40,
-        V2((GetSize(selected_hardware_page->bounds).x - GetTextWidth(context->render_context, selected_hardware->name, 40)) / 2.0f, 0), V2(0, 5)); 
+	RobotHardware *selected_hardware = robot->selected_hardware;
+	Text(selected_hardware_page, selected_hardware->name, 40,
+         V2((GetSize(selected_hardware_page->bounds).x - GetTextWidth(context->render_context, selected_hardware->name, 40)) / 2.0f, 0), V2(0, 5)); 
    
-   layout time_graph = Panel(selected_hardware_page, V2(GetSize(selected_hardware_page->bounds).x - 10, GetSize(selected_hardware_page->bounds).y * 0.45), V2(0, 0), V2(5, 5)).lout;
-   NextLine(selected_hardware_page);
+	layout time_graph = Panel(selected_hardware_page, V2(GetSize(selected_hardware_page->bounds).x - 10, GetSize(selected_hardware_page->bounds).y * 0.45), V2(0, 0), V2(5, 5)).lout;
+	NextLine(selected_hardware_page);
    
-   u64 earliest_timestamp = MAX_U64;
-   u64 latest_timestamp = MIN_U64;
-      
-   for(u32 i = 0;
-       i < ArrayCount(selected_hardware->samples);
-       i++)
-   {
-      RobotHardwareSample *curr = selected_hardware->samples + i;
-      earliest_timestamp = Min(earliest_timestamp, curr->timestamp);
-      latest_timestamp = Max(latest_timestamp, curr->timestamp);
-   }
+	u64 earliest_timestamp = MAX_U64;
+	u64 latest_timestamp = MIN_U64;
+	RobotHardwareSample *latest_sample = NULL;
    
-   RobotHardwareSample *latest_sample = NULL;
+	for(u32 i = 0;
+		i < ArrayCount(selected_hardware->samples);
+		i++)
+	{
+		RobotHardwareSample *curr = selected_hardware->samples + i;
+	
+		earliest_timestamp = Min(earliest_timestamp, curr->timestamp);
+		latest_timestamp = Max(latest_timestamp, curr->timestamp);
+	
+		if(curr->timestamp == latest_timestamp)
+		{
+			latest_sample = curr;
+		}
+	}
    
-   for(u32 i = 0;
-       i < ArrayCount(selected_hardware->samples);
-       i++)
-   {
-      RobotHardwareSample *curr = selected_hardware->samples + i;
-      if(curr->timestamp == latest_timestamp)
-      {
-         latest_sample = curr;
-         break;
-      }
-   }
+	Rectangle(context->render_context, time_graph.bounds, V4(0.3, 0.3, 0.3, 0.6));
+	RectangleOutline(context->render_context, time_graph.bounds, V4(0, 0, 0, 1));
    
-   Rectangle(context->render_context, time_graph.bounds, V4(0.3, 0.3, 0.3, 0.6));
-   RectangleOutline(context->render_context, time_graph.bounds, V4(0, 0, 0, 1));
-   
-   if((latest_timestamp - earliest_timestamp) != 0)
-   {
-	   /*
-      r32 graph_height = GetSize(time_graph.bounds).y;
-      r32 x_axis_interval = GetSize(time_graph.bounds).x / (latest_timestamp - earliest_timestamp);
-      r32 y_axis_scale = GetSize(time_graph.bounds).y / 2.0f;
-   
-      for(u32 i = 0;
-          i < (ArrayCount(selected_hardware->samples) - 1);
-          i++)
-      {
-         if(selected_hardware->type == Hardware_Motor)
-         {
-            v2 a = V2(i * x_axis_interval, graph_height - (selected_hardware->samples[i].state.motor + 1) * y_axis_scale);
-            v2 b = V2((i + 1) * x_axis_interval, graph_height - (selected_hardware->samples[i + 1].state.motor + 1) * y_axis_scale);
-            Line(context->render_context, time_graph.bounds.min + a, time_graph.bounds.min + b, V4(0, 0, 0, 1), 2);
-         }
-         else if(selected_hardware->type == Hardware_Solenoid)
-         {
-            
-         }
-         else if(selected_hardware->type == Hardware_Drive)
-         {
-            v2 a_rotate = V2(i * x_axis_interval,
-                             graph_height - (selected_hardware->samples[i].state.rotate + 1) * y_axis_scale);
-            v2 b_rotate = V2((i + 1) * x_axis_interval,
-                             graph_height - (selected_hardware->samples[i + 1].state.rotate + 1) * y_axis_scale);
-            Line(context->render_context, time_graph.bounds.min + a_rotate, time_graph.bounds.min + b_rotate, V4(0, 0, 0, 1), 2);
-            
-            v2 a_forward = V2(i * x_axis_interval,
-                              graph_height - (selected_hardware->samples[i].state.forward + 1) * y_axis_scale);
-            v2 b_forward = V2((i + 1) * x_axis_interval,
-                              graph_height - (selected_hardware->samples[i + 1].state.forward + 1) * y_axis_scale);
-            Line(context->render_context, time_graph.bounds.min + a_forward, time_graph.bounds.min + b_forward, V4(1, 1, 1, 1), 2);
-         }
-      }
-      */
+	if((latest_timestamp - earliest_timestamp) != 0)
+	{
+		r32 lowest_value = FLTMAX;
+		r32 highest_value = -FLTMAX;
+	
+		for(u32 i = 0;
+			i < ArrayCount(selected_hardware->samples);
+			i++)
+		{
+			RobotHardwareSample *curr = selected_hardware->samples + i;
+			r32 curr_value = 0;
+			
+			if((selected_hardware->type == Hardware_Motor) ||
+			   (selected_hardware->type == Hardware_EncoderMotor))
+			{
+				curr_value = curr->motor;
+			}
+			else if(selected_hardware->type == Hardware_Potentiometer)
+			{ 
+				curr_value = curr->potentiometer;
+			}
+			
+			lowest_value = Min(lowest_value, curr_value);
+			highest_value = Max(highest_value, curr_value);		
+		}
+	
+		r32 value_difference = highest_value - lowest_value;
+	
+		r32 graph_height = GetSize(time_graph.bounds).y;
+		r32 x_axis_interval = GetSize(time_graph.bounds).x / (latest_timestamp - earliest_timestamp);
+		r32 y_axis_scale = GetSize(time_graph.bounds).y / value_difference;
 	  
-      if(selected_hardware->type == Hardware_Motor)
-      {
-         TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
+		for(u32 i = 0;
+			i < ArrayCount(selected_hardware->samples);
+			i++)
+		{
+			r32 x = x_axis_interval * (selected_hardware->samples[i].timestamp - earliest_timestamp);
+			r32 y = 0;
+			
+			if(selected_hardware->type == Hardware_Motor)
+			{
+				y = graph_height - (selected_hardware->samples[i].motor - lowest_value) * y_axis_scale;
+			}
+			else if(selected_hardware->type == Hardware_EncoderMotor)
+			{
+				y = graph_height - (selected_hardware->samples[i].motor - lowest_value) * y_axis_scale;
+			}
+			else if(selected_hardware->type == Hardware_Solenoid)
+			{
+				y = GetSize(time_graph.bounds).y * (selected_hardware->samples[i]._switch ? 0.8 : 0.2);
+			}
+			else if(selected_hardware->type == Hardware_Switch)
+			{
+				y = GetSize(time_graph.bounds).y * (selected_hardware->samples[i].solenoid ? 0.8 : 0.2);
+			}
+			else if(selected_hardware->type == Hardware_Potentiometer)
+			{
+				y = graph_height - (selected_hardware->samples[i].potentiometer - lowest_value) * y_axis_scale;
+			}
+			
+			Rectangle(context->render_context,
+					  RectPosSize(V2(x, y) + time_graph.bounds.min, V2(5, 5)),
+					  V4(0, 0, 0, 1));
+		}
+	  
+		if(selected_hardware->type == Hardware_Motor)
+		{
+			TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
          
-         Text(selected_hardware_page, 
-              Concat(Literal("State: "), ToString(latest_sample->motor, &temp_memory), &temp_memory),
-              20, V2(0, 0), V2(0, 5));  
+			Text(selected_hardware_page, 
+				 Concat(Literal("State: "), ToString(latest_sample->motor, &temp_memory), &temp_memory),
+				 20, V2(0, 0), V2(0, 5));  
               
-         EndTemporaryMemory(temp_memory);
-      }
-	  else if(selected_hardware->type == Hardware_EncoderMotor)
-      {
-         TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
+			EndTemporaryMemory(temp_memory);
+		}
+		else if(selected_hardware->type == Hardware_EncoderMotor)
+		{
+			TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
          
-         Text(selected_hardware_page, 
-              Concat(Literal("State: "), ToString(latest_sample->motor, &temp_memory), Literal("RPM"), &temp_memory),
-              20, V2(0, 0), V2(0, 5));  
+			Text(selected_hardware_page, 
+				 Concat(Literal("State: "), ToString(latest_sample->motor, &temp_memory), Literal("RPM"), &temp_memory),
+				 20, V2(0, 0), V2(0, 5));  
               
-         EndTemporaryMemory(temp_memory);
-      }
-      else if(selected_hardware->type == Hardware_Solenoid)
-      {
-         string solenoid_state_text = latest_sample->solenoid ? Literal("State: Extended") : Literal("State: Retracted");
-         Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
-      }
-	  else if(selected_hardware->type == Hardware_Switch)
-      {
-         string solenoid_state_text = latest_sample->_switch ? Literal("State: Pressed") : Literal("State: Released");
-         Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
-      }
-	  else if(selected_hardware->type == Hardware_Potentiometer)
-	  {
-		  TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
+			EndTemporaryMemory(temp_memory);
+		}
+		else if(selected_hardware->type == Hardware_Solenoid)
+		{
+			string solenoid_state_text = latest_sample->solenoid ? Literal("State: Extended") : Literal("State: Retracted");
+			Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
+		}
+		else if(selected_hardware->type == Hardware_Switch)
+		{
+			string solenoid_state_text = latest_sample->_switch ? Literal("State: Pressed") : Literal("State: Released");
+			Text(selected_hardware_page, solenoid_state_text, 20, V2(0, 0), V2(0, 5)); 
+		}
+		else if(selected_hardware->type == Hardware_Potentiometer)
+		{
+			TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
          
-         Text(selected_hardware_page, 
-              Concat(Literal("State: "), ToString(latest_sample->potentiometer, &temp_memory), &temp_memory),
-              20, V2(0, 0), V2(0, 5));  
+			Text(selected_hardware_page, 
+				 Concat(Literal("State: "), ToString(latest_sample->potentiometer, &temp_memory), &temp_memory),
+				 20, V2(0, 0), V2(0, 5));  
               
-         EndTemporaryMemory(temp_memory);
-	  }
-   }
-   else
-   {
-      Text(&time_graph, Literal("No Data"), 40,
-           V2((GetSize(time_graph.bounds).x - GetTextWidth(context->render_context, Literal("No Data"), 40)) / 2.0f,
-              (GetSize(time_graph.bounds).y - 40) / 2.0f), V2(0, 0)); 
-   }
+			EndTemporaryMemory(temp_memory);
+		}
+	}
+	else
+	{
+		Text(&time_graph, Literal("No Data"), 40,
+			 V2((GetSize(time_graph.bounds).x - GetTextWidth(context->render_context, Literal("No Data"), 40)) / 2.0f,
+				(GetSize(time_graph.bounds).y - 40) / 2.0f), V2(0, 0)); 
+	}
 }
 
 void DrawRobot(layout *robot_ui, UIContext *context, DashboardState *dashstate)
 {
-   Robot *robot = &dashstate->robot;
-   v2 robot_ui_size = GetSize(robot_ui->bounds);
-   layout hardware_list = Panel(robot_ui, V2(robot_ui_size.x * 0.2, robot_ui_size.y) - V2(10, 10), V2(0, 0), V2(5, 5)).lout;
-   layout selected_hardware_page = Panel(robot_ui, V2(robot_ui_size.x * 0.8, robot_ui_size.y) - V2(5, 10), V2(0, 0), V2(5, 5)).lout;
+	Robot *robot = &dashstate->robot;
+	v2 robot_ui_size = GetSize(robot_ui->bounds);
+	layout hardware_list = Panel(robot_ui, V2(robot_ui_size.x * 0.2, robot_ui_size.y) - V2(10, 10), V2(0, 0), V2(5, 5)).lout;
+	layout selected_hardware_page = Panel(robot_ui, V2(robot_ui_size.x * 0.8, robot_ui_size.y) - V2(5, 10), V2(0, 0), V2(5, 5)).lout;
    
-   DrawHardwareList(&hardware_list, context, robot);
+	DrawHardwareList(&hardware_list, context, robot);
    
-   if(robot->selected_hardware)
-   {
-      DrawSelectedHardwarePage(&selected_hardware_page, context, robot, dashstate->generic_arena);
-   }
-   else
-   {
-	   
-	   /*
-	  TemporaryMemoryArena temp_memory = BeginTemporaryMemory(dashstate->generic_arena);
+	if(robot->selected_hardware)
+	{
+		DrawSelectedHardwarePage(&selected_hardware_page, context, robot, dashstate->generic_arena);
+	}
+	else
+	{
+		Rectangle(context->render_context, selected_hardware_page.bounds, V4(0.3, 0.3, 0.3, 0.6));
+		RectangleOutline(context->render_context, selected_hardware_page.bounds, V4(0, 0, 0, 1));
+   
+		RobotHardware *selected_hardware = robot->selected_hardware;
+		Text(&selected_hardware_page, Literal("Drive Train"), 40,
+			 V2((GetSize(selected_hardware_page.bounds).x - GetTextWidth(context->render_context, Literal("Drive Train"), 40)) / 2.0f, 0), V2(0, 5)); 
+   
+		layout time_graph = Panel(&selected_hardware_page, V2(GetSize(selected_hardware_page.bounds).x - 10, GetSize(selected_hardware_page.bounds).y * 0.45), V2(0, 0), V2(5, 5)).lout;
+		NextLine(&selected_hardware_page);
+   
+		Rectangle(context->render_context, time_graph.bounds, V4(0.3, 0.3, 0.3, 0.6));
+		RectangleOutline(context->render_context, time_graph.bounds, V4(0, 0, 0, 1));
+   
+		u64 earliest_timestamp = MAX_U64;
+		u64 latest_timestamp = MIN_U64;
+		
+		r32 lowest_left_value = FLTMAX;
+		r32 highest_left_value = -FLTMAX;
+		
+		r32 lowest_right_value = FLTMAX;
+		r32 highest_right_value = -FLTMAX;
+		
+		RobotDriveSample *latest_sample = NULL;
+   
+		for(u32 i = 0;
+			i < ArrayCount(robot->samples);
+			i++)
+		{
+			RobotDriveSample *curr = robot->samples + i;
+	
+			lowest_left_value = Min(lowest_left_value, curr->left);
+			highest_left_value = Max(highest_left_value, curr->left);		
+	
+			lowest_right_value = Min(lowest_right_value, curr->right);
+			highest_right_value = Max(highest_right_value, curr->right);
+			
+			earliest_timestamp = Min(earliest_timestamp, curr->timestamp);
+			latest_timestamp = Max(latest_timestamp, curr->timestamp);
+		
+			if(curr->timestamp == latest_timestamp)
+			{
+				latest_sample = curr;
+			}
+		}
+		
+		r32 lowest_value = Min(lowest_left_value, lowest_right_value);
+		r32 highest_value = Max(highest_left_value, highest_right_value);
+		
+		r32 value_difference = highest_value - lowest_value;
+	
+		r32 graph_height = GetSize(time_graph.bounds).y;
+		r32 x_axis_interval = GetSize(time_graph.bounds).x / (latest_timestamp - earliest_timestamp);
+		r32 y_axis_scale = GetSize(time_graph.bounds).y / value_difference;
+	  
+		if((latest_timestamp - earliest_timestamp) != 0)
+		{
+			for(u32 i = 0;
+				i < ArrayCount(robot->samples);
+				i++)
+			{
+				r32 x = x_axis_interval * (robot->samples[i].timestamp - earliest_timestamp);
+				r32 left_y = graph_height - (robot->samples[i].left - lowest_value) * y_axis_scale;
+				r32 right_y = graph_height - (robot->samples[i].right - lowest_value) * y_axis_scale;		
+			
+				Rectangle(context->render_context,
+						  RectPosSize(V2(x, left_y) + time_graph.bounds.min, V2(5, 5)),
+						  V4(0, 1, 0, 1));
+			
+				RectangleOutline(context->render_context,
+								 RectPosSize(V2(x, left_y) + time_graph.bounds.min, V2(5, 5)),
+								 V4(0, 0, 0, 1));
+
+				Rectangle(context->render_context,
+						  RectPosSize(V2(x, right_y) + time_graph.bounds.min, V2(5, 5)),
+						  V4(0, 0, 1, 1));
+											 
+				RectangleOutline(context->render_context,
+								 RectPosSize(V2(x, right_y) + time_graph.bounds.min, V2(5, 5)),
+								 V4(0, 0, 0, 1));
+			}
+			
+			TemporaryMemoryArena temp_memory = BeginTemporaryMemory(dashstate->generic_arena);
        
-      Text(selected_hardware_page,
-           Concat(Literal("Forward: "), ToString(latest_sample->forward, &temp_memory), &temp_memory),
-           20, V2(0, 0), V2(0, 5)); 
-      NextLine(selected_hardware_page);
-      Text(selected_hardware_page,
-           Concat(Literal("Rotate: "), ToString(latest_sample->rotate, &temp_memory), &temp_memory),
-           20, V2(0, 0), V2(0, 5)); 
-       
-      EndTemporaryMemory(temp_memory);
-	  */
-   }
+			Text(&selected_hardware_page,
+				 Concat(Literal("Left: "), ToString(latest_sample->left, &temp_memory), robot->drive_encoder ? Literal("RPM") : Literal(""), &temp_memory),
+				 20, V2(0, 0), V2(0, 5)); 
+			NextLine(&selected_hardware_page);
+			Text(&selected_hardware_page,
+				 Concat(Literal("Right: "), ToString(latest_sample->right, &temp_memory), robot->drive_encoder ? Literal("RPM") : Literal(""), &temp_memory),
+				 20, V2(0, 0), V2(0, 5)); 
+       	
+			NextLine(&selected_hardware_page);
+			
+			Text(&selected_hardware_page,
+				 Concat(Literal("Diff: "), ToString(value_difference, &temp_memory), &temp_memory),
+				 20, V2(0, 0), V2(0, 5)); 
+			NextLine(&selected_hardware_page);
+			
+			EndTemporaryMemory(temp_memory);
+		}
+		else
+		{
+			Text(&selected_hardware_page, Literal("No Data"), 20, V2(0, 0), V2(0, 5)); 
+		}
+	}
 }

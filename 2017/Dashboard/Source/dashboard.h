@@ -246,7 +246,7 @@ inline b32 Equal(r32 a, r32 b)
 
 inline r32 Abs(r32 real)
 {
-   return (real > 0) ? -real : real;
+   return (real < 0) ? -real : real;
 }
 
 inline b32 GreaterOrEqual(r32 a, r32 b)
@@ -288,6 +288,11 @@ inline v2 GetCenter(rect2 rect)
 inline b32 Intersects(rect2 a, rect2 b)
 {
    return Contains(RectPosSize(GetCenter(a), GetSize(a) + GetSize(b)), GetCenter(b));
+}
+
+inline r32 GetArea(rect2 a)
+{
+   return GetSize(a).x * GetSize(a).y;
 }
 
 inline s32 RoundR32ToS32(r32 real)

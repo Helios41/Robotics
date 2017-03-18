@@ -1,10 +1,14 @@
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/core/core.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+#include "opencv/cv.h"
+
 #include "ui_renderer.cpp"
 
 enum ui_window_type
 {
    WindowType_DisplaySettings,
    WindowType_NetworkSettings,
-   //WindowType_VideoStream,
    //WindowType_FileSelector,
    WindowType_CreateBlock,
    WindowType_EditBlock
@@ -39,8 +43,8 @@ struct ui_window
       network_settings *net_settings;
 	  struct
 	  {
-	     FunctionBlock *function;
-		 u32 tab; //NOTE: tabs, 0 for function, 1 for hardware, 2 for value
+	     struct FunctionBlockLink *function;
+		 struct CoroutineBlock *coroutine;
 	  } edit_block;
 	  
 	  struct
@@ -67,7 +71,7 @@ struct RobotHardware
    string name;
    
    u32 at_sample;
-   RobotHardwareSample samples[64];
+   RobotHardwareSample samples[256];
 };
 
 struct Robot
@@ -83,19 +87,7 @@ struct Robot
    //NOTE: drive train hardware info
    b32 drive_encoder;
    u32 at_sample;
-   RobotDriveSample samples[64];
-};
-
-//NOTE: config index is just the index of this in the vision_configs array
-struct VisionConfig
-{
-   //NOTE: HSV = Hue Saturation Value
-   v3 hsv_min;
-   v3 hsv_max;
-   
-   //TODO: mask
-   
-   u32 camera_index;
+   RobotDriveSample samples[512];
 };
 
 struct FunctionBlockLink
@@ -106,8 +98,7 @@ struct FunctionBlockLink
 
 struct CoroutineBlock
 {
-   FunctionBlock blocks[4]; //TODO: make this dynamic
-   u32 block_count;
+   FunctionBlockLink *first_block;
 };
 
 struct AutonomousEditor
@@ -125,7 +116,8 @@ enum ConsoleCategory
 	Category_Vision,
 	Category_Network,
 	Category_Debug,
-	Category_RobotDebug
+	Category_RobotDebug,
+	Category_RobotAutonomousDebug
 };
 
 struct ConsoleMessage
@@ -137,23 +129,10 @@ struct ConsoleMessage
 
 struct Console
 {
-   //TODO: message arena
-   
    ConsoleMessage *top_message;
    ConsoleMessage *selected_message;
    
    ConsoleCategory selected_category;
-};
-
-struct TeleopDisplayOverlay
-{
-   b32 widget;
-};
-
-struct TeleopDisplay
-{
-   u32 overlay_count;
-   TeleopDisplayOverlay *overlays;
 };
 
 struct ControllerType
@@ -197,12 +176,33 @@ struct DashboardState
    Robot robot;
    AutonomousEditor auto_editor;
    Console console;
-   
-   TeleopDisplay driver_display;
-   TeleopDisplay op_display;
-   
+  
    u32 controller_type_count;
    ControllerType *controller_types;
+   
+	struct
+	{	
+		cv::VideoCapture *camera;
+		s32 brightness;
+		rect2 top_reference;
+		rect2 bottom_reference;
+		u32 tracks_per_second;
+		b32 enabled;
+		r32 turret_speed;
+		
+		b32 target_hit;
+		rect2 top_target;
+		rect2 bottom_target;
+		
+		r32 left_limit;
+		r32 right_limit;
+		
+		b32 frame_grab_success;
+		cv::Mat grabbed_frame;
+		
+		r32 last_track_time;
+		r32 movement;
+	} vision;
 };
 
 ui_window *AddWindow(DashboardState *dashstate, v2 size, v2 pos, ui_window_type type, u32 flags = 0)
@@ -261,10 +261,20 @@ void RemoveWindow(DashboardState *dashstate, ui_window *window)
    free(window);
 }
 
+void NetworkReconnect(struct NetworkState *net_state, network_settings *net_settings);
+void UploadAutonomous(struct NetworkState *net_state, AutonomousEditor *auto_builder);
+//UploadControls
+void RequestUploadedState(struct NetworkState *net_state);
+void SendSetFloat(struct NetworkState *net_state, u32 hardware_index, r32 value);
+void SendSetMultiplier(struct NetworkState *net_state, u32 hardware_index, r32 multiplier);
+void SendArcadeDrive(struct NetworkState *net_state, r32 power, r32 rotate);
+void SendSetDriveMultiplier(struct NetworkState *net_state, r32 multiplier);
+
 #include "blocklang.cpp"
 
 #include "autonomous_editor.cpp"
 #include "robot.cpp"
+#include "vision.cpp"
 #include "console.cpp"
 #include "teleop.cpp"
 
@@ -325,6 +335,10 @@ void DrawTopBar(layout *top_bar, UIContext *context, DashboardState *dashstate)
 			 
    ConsoleCategoryButton(&notification_bar, dashstate,
 						 Category_RobotDebug, Literal("Robot Debug"),
+						 top_bar_element_size, top_bar_element_margin);
+						 
+   ConsoleCategoryButton(&notification_bar, dashstate,
+						 Category_RobotAutonomousDebug, Literal("Robot Autonomous Debug"),
 						 top_bar_element_size, top_bar_element_margin);
 						 
    if(Button(&settings_bar, NULL, Literal("Display Settings"), top_bar_element_size, V2(0, 0), top_bar_element_margin).state)
@@ -456,8 +470,6 @@ void DrawRightBar(layout *right_bar, UIContext *context, DashboardState *dashsta
    }
 }
 
-void NetworkReconnect(NetworkState *net_state, network_settings *net_settings);
-
 void DrawHome(layout *center_area, UIContext *context, DashboardState *dashstate)
 {
    v2 center_area_size = GetSize(center_area->bounds);
@@ -518,7 +530,7 @@ void DrawCenterArea(layout *center_area, UIContext *context, DashboardState *das
    }
    else if(dashstate->page == Page_Vision)
    {
-      
+      DrawVision(center_area, context, dashstate);
    }
    else if(dashstate->page == Page_Console)
    {
@@ -630,10 +642,6 @@ void DrawWindow(ui_window *window, DashboardState *dashstate, UIContext *context
       DrawNetworkSettings(&window_layout, dashstate);
    }
    /*
-   else if(window->type == WindowType_VideoStream)
-   {
-      
-   }
    else if(window->type == WindowType_FileSelector)
    {
       

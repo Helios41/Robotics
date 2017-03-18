@@ -49,22 +49,28 @@ void SendPing(NetworkState *net_state)
 
 void UploadAutonomous(NetworkState *net_state, AutonomousEditor *auto_builder)
 {
+	u32 block_count = 0;
+	FunctionBlockLink *last_link = auto_builder->coroutine.first_block;
+	while(last_link){ last_link = last_link->next; block_count++; };
+	
 	u32 packet_size = sizeof(upload_autonomous_packet_header) +
-					  sizeof(FunctionBlock) * auto_builder->coroutine.block_count;
+					  sizeof(FunctionBlock) * block_count;
 	u8 *packet = (u8 *) malloc(packet_size);
 	
 	upload_autonomous_packet_header *upload_auto_header = (upload_autonomous_packet_header *) packet;
     upload_auto_header->header.size = packet_size;
     upload_auto_header->header.type = PACKET_TYPE_UPLOAD_AUTONOMOUS;
-    upload_auto_header->block_count = auto_builder->coroutine.block_count;
+    upload_auto_header->block_count = block_count;
 	CopyTo(auto_builder->name, String(upload_auto_header->name, 32));
 	
 	FunctionBlock *blocks = (FunctionBlock *)(upload_auto_header + 1);
-	for(u32 i = 0;
-		i < upload_auto_header->block_count;
-		i++)
+	
+	u32 i = 0;
+	for(FunctionBlockLink *curr_block_link = auto_builder->coroutine.first_block;
+		curr_block_link;
+		curr_block_link = curr_block_link->next)
 	{
-		blocks[i] = auto_builder->coroutine.blocks[i];
+		blocks[i++] = curr_block_link->block;
 	}
 	  
     sendto(net_state->socket, (const char *) &packet, sizeof(packet), 0,
@@ -142,6 +148,8 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
 	  robot->name = String((char *) malloc(sizeof(char) * strlen(welcome_header->name)), strlen(welcome_header->name));
 	  CopyTo(String(welcome_header->name, strlen(welcome_header->name)), robot->name);
       
+	  robot->drive_encoder = welcome_header->drive_encoder;
+	  
 	  //TODO: way to deallocate these on resend?
 	  robot->hardware_count = welcome_header->hardware_count;
 	  robot->hardware = PushArray(arena, robot->hardware_count, RobotHardware, Arena_Clear);
@@ -166,16 +174,27 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
 	   hardware_sample_packet_header *hardware_sample_header = (hardware_sample_packet_header *) header;
 	   
 	   if(hardware_sample_header->index < robot->hardware_count)
-	   {
+	   {   
 		   RobotHardware *hardware = robot->hardware + hardware_sample_header->index;
 		   RobotHardwareSample sample = hardware_sample_header->sample;
 		   
-		   if(sample.timestamp > hardware->samples[(hardware->at_sample - 1) % 64].timestamp)
+		   if(sample.timestamp > hardware->samples[(hardware->at_sample - 1) % ArrayCount(hardware->samples)].timestamp)
 		   {
 		      hardware->samples[hardware->at_sample] = sample;
-			  hardware->at_sample = (hardware->at_sample + 1) % 64;
+			  hardware->at_sample = (hardware->at_sample + 1) % ArrayCount(hardware->samples);
 		   }
 	   }
+   }
+   else if(header->type == PACKET_TYPE_DRIVE_SAMPLE)
+   {
+		drive_sample_packet_header *drive_sample_header = (drive_sample_packet_header *) header;
+		RobotDriveSample sample = drive_sample_header->sample;
+		   
+		if(sample.timestamp > robot->samples[(robot->at_sample - 1) % ArrayCount(robot->samples)].timestamp)
+		{
+			robot->samples[robot->at_sample] = sample;
+			robot->at_sample = (robot->at_sample + 1) % ArrayCount(robot->samples);
+		}
    }
    else if(header->type == PACKET_TYPE_UPLOADED_STATE)
    {

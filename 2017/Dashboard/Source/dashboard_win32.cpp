@@ -118,7 +118,7 @@ void UpdateInputState(InputState *input, HWND window, b32 update_mouse)
    input->key_right = false;
 }
 
-#include "vision_test.cpp"
+//#include "vision_test.cpp"
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {  
@@ -267,23 +267,22 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    dashstate.generic_arena = &generic_arena;
    dashstate.net_state = &net_state;
    dashstate.auto_editor.name = String((char *) malloc(16), 16);
+   Clear(dashstate.auto_editor.name);
    dashstate.controller_type_count = ArrayCount(controller_types);
    dashstate.controller_types = controller_types;
    
-   TeleopDisplayOverlay driver_overlays[] = 
-   {
-      {true},
-      {true},
-      {false}
-   };
-   
-   dashstate.driver_display.overlay_count = ArrayCount(driver_overlays);
-   dashstate.driver_display.overlays = driver_overlays;
+   dashstate.vision.camera = new cv::VideoCapture("http://10.46.18.11:80/mjpg/video.mjpg");
+   dashstate.vision.tracks_per_second = 10;
+   dashstate.vision.brightness = 20;
+   dashstate.vision.top_reference = RectMinSize(V2(250, 300), V2(70, 18));
+   dashstate.vision.bottom_reference = RectMinSize(V2(250, 264), V2(68, 28));
    
    dashstate.net_settings.connect_to = String((char *) malloc(sizeof(char) * 30), 30);
    Clear(dashstate.net_settings.connect_to);
-   CopyTo(Literal("10.46.18.33") /*Literal("chimera.local")*/, dashstate.net_settings.connect_to);
+   CopyTo(Literal("10.46.18.33"), dashstate.net_settings.connect_to);
    dashstate.net_settings.is_mdns = false;
+   
+   LoadVisionConfig(&dashstate);
    
    if(!net_state.bound)
    {
@@ -291,12 +290,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
                  Literal("Bind Failed"), Category_Network);
    }
    
-   s32 brightness = 20;
-   cv::Rect top_reference(326, 348, 40, 12);
-   cv::Rect bottom_reference(324, 324, 38, 17);
-   
-   cv::VideoCapture cap("http://10.46.18.11:80/mjpg/video.mjpg");
-   AddMessage(&dashstate.console, cap.isOpened() ? Literal("Camera Found") : Literal("Camera Not Found"), Category_Vision);
+   AddMessage(&dashstate.console, dashstate.vision.camera->isOpened() ? Literal("Camera Found") : Literal("Camera Not Found"), Category_Vision);
    
    NetworkReconnect(&net_state, &dashstate.net_settings);
    
@@ -305,9 +299,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    ShowWindow(window, nCmdShow);
    UpdateWindow(window);
-   
-   r32 last_track_time = 0.0f;
-   r32 vision_movement = 0.0f;
    
    GetCounter(&last_timer, timer_freq);
    while(running)
@@ -413,7 +404,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       ui_context.input_state = input;
       
       DrawDashboardUI(&ui_context, &dashstate);
-     
+	  RunVision(&ui_context, &dashstate);
+	 
       HandlePackets(&generic_arena, &net_state,
 					&dashstate.robot, ui_context.curr_time);
 	/*
@@ -425,30 +417,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	  }
 	 */
 	  
-	  u32 tracks_per_second = 5;
-	  if((ui_context.curr_time - last_track_time) > (1.0 / (r32)tracks_per_second))
-	  {
-		vision_movement = VisionTest(cap, brightness, top_reference, bottom_reference);
-		
-		if(Absolute(vision_movement) > 50)
-		{
-			SendSetFloat(&net_state, 5,
-						 (vision_movement / Absolute(vision_movement)) * 0.25);
-		}
-		else if((50 > Absolute(vision_movement)) &&
-				(Absolute(vision_movement) > 20))
-		{
-			SendSetFloat(&net_state, 5,
-						 (vision_movement / Absolute(vision_movement)) * 0.16);
-		}
-		else if(20 > Absolute(vision_movement))
-		{
-			SendSetFloat(&net_state, 5, 0.0f);
-		}
-		
-		last_track_time = ui_context.curr_time;
-	  }
-	  
+	  /*
       char frame_time_buffer[64];
       Rectangle(&context, RectMinSize(V2(200, 40), V2(200, 20)), V4(0, 0, 0, 0.5));
       Text(&context, V2(200, 40), Literal(R64ToString(frame_length, frame_time_buffer)), 20);
@@ -465,10 +434,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	  Rectangle(&context, RectMinSize(V2(200, 100), V2(200, 20)), V4(0, 0, 0, 0.5));
 	  Text(&context, V2(200, 100), wglSwapInterval ? Literal("wglSwapInterval") : Literal("Sleep"), 20);
 #endif
-	  
-	  char vision_movement_buffer[64];
-      Rectangle(&context, RectMinSize(V2(200, 120), V2(200, 20)), V4(0, 0, 0, 0.5));
-      Text(&context, V2(200, 120), Literal(R64ToString(vision_movement, vision_movement_buffer)), 20);
+	  */
 	  
 	  RenderUI(&context, window_size);
       SwapBuffers(device_context);
@@ -482,6 +448,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
       }
 #endif
    }
+   
+   SaveVisionConfig(&dashstate);
    
    shutdown(net_state.socket, SD_BOTH);
    closesocket(net_state.socket);
