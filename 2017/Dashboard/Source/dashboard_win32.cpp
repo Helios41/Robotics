@@ -266,16 +266,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    DashboardState dashstate = {};
    dashstate.generic_arena = &generic_arena;
    dashstate.net_state = &net_state;
-   dashstate.auto_editor.name = String((char *) malloc(16), 16);
+   
+   dashstate.auto_editor.name = String((char *) malloc(32), 32);
    Clear(dashstate.auto_editor.name);
+   
    dashstate.controller_type_count = ArrayCount(controller_types);
    dashstate.controller_types = controller_types;
    
    dashstate.vision.camera = new cv::VideoCapture("http://10.46.18.11:80/mjpg/video.mjpg");
    dashstate.vision.tracks_per_second = 10;
    dashstate.vision.brightness = 20;
-   dashstate.vision.top_reference = RectMinSize(V2(250, 300), V2(70, 18));
-   dashstate.vision.bottom_reference = RectMinSize(V2(250, 264), V2(68, 28));
+   dashstate.vision.top_reference = RectMinSize(V2(290, 236), V2(63, 16));
+   dashstate.vision.bottom_reference = RectMinSize(V2(285, 200), V2(66, 27));
    
    dashstate.vision.grabbed_frame = new cv::Mat(dashstate.vision.camera->get(CV_CAP_PROP_FRAME_WIDTH),
 												dashstate.vision.camera->get(CV_CAP_PROP_FRAME_HEIGHT),
@@ -411,7 +413,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	  RunVision(&ui_context, &dashstate);
 	 
 	  HandlePackets(&generic_arena, &net_state,
-					&dashstate.robot, ui_context.curr_time);
+					&dashstate, ui_context.curr_time);
 	
 	/*
 	  dashstate.robot.connected = 1.0f > (net_state.last_packet_recieved - ui_context.curr_time);

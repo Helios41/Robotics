@@ -486,6 +486,23 @@ string ToString(u32 flt, TemporaryMemoryArena *temp_memory)
    return result;
 }
 
+string ToString(u64 number, TemporaryMemoryArena *temp_memory)
+{
+   string result = String(PushArray(temp_memory, 12, char, Arena_Clear), 12);
+   _snprintf(result.text, result.length, "%llu", number);
+   
+   for(u32 i = 0; i < result.length; i++)
+   {
+      if(result.text[i] == '\0')
+      {
+         result.length = i;
+         break;
+      }
+   }
+   
+   return result;
+}
+
 b32 IsEmpty(string text)
 {
    return (text.length == 0) || (text.text == NULL);
@@ -521,79 +538,15 @@ string Clear(string str)
    return str;
 }
 
-#if 0
-//TODO: make this more robust
-string *Split(string input, char split_char, u32 *array_length)
+char *ToCString(string s, TemporaryMemoryArena *temp_memory)
 {
-   {
-      u32 i = 0;
-      while((i < input.length) && 
-            (input.text[i] == split_char))
-      {
-         input.text++;
-         input.length--;
-         i++;
-      }
-   }
+   u32 result_length = s.length + 1;
+   char *result = PushArray(temp_memory, result_length, char, Arena_Clear);
    
-   {
-      u32 i = input.length - 1;
-      while((i > 0) && 
-            (input.text[i] == split_char))
-      {
-         input.length--;
-         i--;
-      }
-   }
-   
-   *array_length = 1;
-   
-   for(u32 i = 0;
-       i < input.length;
-       i++)
-   {
-      if((input.text[i] == split_char) &&
-         ((input.text[i - 1] != split_char) || (input.text[i + 1] != split_char)))
-         (*array_length)++;
-   }
-   
-   string *result = (string *) malloc(sizeof(string) * (*array_length));
-   
-   u32 index = 0;
-   for(u32 i = 0;
-       i < input.length;
-       i++)
-   {
-      if(input.text[i] == split_char)
-      {
-         if(index == 0)
-         {
-            result[index] = String(input.text, i);
-         }
-         else
-         {
-            string last_segment = result[index - 1];
-            result[index] = String(last_segment.text + last_segment.length + 1,
-                                   i - (u32)((last_segment.text + last_segment.length) - input.text) - 1);
-         }
-         
-         index++;
-      }
-   }
-   
-   if((index == 0) && (*array_length == 1))
-   {
-      result[0] = input;
-   }
-   else
-   {
-      string last_segment = result[index - 1];
-      result[index] = String(last_segment.text + last_segment.length + 1, (u32)((input.text + input.length - 1) - (last_segment.text + last_segment.length)));
-   }
+   CopyTo(s, String(result, result_length));
    
    return result;
 }
-#endif
 
 string Concat(string s0, string s1, TemporaryMemoryArena *temp_memory)
 {

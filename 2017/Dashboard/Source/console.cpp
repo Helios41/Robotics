@@ -62,9 +62,12 @@ void DrawSelectedMessagePage(layout *selected_message_page, UIContext *context, 
    
    string title = Literal("PLACEHOLDER");
    
-   Text(selected_message_page, title, 40,
-        V2((GetSize(selected_message_page->bounds).x - GetTextWidth(context->render_context, title, 40)) / 2.0f, 0), V2(0, 5));
+	Text(selected_message_page, title, 40,
+         V2((GetSize(selected_message_page->bounds).x - GetTextWidth(context->render_context, title, 40)) / 2.0f, 0), V2(0, 5));
+	NextLine(selected_message_page);
+		
    Text(selected_message_page, console->selected_message->text, 20, V2(0, 0), V2(0, 5));
+   NextLine(selected_message_page);
 }
 
 void DrawConsoleOptions(layout *console_options, UIContext *context, Console *console)

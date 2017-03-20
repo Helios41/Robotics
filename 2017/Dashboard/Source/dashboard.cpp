@@ -108,6 +108,10 @@ struct AutonomousEditor
    
    string name;
    CoroutineBlock coroutine;
+   
+   b32 is_recording;
+   r32 recording_timer_start;
+   u64 earliest_sample_timestamp;
 };
 
 enum ConsoleCategory
@@ -164,6 +168,8 @@ struct DashboardState
 {
    MemoryArena *generic_arena;
    struct NetworkState *net_state;
+   
+   u64 latest_sample_timestamp;
    
    b32 competition_mode;
    DashboardPage page;
@@ -274,10 +280,10 @@ void SendSetDriveMultiplier(struct NetworkState *net_state, r32 multiplier);
 
 #include "blocklang.cpp"
 
-#include "autonomous_editor.cpp"
-#include "robot.cpp"
-#include "vision.cpp"
 #include "console.cpp"
+#include "robot.cpp"
+#include "autonomous_editor.cpp"
+#include "vision.cpp"
 #include "teleop.cpp"
 
 void ConsoleCategoryButton(layout *panel, DashboardState *dashstate,

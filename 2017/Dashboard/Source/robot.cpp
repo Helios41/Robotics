@@ -56,6 +56,183 @@ RobotHardwareSample *GetLatestSample(RobotHardware *hardware)
 	return latest_sample;
 }
 
+struct robot_sample
+{
+	b32 is_drive_sample;
+	union
+	{
+		struct
+		{
+			RobotHardwareSample sample;
+			u32 index;
+		} hardware;
+		
+		RobotDriveSample drive_sample;
+	};
+};
+
+u64 GetTimestamp(robot_sample in)
+{
+	if(in.is_drive_sample)
+	{
+		return in.drive_sample.timestamp;
+	}
+	else
+	{
+		return in.hardware.sample.timestamp;
+	}
+}
+
+struct earliest_sample_result
+{
+	b32 success;
+	robot_sample sample;
+};
+
+u64 GetTimestamp(earliest_sample_result in)
+{
+	return in.success ? GetTimestamp(in.sample) : 0;
+}
+
+earliest_sample_result GetEarliestSampleFromAll(Robot *robot, u64 after_timestamp, 
+												u32 *do_not_include = NULL, u32 do_not_include_length = 0)
+{
+	earliest_sample_result result = {};
+	
+	for(u32 hw_index = 0;
+		hw_index < robot->hardware_count;
+		hw_index++)
+	{
+		RobotHardware *curr_hardware = robot->hardware + hw_index;
+		
+		for(u32 i = 0;
+			i < ArrayCount(curr_hardware->samples);
+			i++)
+		{
+			RobotHardwareSample *curr = curr_hardware->samples + i;
+			b32 include = true;
+		
+			for(u32 i = 0;
+				i < do_not_include_length;
+				i++)
+			{
+				if(do_not_include[i] == hw_index)
+				{
+					include = false;
+					break;
+				}
+			}
+		
+			if(include && (curr->timestamp > after_timestamp))
+			{
+				if(GetTimestamp(result) == 0)
+				{
+					result.success = true;
+					result.sample.hardware.index = hw_index;
+					result.sample.hardware.sample = *curr;
+				}
+				else if(curr->timestamp < GetTimestamp(result))
+				{
+					result.sample.hardware.index = hw_index;
+					result.sample.hardware.sample = *curr;
+				}
+			}
+		}
+	}
+
+	for(u32 i = 0;
+		i < ArrayCount(robot->samples);
+		i++)
+	{
+		RobotDriveSample *curr = robot->samples + i;
+		
+		if(curr->timestamp > after_timestamp)
+		{
+			if(GetTimestamp(result) == 0)
+			{
+				result.success = true;
+				result.sample.is_drive_sample = true;
+				result.sample.drive_sample = *curr;
+			}
+			else if(curr->timestamp < GetTimestamp(result))
+			{
+				result.sample.is_drive_sample = true;
+				result.sample.drive_sample = *curr;
+			}
+		}
+	}
+	
+	return result;
+}
+
+bool sort_by_timestamp(robot_sample a, robot_sample b)
+{
+	return (GetTimestamp(a) < GetTimestamp(b));
+}
+
+std::vector<robot_sample> *ListSamplesFromTo(Robot *robot, u64 from, u64 to, u32 *do_not_include = NULL, u32 do_not_include_length = 0)
+{
+	std::vector<robot_sample> *list = new std::vector<robot_sample>();
+	
+	for(u32 hw_index = 0;
+		hw_index < robot->hardware_count;
+		hw_index++)
+	{
+		RobotHardware *curr_hardware = robot->hardware + hw_index;
+		b32 include = true;
+		
+		for(u32 i = 0;
+			i < do_not_include_length;
+			i++)
+		{
+			if(do_not_include[i] == hw_index)
+			{
+				include = false;
+				break;
+			}
+		}
+		
+		if(include)
+		{			
+			for(u32 i = 0;
+				i < ArrayCount(curr_hardware->samples);
+				i++)
+			{
+				RobotHardwareSample *curr = curr_hardware->samples + i;
+				
+				if((from <= curr->timestamp) && (curr->timestamp <= to) && (curr->timestamp != 0))
+				{
+					robot_sample sample = {};
+					sample.hardware.index = hw_index;
+					sample.hardware.sample = *curr;
+					
+					list->push_back(sample);
+				}
+			}
+		}
+	}
+
+	for(u32 i = 0;
+		i < ArrayCount(robot->samples);
+		i++)
+	{
+		RobotDriveSample *curr = robot->samples + i;
+		
+		if((from <= curr->timestamp) && (curr->timestamp <= to) && (curr->timestamp != 0))
+		{
+			robot_sample sample = {};
+			sample.is_drive_sample = true;
+			sample.drive_sample = *curr;
+					
+			list->push_back(sample);
+		}
+	}
+	
+	std::sort(list->begin(), list->end(), sort_by_timestamp);
+	
+	return list;
+}
+
 void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context,
                               Robot *robot, MemoryArena *generic_arena)
 {
@@ -71,6 +248,10 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
    
 	u64 earliest_timestamp = MAX_U64;
 	u64 latest_timestamp = MIN_U64;
+
+	r32 lowest_value = FLTMAX;
+	r32 highest_value = -FLTMAX;
+	
 	RobotHardwareSample *latest_sample = NULL;
    
 	for(u32 i = 0;
@@ -79,28 +260,8 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
 	{
 		RobotHardwareSample *curr = selected_hardware->samples + i;
 	
-		earliest_timestamp = Min(earliest_timestamp, curr->timestamp);
-		latest_timestamp = Max(latest_timestamp, curr->timestamp);
-	
-		if(curr->timestamp == latest_timestamp)
+		if(curr->timestamp != 0)
 		{
-			latest_sample = curr;
-		}
-	}
-   
-	Rectangle(context->render_context, time_graph.bounds, V4(0.3, 0.3, 0.3, 0.6));
-	RectangleOutline(context->render_context, time_graph.bounds, V4(0, 0, 0, 1));
-   
-	if((latest_timestamp - earliest_timestamp) != 0)
-	{
-		r32 lowest_value = FLTMAX;
-		r32 highest_value = -FLTMAX;
-	
-		for(u32 i = 0;
-			i < ArrayCount(selected_hardware->samples);
-			i++)
-		{
-			RobotHardwareSample *curr = selected_hardware->samples + i;
 			r32 curr_value = 0;
 			
 			if((selected_hardware->type == Hardware_Motor) ||
@@ -115,66 +276,81 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
 			
 			lowest_value = Min(lowest_value, curr_value);
 			highest_value = Max(highest_value, curr_value);		
-		}
 	
+			earliest_timestamp = Min(earliest_timestamp, curr->timestamp);
+			latest_timestamp = Max(latest_timestamp, curr->timestamp);
+		
+			if(curr->timestamp == latest_timestamp)
+			{
+				latest_sample = curr;
+			}
+		}
+	}
+   
+	Rectangle(context->render_context, time_graph.bounds, V4(0.3, 0.3, 0.3, 0.6));
+	RectangleOutline(context->render_context, time_graph.bounds, V4(0, 0, 0, 1));
+   
+	if(latest_sample)
+	{
 		r32 value_difference = highest_value - lowest_value;
 	
 		r32 graph_height = GetSize(time_graph.bounds).y;
 		r32 x_axis_interval = GetSize(time_graph.bounds).x / (latest_timestamp - earliest_timestamp);
-		r32 y_axis_scale = GetSize(time_graph.bounds).y / value_difference;
+		r32 y_axis_scale = ((selected_hardware->type == Hardware_Motor) || (selected_hardware->type == Hardware_EncoderMotor) ||(selected_hardware->type == Hardware_Potentiometer)) ? (GetSize(time_graph.bounds).y / value_difference) : 0;
+	  
+		u32 sample_count = 0;
 	  
 		for(u32 i = 0;
 			i < ArrayCount(selected_hardware->samples);
 			i++)
 		{
-			r32 x = x_axis_interval * (selected_hardware->samples[i].timestamp - earliest_timestamp);
-			r32 y = 0;
-			
-			if(selected_hardware->type == Hardware_Motor)
+			if(selected_hardware->samples[i].timestamp != 0)
 			{
-				y = graph_height - (selected_hardware->samples[i].motor - lowest_value) * y_axis_scale;
+				r32 x = x_axis_interval * (selected_hardware->samples[i].timestamp - earliest_timestamp);
+				r32 y = 0;
+				
+				if(selected_hardware->type == Hardware_Motor)
+				{
+					y = graph_height - (selected_hardware->samples[i].motor - lowest_value) * y_axis_scale;
+				}
+				else if(selected_hardware->type == Hardware_EncoderMotor)
+				{
+					y = graph_height - (selected_hardware->samples[i].motor - lowest_value) * y_axis_scale;
+				}
+				else if(selected_hardware->type == Hardware_Solenoid)
+				{
+					y = GetSize(time_graph.bounds).y * (selected_hardware->samples[i]._switch ? 0.2 : 0.8);
+				}
+				else if(selected_hardware->type == Hardware_Switch)
+				{
+					y = GetSize(time_graph.bounds).y * (selected_hardware->samples[i].solenoid ? 0.2 : 0.8);
+				}
+				else if(selected_hardware->type == Hardware_Potentiometer)
+				{
+					y = graph_height - (selected_hardware->samples[i].potentiometer - lowest_value) * y_axis_scale;
+				}
+				
+				Rectangle(context->render_context,
+						  RectPosSize(V2(x, y) + time_graph.bounds.min, V2(5, 5)),
+						  V4(0, 0, 0, 1));
+				
+				sample_count++;
 			}
-			else if(selected_hardware->type == Hardware_EncoderMotor)
-			{
-				y = graph_height - (selected_hardware->samples[i].motor - lowest_value) * y_axis_scale;
-			}
-			else if(selected_hardware->type == Hardware_Solenoid)
-			{
-				y = GetSize(time_graph.bounds).y * (selected_hardware->samples[i]._switch ? 0.8 : 0.2);
-			}
-			else if(selected_hardware->type == Hardware_Switch)
-			{
-				y = GetSize(time_graph.bounds).y * (selected_hardware->samples[i].solenoid ? 0.8 : 0.2);
-			}
-			else if(selected_hardware->type == Hardware_Potentiometer)
-			{
-				y = graph_height - (selected_hardware->samples[i].potentiometer - lowest_value) * y_axis_scale;
-			}
-			
-			Rectangle(context->render_context,
-					  RectPosSize(V2(x, y) + time_graph.bounds.min, V2(5, 5)),
-					  V4(0, 0, 0, 1));
 		}
+	  
+		TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
 	  
 		if(selected_hardware->type == Hardware_Motor)
 		{
-			TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
-         
 			Text(selected_hardware_page, 
 				 Concat(Literal("State: "), ToString(latest_sample->motor, &temp_memory), &temp_memory),
-				 20, V2(0, 0), V2(0, 5));  
-              
-			EndTemporaryMemory(temp_memory);
+				 20, V2(0, 0), V2(0, 5));
 		}
 		else if(selected_hardware->type == Hardware_EncoderMotor)
-		{
-			TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
-         
+		{	
 			Text(selected_hardware_page, 
 				 Concat(Literal("State: "), ToString(latest_sample->motor, &temp_memory), Literal("RPM"), &temp_memory),
-				 20, V2(0, 0), V2(0, 5));  
-              
-			EndTemporaryMemory(temp_memory);
+				 20, V2(0, 0), V2(0, 5));
 		}
 		else if(selected_hardware->type == Hardware_Solenoid)
 		{
@@ -188,14 +364,29 @@ void DrawSelectedHardwarePage(layout *selected_hardware_page, UIContext *context
 		}
 		else if(selected_hardware->type == Hardware_Potentiometer)
 		{
-			TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
-         
 			Text(selected_hardware_page, 
 				 Concat(Literal("State: "), ToString(latest_sample->potentiometer, &temp_memory), &temp_memory),
-				 20, V2(0, 0), V2(0, 5));  
-              
-			EndTemporaryMemory(temp_memory);
+				 20, V2(0, 0), V2(0, 5));
 		}
+		
+		NextLine(selected_hardware_page);
+			
+		Text(selected_hardware_page,
+			 Concat(Literal("Sample Count: "), ToString(sample_count, &temp_memory), Literal(" of "), ToString((u32)ArrayCount(selected_hardware->samples), &temp_memory), &temp_memory),
+			 20, V2(0, 0), V2(0, 5)); 			
+		NextLine(selected_hardware_page);
+			
+		if(Button(selected_hardware_page, NULL, Literal("Clear"), V2(120, 40), V2(0, 0), V2(5, 5)).state)
+		{
+			for(u32 i = 0;
+				i < ArrayCount(selected_hardware->samples);
+				i++)
+			{
+				selected_hardware->samples[i].timestamp = 0;
+			}
+		}
+		
+		EndTemporaryMemory(temp_memory);
 	}
 	else
 	{
@@ -243,62 +434,85 @@ void DrawRobot(layout *robot_ui, UIContext *context, DashboardState *dashstate)
 		r32 highest_right_value = -FLTMAX;
 		
 		RobotDriveSample *latest_sample = NULL;
-   
+		
 		for(u32 i = 0;
 			i < ArrayCount(robot->samples);
 			i++)
 		{
 			RobotDriveSample *curr = robot->samples + i;
 	
-			lowest_left_value = Min(lowest_left_value, curr->left);
-			highest_left_value = Max(highest_left_value, curr->left);		
-	
-			lowest_right_value = Min(lowest_right_value, curr->right);
-			highest_right_value = Max(highest_right_value, curr->right);
-			
-			earliest_timestamp = Min(earliest_timestamp, curr->timestamp);
-			latest_timestamp = Max(latest_timestamp, curr->timestamp);
-		
-			if(curr->timestamp == latest_timestamp)
+			if(curr->timestamp != 0)
 			{
-				latest_sample = curr;
+				lowest_left_value = Min(lowest_left_value, curr->left);
+				highest_left_value = Max(highest_left_value, curr->left);		
+		
+				lowest_right_value = Min(lowest_right_value, curr->right);
+				highest_right_value = Max(highest_right_value, curr->right);
+				
+				earliest_timestamp = Min(earliest_timestamp, curr->timestamp);
+				latest_timestamp = Max(latest_timestamp, curr->timestamp);
+			
+				if(curr->timestamp == latest_timestamp)
+				{
+					latest_sample = curr;
+				}
 			}
 		}
 		
-		r32 lowest_value = Min(lowest_left_value, lowest_right_value);
-		r32 highest_value = Max(highest_left_value, highest_right_value);
-		
-		r32 value_difference = highest_value - lowest_value;
-	
-		r32 graph_height = GetSize(time_graph.bounds).y;
-		r32 x_axis_interval = GetSize(time_graph.bounds).x / (latest_timestamp - earliest_timestamp);
-		r32 y_axis_scale = GetSize(time_graph.bounds).y / value_difference;
-	  
-		if((latest_timestamp - earliest_timestamp) != 0)
+		if(latest_sample)
 		{
+			r32 lowest_value = Min(lowest_left_value, lowest_right_value);
+			r32 highest_value = Max(highest_left_value, highest_right_value);
+		
+			r32 value_difference = highest_value - lowest_value;
+	
+			r32 graph_height = GetSize(time_graph.bounds).y;
+			r32 x_axis_interval = GetSize(time_graph.bounds).x / (latest_timestamp - earliest_timestamp);
+			r32 y_axis_scale = GetSize(time_graph.bounds).y / value_difference;
+	  
+			u32 sample_count = 0;
+			b32 in_turn = false;
+			
 			for(u32 i = 0;
 				i < ArrayCount(robot->samples);
 				i++)
 			{
-				r32 x = x_axis_interval * (robot->samples[i].timestamp - earliest_timestamp);
-				r32 left_y = graph_height - (robot->samples[i].left - lowest_value) * y_axis_scale;
-				r32 right_y = graph_height - (robot->samples[i].right - lowest_value) * y_axis_scale;		
-			
-				Rectangle(context->render_context,
-						  RectPosSize(V2(x, left_y) + time_graph.bounds.min, V2(5, 5)),
-						  V4(0, 1, 0, 1));
-			
-				RectangleOutline(context->render_context,
-								 RectPosSize(V2(x, left_y) + time_graph.bounds.min, V2(5, 5)),
-								 V4(0, 0, 0, 1));
+				if(robot->samples[i].timestamp != 0)
+				{
+					r32 x = x_axis_interval * (robot->samples[i].timestamp - earliest_timestamp);
+					r32 left_y = graph_height - (robot->samples[i].left - lowest_value) * y_axis_scale;
+					r32 right_y = graph_height - (robot->samples[i].right - lowest_value) * y_axis_scale;		
+				
+					Rectangle(context->render_context,
+							  RectPosSize(V2(x, left_y) + time_graph.bounds.min, V2(5, 5)),
+							  V4(0, 1, 0, 1));
+				
+					RectangleOutline(context->render_context,
+									 RectPosSize(V2(x, left_y) + time_graph.bounds.min, V2(5, 5)),
+									 V4(0, 0, 0, 1));
 
-				Rectangle(context->render_context,
-						  RectPosSize(V2(x, right_y) + time_graph.bounds.min, V2(5, 5)),
-						  V4(0, 0, 1, 1));
-											 
-				RectangleOutline(context->render_context,
-								 RectPosSize(V2(x, right_y) + time_graph.bounds.min, V2(5, 5)),
-								 V4(0, 0, 0, 1));
+					Rectangle(context->render_context,
+							  RectPosSize(V2(x, right_y) + time_graph.bounds.min, V2(5, 5)),
+							  V4(0, 0, 1, 1));
+												 
+					RectangleOutline(context->render_context,
+									 RectPosSize(V2(x, right_y) + time_graph.bounds.min, V2(5, 5)),
+									 V4(0, 0, 0, 1));
+					
+					b32 was_in_turn = in_turn;
+					in_turn = Abs(robot->samples[i].left - robot->samples[i].right) > 1000;
+					
+					if((!was_in_turn && in_turn) ||
+					   (was_in_turn && !in_turn))
+					{
+						Line(context->render_context,
+							 V2(x + time_graph.bounds.min.x, time_graph.bounds.min.y),
+							 V2(x + time_graph.bounds.min.x, time_graph.bounds.max.y),
+							 V4(1, 0, 1, 1), 4);
+					}
+					
+					sample_count++;
+				}
 			}
 			
 			TemporaryMemoryArena temp_memory = BeginTemporaryMemory(dashstate->generic_arena);
@@ -310,7 +524,23 @@ void DrawRobot(layout *robot_ui, UIContext *context, DashboardState *dashstate)
 			Text(&selected_hardware_page,
 				 Concat(Literal("Right: "), ToString(latest_sample->right, &temp_memory), robot->drive_encoder ? Literal("RPM") : Literal(""), &temp_memory),
 				 20, V2(0, 0), V2(0, 5)); 
-				 
+			NextLine(&selected_hardware_page);
+			
+			Text(&selected_hardware_page,
+				 Concat(Literal("Sample Count: "), ToString(sample_count, &temp_memory), Literal(" of "), ToString((u32)ArrayCount(robot->samples), &temp_memory), &temp_memory),
+				 20, V2(0, 0), V2(0, 5)); 			
+			NextLine(&selected_hardware_page);
+			
+			if(Button(&selected_hardware_page, NULL, Literal("Clear"), V2(120, 40), V2(0, 0), V2(5, 5)).state)
+			{
+				for(u32 i = 0;
+					i < ArrayCount(robot->samples);
+					i++)
+				{
+					robot->samples[i].timestamp = 0;
+				}
+			}
+			
 			EndTemporaryMemory(temp_memory);
 		}
 		else

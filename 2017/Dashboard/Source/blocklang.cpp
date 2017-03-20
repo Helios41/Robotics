@@ -1,3 +1,24 @@
+void AddBlock(CoroutineBlock *coroutine, FunctionBlock block)
+{
+	FunctionBlockLink *new_block_link = (FunctionBlockLink *) malloc(sizeof(FunctionBlockLink));
+	new_block_link->next = NULL;
+	new_block_link->block = block;
+	
+	if(coroutine->first_block)
+	{
+		FunctionBlockLink *last_block = coroutine->first_block;
+		while(last_block->next)
+		{
+			last_block = last_block->next;
+		}
+		last_block->next = new_block_link;
+	}
+	else
+	{
+		coroutine->first_block = new_block_link;
+	}
+}
+
 void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *dashstate)
 {
 	UIContext *context = window_layout->context;
@@ -115,24 +136,31 @@ void DrawCreateBlock(ui_window *window, layout *window_layout, DashboardState *d
    
 	if(block_added)
 	{
-		FunctionBlockLink *new_block_link = (FunctionBlockLink *) malloc(sizeof(FunctionBlockLink));
-		new_block_link->next = NULL;
-		new_block_link->block = block;
-		
-		if(coroutine->first_block)
-		{
-			FunctionBlockLink *last_block = coroutine->first_block;
-			while(last_block->next)
-			{
-				last_block = last_block->next;
-			}
-			last_block->next = new_block_link;
-		}
-		else
-		{
-			coroutine->first_block = new_block_link;
-		}
+		AddBlock(coroutine, block);
 	}
+}
+
+void DeleteBlock(CoroutineBlock *coroutine, FunctionBlockLink *function)
+{
+	if(coroutine->first_block == function)
+	{
+		coroutine->first_block = function->next;
+	}
+	else
+	{
+		FunctionBlockLink *parent_link = coroutine->first_block;
+		while(parent_link)
+		{
+			if(parent_link->next == function)
+			{
+				break;
+			}
+			parent_link = parent_link->next;
+		}
+		parent_link->next = function->next;
+	}
+	
+	free(function);
 }
 
 void DrawEditBlock(ui_window *window, layout *window_layout, DashboardState *dashstate)
@@ -203,7 +231,16 @@ void DrawEditBlock(ui_window *window, layout *window_layout, DashboardState *das
 		
 		case FunctionBlock_ArcadeDriveConst:
 		{
-			
+			Text(window_layout, Literal("Power"), 20, V2(0, 0), V2(0, 5));
+			SliderBar(window_layout, -1, 1, &function_link->block.arcade_drive_const.power, V2(GetSize(window_layout->bounds).x, 20), V2(0, 0), V2(0, 0));
+			NextLine(window_layout);
+			TextBox(window_layout, -1, 1, &function_link->block.arcade_drive_const.power, V2(GetSize(window_layout->bounds).x, 20), V2(0, 0), V2(0, 0));
+			NextLine(window_layout);
+		
+			Text(window_layout, Literal("Rotate"), 20, V2(0, 0), V2(0, 5));
+			SliderBar(window_layout, -1, 1, &function_link->block.arcade_drive_const.rotate, V2(GetSize(window_layout->bounds).x, 20), V2(0, 0), V2(0, 0));
+			NextLine(window_layout);
+			TextBox(window_layout, -1, 1, &function_link->block.arcade_drive_const.rotate, V2(GetSize(window_layout->bounds).x, 20), V2(0, 0), V2(0, 0));
 		}
 		break;
 		
@@ -238,25 +275,7 @@ void DrawEditBlock(ui_window *window, layout *window_layout, DashboardState *das
    
 	if(Button(window_layout, NULL, Literal("Delete"), V2(60, 20), V2(0, 0), V2(5, 5)).state)
 	{
-		if(window->edit_block.coroutine->first_block == window->edit_block.function)
-		{
-			window->edit_block.coroutine->first_block = window->edit_block.function->next;
-		}
-		else
-		{
-			FunctionBlockLink *parent_link = window->edit_block.coroutine->first_block;
-			while(parent_link)
-			{
-				if(parent_link->next == window->edit_block.function)
-				{
-					break;
-				}
-				parent_link = parent_link->next;
-			}
-			parent_link->next = window->edit_block.function->next;
-		}
-		
-		free(window->edit_block.function);
+		DeleteBlock(window->edit_block.coroutine, window->edit_block.function);
 		window->flags |= Flag_CloseRequested;
 	}
 	

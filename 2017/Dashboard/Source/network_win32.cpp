@@ -73,7 +73,7 @@ void UploadAutonomous(NetworkState *net_state, AutonomousEditor *auto_builder)
 		blocks[i++] = curr_block_link->block;
 	}
 	  
-    sendto(net_state->socket, (const char *) &packet, sizeof(packet), 0,
+    sendto(net_state->socket, (const char *) packet, packet_size, 0,
            (struct sockaddr *) &net_state->server_info, sizeof(net_state->server_info));
 		   
 	free(packet);
@@ -136,8 +136,11 @@ void SendSetDriveMultiplier(NetworkState *net_state, r32 multiplier)
            (struct sockaddr *) &net_state->server_info, sizeof(net_state->server_info));
 }
 
-void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
+void HandlePacket(MemoryArena *arena, u8 *buffer, DashboardState *dashstate)
 {
+	Console *console = &dashstate->console;
+	Robot *robot = &dashstate->robot;
+	
    generic_packet_header *header = (generic_packet_header *) buffer;
    Assert(header->type != PACKET_TYPE_INVALID);
    
@@ -182,6 +185,7 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
 		   {
 		      hardware->samples[hardware->at_sample] = sample;
 			  hardware->at_sample = (hardware->at_sample + 1) % ArrayCount(hardware->samples);
+			  dashstate->latest_sample_timestamp = sample.timestamp;
 		   }
 	   }
    }
@@ -194,6 +198,7 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
 		{
 			robot->samples[robot->at_sample] = sample;
 			robot->at_sample = (robot->at_sample + 1) % ArrayCount(robot->samples);
+			dashstate->latest_sample_timestamp = sample.timestamp;
 		}
    }
    else if(header->type == PACKET_TYPE_UPLOADED_STATE)
@@ -203,17 +208,18 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, Robot *robot)
 		   
 	   }
    }
-   else if(header->type == PACKET_TYPE_DEBUG_MESSAGE)
-   {
-	   debug_message_packet_header *debug_message_packet  = (debug_message_packet_header *) header;
-	   {
-		   
-	   }
-   }
+	else if(header->type == PACKET_TYPE_DEBUG_MESSAGE)
+	{
+		debug_message_packet_header *debug_message_packet  = (debug_message_packet_header *) header;
+		string message = String((char *) malloc(sizeof(char) * strlen(debug_message_packet->text)), strlen(debug_message_packet->text));
+		CopyTo(String(debug_message_packet->text, strlen(debug_message_packet->text)), message);
+		
+		AddMessage(console, message, debug_message_packet->is_autonomous_debug ? Category_RobotAutonomousDebug : Category_RobotDebug);
+	}
 }
 
 void HandlePackets(MemoryArena *arena, NetworkState *net_state,
-				   Robot *robot, r64 curr_time)
+				   DashboardState *dashstate, r64 curr_time)
 {
 	b32 has_packets = true;
     while(has_packets)
@@ -244,7 +250,7 @@ void HandlePackets(MemoryArena *arena, NetworkState *net_state,
         else
         {
 			net_state->last_packet_recieved = curr_time;
-			HandlePacket(arena, (u8 *)buffer, robot);
+			HandlePacket(arena, (u8 *)buffer, dashstate);
         }
 	}	
 }
