@@ -205,6 +205,8 @@ struct upload_autonomous_packet_header
    
    char name[32];
    u8 block_count;
+   
+   u8 slot; //NOTE: this can be 0, 1, 2 or 3, thats it
 };
 
 //NOTE: PACKET_TYPE_UPLOAD_CONTROLS
@@ -265,7 +267,7 @@ struct set_multiplier_packet_header
 	r32 multiplier;
 };
 
-//NOTE: PACKET_TYPE_SET_FLOAT
+//NOTE: PACKET_TYPE_ARCADE_DRIVE
 struct arcade_drive_packet_header
 {
 	generic_packet_header header;
@@ -274,7 +276,7 @@ struct arcade_drive_packet_header
 	r32 rotate;
 };
 
-//NOTE: PACKET_TYPE_SET_MULTIPLIER
+//NOTE: PACKET_TYPE_SET_DRIVE_MULTIPLIER
 struct set_drive_multiplier_packet_header
 {
 	generic_packet_header header;
