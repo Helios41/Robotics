@@ -5,6 +5,8 @@
 #include <gl/gl.h>
 #include "wglext.h"
 
+#define CAMERA_CONNECTION "http://10.46.18.11:80/mjpg/video.mjpg"
+
 #include "dashboard.h"
 #include "packet_definitions.h" //Needs stdint typedefs
 #include "dashboard.cpp"
@@ -273,11 +275,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    dashstate.controller_type_count = ArrayCount(controller_types);
    dashstate.controller_types = controller_types;
    
-   dashstate.vision.camera = new cv::VideoCapture("http://10.46.18.11:80/mjpg/video.mjpg");
+   dashstate.vision.camera = new cv::VideoCapture(CAMERA_CONNECTION);
    dashstate.vision.tracks_per_second = 10;
    dashstate.vision.brightness = 20;
    dashstate.vision.top_reference = RectMinSize(V2(290, 236), V2(63, 16));
    dashstate.vision.bottom_reference = RectMinSize(V2(285, 200), V2(66, 27));
+   dashstate.vision.shooter_threshold = 13000;
    
    dashstate.vision.grabbed_frame = new cv::Mat(dashstate.vision.camera->get(CV_CAP_PROP_FRAME_WIDTH),
 												dashstate.vision.camera->get(CV_CAP_PROP_FRAME_HEIGHT),

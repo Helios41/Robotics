@@ -225,7 +225,20 @@ void DrawEditBlock(ui_window *window, layout *window_layout, DashboardState *das
 		
 		case FunctionBlock_SetBool:
 		{
-			
+			if(Button(window_layout, NULL, Literal("Toggle"), function_link->block.set_bool.op == BooleanOp_Not, V2(120, 40), V2(0, 0), V2(5, 5)).state)
+			{
+				function_link->block.set_bool.op = BooleanOp_Not;
+			}	
+	
+			if(Button(window_layout, NULL, Literal("Extended"), function_link->block.set_bool.op == BooleanOp_True, V2(120, 40), V2(0, 0), V2(5, 5)).state)
+			{
+				function_link->block.set_bool.op = BooleanOp_True;
+			}
+	
+			if(Button(window_layout, NULL, Literal("Retracted"), function_link->block.set_bool.op == BooleanOp_False, V2(120, 40), V2(0, 0), V2(5, 5)).state)
+			{
+				function_link->block.set_bool.op = BooleanOp_False;
+			}
 		}
 		break;
 		
@@ -321,18 +334,39 @@ void DrawFunctionBlock(FunctionBlockLink *block_link, rect2 bounds, layout *edit
 	switch(block_link->block.type)
 	{
 		case FunctionBlock_Wait:
-			title = Concat(Literal("Wait "), ToString(block_link->block.wait.duration, &temp_memory), &temp_memory);
+			title = /*Concat(*/Literal("W")/*, ToString(block_link->block.wait.duration, &temp_memory), &temp_memory)*/;
 			break;
       
 		case FunctionBlock_SetFloatConst:
-			title = Literal("Set Motor ");
+			title = Literal("SF");
 			break;
    
 		case FunctionBlock_SetFloatController:
 			title = Literal("Control Motor ");
 			break;
    
-		default:
+		case FunctionBlock_SetMultiplier:
+			break;
+		
+		case FunctionBlock_SetBool:
+			title = Literal("SB");
+			break;
+		
+		case FunctionBlock_ArcadeDriveConst:
+			title = Literal("AD");
+			break;
+		
+		case FunctionBlock_ArcadeDriveController:
+			break;
+		
+		case FunctionBlock_SetDriveMultiplier:
+			break;
+		
+		case FunctionBlock_DriveDistance:
+			title = Literal("DD");
+			break;
+		
+		case FunctionBlock_GotoPosition:
 			break;
 	}
    

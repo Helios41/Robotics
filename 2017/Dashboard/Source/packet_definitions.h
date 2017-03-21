@@ -205,6 +205,8 @@ struct upload_autonomous_packet_header
    
    char name[32];
    u8 block_count;
+   
+   u8 slot; //NOTE: this can be 0, 1, 2 or 3, thats it
 };
 
 //NOTE: PACKET_TYPE_UPLOAD_CONTROLS

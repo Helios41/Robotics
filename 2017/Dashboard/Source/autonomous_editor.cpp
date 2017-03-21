@@ -75,10 +75,9 @@ void DrawEditorMenu(layout *editor_menu, AutonomousEditor *auto_editor, NetworkS
    Rectangle(render_context, editor_menu->bounds, V4(0.3, 0.3, 0.3, 0.6));
    RectangleOutline(render_context, editor_menu->bounds, V4(0, 0, 0, 1));
    
-   v2 button_size = V2(GetSize(editor_menu->bounds).x * 0.9, 40);
+   v2 button_size = V2(GetSize(editor_menu->bounds).x * 0.9, 30);
    v2 button_margin = V2(GetSize(editor_menu->bounds).x * 0.05, 5);
    
-   //TODO: make these buttons work
    if(Button(editor_menu, NULL, Literal("Open"), button_size, V2(0, 0), button_margin).state)
    {
 	   LoadAutoFile(auto_editor, dashstate->generic_arena);	   
@@ -89,10 +88,25 @@ void DrawEditorMenu(layout *editor_menu, AutonomousEditor *auto_editor, NetworkS
 	   SaveAutoFile(auto_editor, dashstate->generic_arena);
    }
    
-   if(Button(editor_menu, NULL, Literal("Upload"), button_size, V2(0, 0), button_margin).state)
-   {
-	   UploadAutonomous(net_state, auto_editor);
-   }
+	if(Button(editor_menu, NULL, Literal("Upload 0"), button_size, V2(0, 0), button_margin).state)
+	{
+		UploadAutonomous(net_state, auto_editor, 0);
+	}
+   
+	if(Button(editor_menu, NULL, Literal("Upload 1"), button_size, V2(0, 0), button_margin).state)
+	{
+		UploadAutonomous(net_state, auto_editor, 1);
+	}
+	
+	if(Button(editor_menu, NULL, Literal("Upload 2"), button_size, V2(0, 0), button_margin).state)
+	{
+		UploadAutonomous(net_state, auto_editor, 2);
+	}
+	
+	if(Button(editor_menu, NULL, Literal("Upload 3"), button_size, V2(0, 0), button_margin).state)
+	{
+		UploadAutonomous(net_state, auto_editor, 3);
+	}
    
 	if(Button(editor_menu, NULL, Literal("Record"), auto_editor->is_recording, button_size, V2(0, 0), button_margin).state)
 	{
@@ -103,42 +117,58 @@ void DrawEditorMenu(layout *editor_menu, AutonomousEditor *auto_editor, NetworkS
 			auto_editor->recording_timer_start = editor_menu->context->curr_time;
 			auto_editor->earliest_sample_timestamp = dashstate->latest_sample_timestamp;
 		}
-   }
+	}
    
-   if(Button(editor_menu, NULL, Literal("Clear"), button_size, V2(0, 0), button_margin).state)
-   {
-	   FunctionBlockLink *block_link = auto_editor->coroutine.first_block;
+	if(Button(editor_menu, NULL, Literal("Clear"), button_size, V2(0, 0), button_margin).state)
+	{
+		FunctionBlockLink *block_link = auto_editor->coroutine.first_block;
 	   
-	   while(block_link)
-	   {
-		   FunctionBlockLink *curr_block_link = block_link;
-		   block_link = block_link->next;
-		   DeleteBlock(&auto_editor->coroutine, curr_block_link);
-	   }
+		while(block_link)
+		{
+			FunctionBlockLink *curr_block_link = block_link;
+			block_link = block_link->next;
+			DeleteBlock(&auto_editor->coroutine, curr_block_link);
+		}
 	   
 		if(dashstate->auto_editor.edit_block_window)
 		{
 			dashstate->auto_editor.edit_block_window->flags |= Flag_CloseRequested;
 		}
-   }
+	}
+	
+	if(Button(editor_menu, NULL, Literal("Request"), button_size, V2(0, 0), button_margin).state)
+	{
+		RequestUploadedState(net_state);
+	}
 }
 
-void DrawGraphView(layout *graph_view, AutonomousEditor *auto_editor, MemoryArena *generic_arena)
+void DrawGraphView(layout *graph_view, AutonomousEditor *auto_editor, MemoryArena *generic_arena, Robot *robot)
 {
 	RenderContext *render_context = graph_view->context->render_context;
 	rect2 view_bounds = graph_view->bounds;
-	rect2 graph_bounds = RectPosSize(GetCenter(view_bounds), GetSize(view_bounds) - V2(10, 10));
+	//rect2 graph_bounds = RectPosSize(GetCenter(view_bounds), GetSize(view_bounds) - V2(10, 10));
    
 	Rectangle(render_context, view_bounds, V4(0.3, 0.3, 0.3, 0.6));
 	RectangleOutline(render_context, view_bounds, V4(0, 0, 0, 1));
-	RectangleOutline(render_context, graph_bounds, V4(0, 0, 0, 1));
+	//RectangleOutline(render_context, graph_bounds, V4(0, 0, 0, 1));
  
+	//TODO: remove all the if(robot->connected) checks and just disable this tab if we're not connected
+	if(robot->connected)
+	{
+		Rectangle(graph_view, robot->uploaded_state.has_autonomous ? V4(0, 1, 0, 0.6) : V4(1, 0, 0, 0.6), V2(40, 40), V2(0, 0), V2(5, 5));
+		
+		if(robot->uploaded_state.has_autonomous)
+		{
+			Text(graph_view, robot->uploaded_state.autonomous_name, 20, V2(0, 0), V2(5, 5));
+		}
+	}
+	
 	if(auto_editor->is_recording)
 	{ 
 		r32 time_elapsed = graph_view->context->curr_time - auto_editor->recording_timer_start;
 		TemporaryMemoryArena temp_memory = BeginTemporaryMemory(generic_arena);
 
-		Text(render_context, graph_bounds.min, Concat(Literal("Time Elapsed: "), ToString(time_elapsed, &temp_memory), &temp_memory), 20);
+		Text(graph_view, Concat(Literal("Time Elapsed: "), ToString(time_elapsed, &temp_memory), &temp_memory), 20, V2(0, 0), V2(5, 5));
    
 		EndTemporaryMemory(temp_memory);
 		
@@ -180,7 +210,7 @@ void DrawAutonomousEditor(layout *auto_editor, UIContext *context, DashboardStat
 	
 	layout block_editor = Panel(auto_editor, V2(editor_size.x, editor_size.y * 0.4) - V2(10, 10), V2(0, 0), V2(5, 5)).lout;
    
-	DrawGraphView(&timeline_view, &dashstate->auto_editor, dashstate->generic_arena);
+	DrawGraphView(&timeline_view, &dashstate->auto_editor, dashstate->generic_arena, &dashstate->robot);
 	DrawEditorMenu(&menu_bar, &dashstate->auto_editor, dashstate->net_state, dashstate);
 	DrawBlockEditor(&block_editor, dashstate, dashstate->generic_arena);
 	

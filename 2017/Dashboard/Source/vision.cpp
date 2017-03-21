@@ -105,28 +105,61 @@ r32 VisionTest(cv::VideoCapture *cap, s32 brightness,
 
 void RunVision(UIContext *context, DashboardState *dashstate)
 {
-	if(((context->curr_time - dashstate->vision.last_track_time) > (1.0 / (r32)dashstate->vision.tracks_per_second)) &&
-	   dashstate->vision.enabled)
+	if(dashstate->robot.connected && dashstate->vision.enabled)
 	{
-		dashstate->vision.movement = VisionTest(dashstate->vision.camera, dashstate->vision.brightness,
-												dashstate->vision.top_reference, dashstate->vision.bottom_reference,
-												dashstate);
+		r32 potentiometer_reading = GetLatestSample(dashstate->robot.hardware + 9)->potentiometer;
+			
+		if((context->curr_time - dashstate->vision.last_track_time) > (1.0 / (r32)dashstate->vision.tracks_per_second))
+		{
+			dashstate->vision.movement = VisionTest(dashstate->vision.camera, dashstate->vision.brightness,
+													dashstate->vision.top_reference, dashstate->vision.bottom_reference,
+													dashstate);
+			
+			if(Abs(dashstate->vision.movement) > 50)
+			{
+				dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * 0.25;
+			}
+			else if((50 > Abs(dashstate->vision.movement)) && (Abs(dashstate->vision.movement) > 20))
+			{
+				dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * 0.16;
+			}
+			else if(20 > Abs(dashstate->vision.movement))
+			{
+				dashstate->vision.turret_speed = 0.0f;
+			}
+			
+			//if(dashstate->vision.left_limit < potentiometer_reading)
+			{
+				SendSetFloat(dashstate->net_state, 5, dashstate->vision.turret_speed);
+			}
+			
+			dashstate->vision.last_track_time = context->curr_time;
+		}
 		
-		if(Abs(dashstate->vision.movement) > 50)
+		if(dashstate->vision.target_hit)
 		{
-			dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * 0.25;
+			if(dashstate->vision.turret_speed == 0)
+			{
+				r32 motor_reading = GetLatestSample(dashstate->robot.hardware + 1)->motor;
+				b32 speed_hit = (Abs(motor_reading - (-59414)) < dashstate->vision.shooter_threshold);
+			
+				SendSetFloat(dashstate->net_state, 3, speed_hit ? -0.65 : 0);
+				SendSetFloat(dashstate->net_state, 0, speed_hit ? 1 : 0);
+			}
 		}
-		else if((50 > Abs(dashstate->vision.movement)) && (Abs(dashstate->vision.movement) > 20))
+		else
 		{
-			dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * 0.16;
+			if(dashstate->vision.left_limit > potentiometer_reading)
+			{
+				dashstate->vision.sweep_speed = -0.2;
+			}
+			else if(potentiometer_reading > dashstate->vision.right_limit)
+			{
+				dashstate->vision.sweep_speed = 0.2;
+			}
+			
+			SendSetFloat(dashstate->net_state, 5, dashstate->vision.sweep_speed);
 		}
-		else if(20 > Abs(dashstate->vision.movement))
-		{
-			dashstate->vision.turret_speed = 0.0f;
-		}
-		
-		SendSetFloat(dashstate->net_state, 5, dashstate->vision.turret_speed);
-		dashstate->vision.last_track_time = context->curr_time;
 	}
 }
 
@@ -136,6 +169,8 @@ struct vision_config_file_format
 	u32 tracks_per_second;
 	r32 left_limit;
 	r32 right_limit;
+	rect2 top_reference;
+	rect2 bottom_reference;
 };
 
 void SaveVisionConfig(DashboardState *dashstate)
@@ -149,6 +184,8 @@ void SaveVisionConfig(DashboardState *dashstate)
 		vision_config_file_data.tracks_per_second = dashstate->vision.tracks_per_second;
 		vision_config_file_data.left_limit = dashstate->vision.left_limit;
 		vision_config_file_data.right_limit = dashstate->vision.right_limit;
+		vision_config_file_data.top_reference = dashstate->vision.top_reference;
+		vision_config_file_data.bottom_reference = dashstate->vision.bottom_reference;
 		
 		fwrite(&vision_config_file_data, sizeof(vision_config_file_data), 1, vision_config_file);
 		fclose(vision_config_file);
@@ -168,6 +205,8 @@ void LoadVisionConfig(DashboardState *dashstate)
 		dashstate->vision.tracks_per_second = vision_config_file_data.tracks_per_second;
 		dashstate->vision.left_limit = vision_config_file_data.left_limit;
 		dashstate->vision.right_limit = vision_config_file_data.right_limit;
+		dashstate->vision.top_reference = vision_config_file_data.top_reference;
+		dashstate->vision.bottom_reference = vision_config_file_data.bottom_reference;	
 	}
 }
 
@@ -212,7 +251,22 @@ void DrawVision(layout *vision_ui, UIContext *context, DashboardState *dashstate
 	NextLine(&vision_config_list);
 	TextBox(&vision_config_list, &dashstate->vision.right_limit, V2(GetSize(vision_config_list.bounds).x, 20), V2(0, 0), V2(0, 0));
 	NextLine(&vision_config_list);
-		
+	
+	if(Button(&vision_config_list, NULL, Literal("Camera Reconnect"), V2(120, 40), V2(0, 0), V2(5, 5)).state)
+	{
+		delete dashstate->vision.camera;
+		dashstate->vision.camera = new cv::VideoCapture(CAMERA_CONNECTION);
+	}
+	
+	if(Button(&vision_config_list, NULL, Literal("Set References"), V2(120, 40), V2(0, 0), V2(5, 5)).state)
+	{
+		if(dashstate->vision.target_hit)
+		{
+			dashstate->vision.top_reference = dashstate->vision.top_target;
+			dashstate->vision.bottom_reference = dashstate->vision.bottom_target;
+		}
+	}
+	
 	Rectangle(render_context, vision_info_page.bounds, V4(0.3, 0.3, 0.3, 0.6));
 	RectangleOutline(render_context, vision_info_page.bounds, V4(0, 0, 0, 1));
 	
@@ -237,22 +291,19 @@ void DrawVision(layout *vision_ui, UIContext *context, DashboardState *dashstate
 	
 		Text(&vision_info_page, Concat(Literal("Potentiometer: "), ToString(potentiometer_reading, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
 		NextLine(&vision_info_page);
-		
-		if(!dashstate->vision.target_hit && dashstate->vision.enabled)
-		{
-			if(dashstate->vision.left_limit > potentiometer_reading)
-			{
-				dashstate->vision.sweep_speed = -0.2;
-			}
-			else if(potentiometer_reading > dashstate->vision.right_limit)
-			{
-				dashstate->vision.sweep_speed = 0.2;
-			}
 			
-			SendSetFloat(dashstate->net_state, 5, dashstate->vision.sweep_speed);
-		}
-		
 		Text(&vision_info_page, Concat(Literal("Swivel Speed: "), ToString(dashstate->vision.sweep_speed, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
+		NextLine(&vision_info_page);
+		
+		r32 motor_reading = GetLatestSample(dashstate->robot.hardware + 1)->motor;
+		
+		Text(&vision_info_page, Concat(Literal("Shooter Motor: "), ToString(motor_reading, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
+		NextLine(&vision_info_page);
+		
+		r32 speed_diff = Abs(motor_reading - (-59414));
+		b32 speed_hit = (speed_diff < dashstate->vision.shooter_threshold);
+		
+		Text(&vision_info_page, Concat(speed_hit ? Literal("Speed Hit") : Literal("Speed Not Hit: "), ToString(speed_diff, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
 		NextLine(&vision_info_page);
 	}
 	

@@ -88,6 +88,12 @@ struct Robot
    b32 drive_encoder;
    u32 at_sample;
    RobotDriveSample samples[512];
+   
+	struct
+	{
+		b32 has_autonomous;
+		string autonomous_name;
+	} uploaded_state;
 };
 
 struct FunctionBlockLink
@@ -210,6 +216,8 @@ struct DashboardState
 	
 		r32 last_track_time;
 		r32 movement;
+		
+		r32 shooter_threshold;
 	} vision;
 };
 
@@ -270,7 +278,7 @@ void RemoveWindow(DashboardState *dashstate, ui_window *window)
 }
 
 void NetworkReconnect(struct NetworkState *net_state, network_settings *net_settings);
-void UploadAutonomous(struct NetworkState *net_state, AutonomousEditor *auto_builder);
+void UploadAutonomous(struct NetworkState *net_state, AutonomousEditor *auto_builder, u8 slot);
 //UploadControls
 void RequestUploadedState(struct NetworkState *net_state);
 void SendSetFloat(struct NetworkState *net_state, u32 hardware_index, r32 value);

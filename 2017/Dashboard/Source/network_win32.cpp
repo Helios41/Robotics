@@ -47,7 +47,7 @@ void SendPing(NetworkState *net_state)
 	SendGenericPacket(net_state, PACKET_TYPE_PING);
 }
 
-void UploadAutonomous(NetworkState *net_state, AutonomousEditor *auto_builder)
+void UploadAutonomous(NetworkState *net_state, AutonomousEditor *auto_builder, u8 slot)
 {
 	u32 block_count = 0;
 	FunctionBlockLink *last_link = auto_builder->coroutine.first_block;
@@ -62,6 +62,7 @@ void UploadAutonomous(NetworkState *net_state, AutonomousEditor *auto_builder)
     upload_auto_header->header.type = PACKET_TYPE_UPLOAD_AUTONOMOUS;
     upload_auto_header->block_count = block_count;
 	CopyTo(auto_builder->name, String(upload_auto_header->name, 32));
+	upload_auto_header->slot = slot;
 	
 	FunctionBlock *blocks = (FunctionBlock *)(upload_auto_header + 1);
 	
@@ -201,13 +202,16 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, DashboardState *dashstate)
 			dashstate->latest_sample_timestamp = sample.timestamp;
 		}
    }
-   else if(header->type == PACKET_TYPE_UPLOADED_STATE)
-   {
-	   uploaded_state_packet_header *uploaded_state_header = (uploaded_state_packet_header *) header;
-	   {
-		   
-	   }
-   }
+	else if(header->type == PACKET_TYPE_UPLOADED_STATE)
+	{
+		uploaded_state_packet_header *uploaded_state_header = (uploaded_state_packet_header *) header;
+		
+		string auto_name = String((char *) malloc(sizeof(char) * strlen(uploaded_state_header->autonomous_name)), strlen(uploaded_state_header->autonomous_name));
+		CopyTo(String(uploaded_state_header->autonomous_name, strlen(uploaded_state_header->autonomous_name)), auto_name);
+		
+		dashstate->robot.uploaded_state.has_autonomous = uploaded_state_header->has_autonomous;
+		dashstate->robot.uploaded_state.autonomous_name = auto_name;
+	}
 	else if(header->type == PACKET_TYPE_DEBUG_MESSAGE)
 	{
 		debug_message_packet_header *debug_message_packet  = (debug_message_packet_header *) header;
