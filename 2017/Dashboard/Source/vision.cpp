@@ -128,10 +128,11 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 				dashstate->vision.turret_speed = 0.0f;
 			}
 			
-			//if(dashstate->vision.left_limit < potentiometer_reading)
-			{
-				SendSetFloat(dashstate->net_state, 5, dashstate->vision.turret_speed);
-			}
+			b32 moving_right = (dashstate->vision.turret_speed > 0) && (dashstate->vision.right_limit > potentiometer_reading);
+			b32 moving_left = (dashstate->vision.turret_speed < 0) && (dashstate->vision.left_limit < potentiometer_reading);
+			b32 stopping = (dashstate->vision.turret_speed == 0);
+			
+			SendSetFloat(dashstate->net_state, 5, dashstate->vision.turret_speed);
 			
 			dashstate->vision.last_track_time = context->curr_time;
 		}

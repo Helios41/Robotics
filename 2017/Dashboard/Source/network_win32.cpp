@@ -205,12 +205,16 @@ void HandlePacket(MemoryArena *arena, u8 *buffer, DashboardState *dashstate)
 	else if(header->type == PACKET_TYPE_UPLOADED_STATE)
 	{
 		uploaded_state_packet_header *uploaded_state_header = (uploaded_state_packet_header *) header;
-		
-		string auto_name = String((char *) malloc(sizeof(char) * strlen(uploaded_state_header->autonomous_name)), strlen(uploaded_state_header->autonomous_name));
-		CopyTo(String(uploaded_state_header->autonomous_name, strlen(uploaded_state_header->autonomous_name)), auto_name);
-		
 		dashstate->robot.uploaded_state.has_autonomous = uploaded_state_header->has_autonomous;
-		dashstate->robot.uploaded_state.autonomous_name = auto_name;
+		
+		if(uploaded_state_header->has_autonomous)
+		{
+			u32 auto_name_length = ArrayCount(uploaded_state_header->autonomous_name);
+		
+			string auto_name = String((char *) malloc(sizeof(char) * auto_name_length), auto_name_length);
+			CopyTo(String(uploaded_state_header->autonomous_name, auto_name_length), auto_name);
+			dashstate->robot.uploaded_state.autonomous_name = auto_name;
+		}
 	}
 	else if(header->type == PACKET_TYPE_DEBUG_MESSAGE)
 	{
