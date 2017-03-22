@@ -171,7 +171,7 @@ public:
 
 	u32 current_auto_slot = 0;
 
-	char auto_name[4][32] = {};
+	char *auto_name[4] = {(char *) malloc(sizeof(char) * 32), (char *) malloc(sizeof(char) * 32), (char *) malloc(sizeof(char) * 32), (char *) malloc(sizeof(char) * 32)};
 	u32 auto_length[4] = {0, 0, 0, 0};
 	FunctionBlock *auto_program[4] = {NULL, NULL, NULL, NULL};
 	
@@ -182,6 +182,8 @@ public:
 	void Autonomous();
 	void OperatorControl();
 };
+
+void SendDebugMessagePacket(network_state *net_state, const char *text, b32 auto_debug);
 
 #include <dashcode.h>
 
@@ -300,7 +302,7 @@ void SendUploadedState(network_state *net_state, TestRobot *robot)
 	uploaded_state_packet.header.type = PACKET_TYPE_UPLOADED_STATE;
 
 	strcpy(uploaded_state_packet.autonomous_name, robot->auto_name[robot->current_auto_slot]);
-	uploaded_state_packet.has_autonomous = (robot->auto_program[robot->current_auto_slot] != NULL);
+	uploaded_state_packet.has_autonomous = (robot->auto_length[robot->current_auto_slot] > 0);
 
 	sendto(net_state->socket, (const char *) &uploaded_state_packet, sizeof(uploaded_state_packet), 0,
 		   (struct sockaddr *) &net_state->client_info, net_state->client_info_size);
@@ -361,12 +363,14 @@ void HandlePackets(network_state *net_state, TestRobot *robot)
 			}
 			else if(header->type == PACKET_TYPE_UPLOAD_AUTONOMOUS)
 			{
+				SendDebugMessagePacket(net_state, "Recieved Autonomous", true);
+
 				upload_autonomous_packet_header *upload_autonomous = (upload_autonomous_packet_header *) header;
 				FunctionBlock *blocks = (FunctionBlock *)(upload_autonomous + 1);
 
 				strncpy(robot->auto_name[upload_autonomous->slot], upload_autonomous->name, strlen(upload_autonomous->name));
 				robot->auto_length[upload_autonomous->slot] = upload_autonomous->block_count;
-				free(robot->auto_program);
+				free(robot->auto_program[upload_autonomous->slot]);
 				robot->auto_program[upload_autonomous->slot] = (FunctionBlock *) malloc(sizeof(FunctionBlock) * robot->auto_length[upload_autonomous->slot]);
 
 				for(u32 i = 0;
@@ -377,15 +381,15 @@ void HandlePackets(network_state *net_state, TestRobot *robot)
 				}
 
 				SendUploadedState(net_state, robot);
-				SendDebugMessagePacket(net_state, "Recieved Autonomous", true);
 
-				SaveAutoFile(robot, "auto0.abin2", 0);
-				SaveAutoFile(robot, "auto1.abin2", 1);
-				SaveAutoFile(robot, "auto2.abin2", 2);
-				SaveAutoFile(robot, "auto3.abin2", 3);
+				SaveAutoFile(robot, "/home/lvuser/auto0.rabin2", 0);
+				SaveAutoFile(robot, "/home/lvuser/auto1.rabin2", 1);
+				SaveAutoFile(robot, "/home/lvuser/auto2.rabin2", 2);
+				SaveAutoFile(robot, "/home/lvuser/auto3.rabin2", 3);
 			}
 			else if(header->type == PACKET_TYPE_REQUEST_UPLOADED_STATE)
 			{
+				SendDebugMessagePacket(net_state, "Request State", false);
 				SendUploadedState(net_state, robot);
 			}
 		}
@@ -544,10 +548,10 @@ void TestRobot::RobotInit()
 
 	bind(net_state.socket, (struct sockaddr *) &server_info, sizeof(server_info));
 
-	LoadAutoFile(this, "auto0.abin2", 0);
-	LoadAutoFile(this, "auto1.abin2", 1);
-	LoadAutoFile(this, "auto2.abin2", 2);
-	LoadAutoFile(this, "auto3.abin2", 3);
+	LoadAutoFile(this, "/home/lvuser/auto0.rabin2", 0);
+	LoadAutoFile(this, "/home/lvuser/auto1.rabin2", 1);
+	LoadAutoFile(this, "/home/lvuser/auto2.rabin2", 2);
+	LoadAutoFile(this, "/home/lvuser/auto3.rabin2", 3);
 
 	//(new Compressor(0))->Stop();
 }
@@ -555,6 +559,11 @@ void TestRobot::RobotInit()
 void TestRobot::Disabled()
 {
 	SendDebugMessagePacket(&net_state, "Disabled", false);
+
+	LoadAutoFile(this, "/home/lvuser/auto0.rabin2", 0);
+	LoadAutoFile(this, "/home/lvuser/auto1.rabin2", 1);
+	LoadAutoFile(this, "/home/lvuser/auto2.rabin2", 2);
+	LoadAutoFile(this, "/home/lvuser/auto3.rabin2", 3);
 
 	while(!IsEnabled())
 	{
@@ -903,7 +912,7 @@ void TestRobot::OperatorControl()
 			FunctionBlock toggle_flap = {};
 			toggle_flap.type = FunctionBlock_SetBool;
 			toggle_flap.set_bool.op = BooleanOp_Not;
-			toggle_flap.set_bool.hardware_index = HW_TURNTABLE;
+			toggle_flap.set_bool.hardware_index = HW_HOPPER_FLAP;
 			ExecuteBlocklangFunction(toggle_flap, this);
 		}
 

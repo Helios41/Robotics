@@ -249,7 +249,7 @@ void ExecuteBlocklangRuntime(blocklang_runtime *runtime, TestRobot *robot, b32 f
 		}
 		else if(runtime->left_remaining || runtime->right_remaining)
 		{
-			r32 speed = (Sign(runtime->left_distance) != Sign(runtime->right_distance)) ? 0.60 : 0.175;
+			r32 speed = (Sign(runtime->left_distance) != Sign(runtime->right_distance)) ? 0.60 : 0.25;
 
 			r32 left_distance = robot->left_encoder.Get() / 1173.0;
 			b32 prev_left_remaining = runtime->left_remaining;
@@ -303,11 +303,15 @@ void SaveAutoFile(TestRobot *robot, const char *file_name, u8 slot)
 		fwrite(robot->auto_program[slot], sizeof(FunctionBlock) * save_file_header.block_count, 1, auto_save_file);
 		fclose(auto_save_file);
 	}
+	else
+	{
+		SendDebugMessagePacket(&robot->net_state, "Save Error", true);
+	}
 }
 
 void LoadAutoFile(TestRobot *robot, const char *file_name, u8 slot)
 {
-	FILE *auto_save_file = fopen(file_name, "wb");
+	FILE *auto_save_file = fopen(file_name, "rb");
 
 	if(auto_save_file)
 	{
@@ -320,6 +324,12 @@ void LoadAutoFile(TestRobot *robot, const char *file_name, u8 slot)
 		robot->auto_program[slot] = (FunctionBlock *) malloc(sizeof(FunctionBlock) * save_file_header.block_count);
 		fread(robot->auto_program[slot], sizeof(FunctionBlock) * save_file_header.block_count, 1, auto_save_file);
 
+		SendDebugMessagePacket(&robot->net_state, (save_file_header.block_count > 0) ? "Load Success" : "Empty", true);
+
 		fclose(auto_save_file);
+	}
+	else
+	{
+		SendDebugMessagePacket(&robot->net_state, "Load Error", true);
 	}
 }
