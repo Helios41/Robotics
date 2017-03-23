@@ -288,7 +288,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    
    dashstate.net_settings.connect_to = String((char *) malloc(sizeof(char) * 30), 30);
    Clear(dashstate.net_settings.connect_to);
-   CopyTo(Literal("10.46.18.33"), dashstate.net_settings.connect_to);
+   CopyTo(Literal("10.46.18.75"), dashstate.net_settings.connect_to);
    dashstate.net_settings.is_mdns = false;
    
    LoadVisionConfig(&dashstate);

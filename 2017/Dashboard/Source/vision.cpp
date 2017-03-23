@@ -115,13 +115,13 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 													dashstate->vision.top_reference, dashstate->vision.bottom_reference,
 													dashstate);
 			
-			if(Abs(dashstate->vision.movement) > 50)
+			if(Abs(dashstate->vision.movement) > 170)
 			{
 				dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * 0.25;
 			}
-			else if((50 > Abs(dashstate->vision.movement)) && (Abs(dashstate->vision.movement) > 20))
+			else if((170 > Abs(dashstate->vision.movement)) && (Abs(dashstate->vision.movement) > 20))
 			{
-				dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * 0.16;
+				dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * 0.165;
 			}
 			else if(20 > Abs(dashstate->vision.movement))
 			{
