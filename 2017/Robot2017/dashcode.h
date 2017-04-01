@@ -11,13 +11,20 @@ RobotHardware HWMotor_Victor(u32 port, char *name)
 
 RobotHardware HWMotor_EncoderVictor(u32 motor_port, u32 encoder_a,
 									u32 encoder_b,
-									ErrorFunction e_function, char *name)
+									r32 Kp, r32 Ki, r32 Kd,
+									u32 average_span, r32 encoder_coeff, char *name)
 {
 	RobotHardware result = {};
 	result.multiplier = 1.0f;
 	result.encoder_motor.motor = new Victor(motor_port);
+
 	result.encoder_motor.encoder = new Encoder(encoder_a, encoder_b);
-	result.encoder_motor.error_function = e_function;
+	result.encoder_motor.encoder->SetPIDSourceType(PIDSourceType::kRate);
+	result.encoder_motor.encoder->SetSamplesToAverage(average_span);
+	result.encoder_motor.encoder->SetDistancePerPulse(encoder_coeff);
+
+	result.encoder_motor.pid = new PIDController(Kp, Ki, Kd, result.encoder_motor.encoder, result.encoder_motor.motor);
+	result.encoder_motor.pid->Enable();
 	result.type = Hardware_EncoderMotor;
 	stpcpy(result.name, name);
 	return result;
@@ -67,7 +74,26 @@ void SetMotor(RobotHardware *hardware, r32 value)
 	}
 	else if(hardware->type == Hardware_EncoderMotor)
 	{
-		hardware->encoder_motor.error_function.target = hardware->multiplier * value;
+#ifdef COMP_BOT
+		//if(i == HW_SHOOTER)
+		{
+			hardware->encoder_motor.error_function.target = hardware->multiplier * -value;
+		}
+		/*
+		else
+		{
+			hardware->encoder_motor.error_function.target = hardware->multiplier * value;
+		}
+		*/
+#else
+		r32 rmp_value = value / 60.0f;
+
+		if(hardware->encoder_motor.pid->GetSetpoint() != rmp_value)
+		{
+			SmartDashboard::PutNumber("Setpoint Changed", SmartDashboard::GetNumber("Setpoint Changed", 0) + 1);
+			hardware->encoder_motor.pid->SetSetpoint(rmp_value);
+		}
+#endif
 	}
 }
 
@@ -232,8 +258,16 @@ void ExecuteBlocklangRuntime(blocklang_runtime *runtime, TestRobot *robot, b32 f
 					runtime->left_remaining = true;
 					runtime->right_remaining = true;
 
+					b32 is_turn = Sign(function.drive_distance.left_distance) != Sign(function.drive_distance.right_distance);
+
 					runtime->left_distance = function.drive_distance.left_distance;
 					runtime->right_distance = function.drive_distance.right_distance;
+
+					if(is_turn && flip_turns)
+					{
+						runtime->left_distance *= -1;
+						runtime->right_distance *= -1;
+					}
 
 					break;
 				}
@@ -249,17 +283,24 @@ void ExecuteBlocklangRuntime(blocklang_runtime *runtime, TestRobot *robot, b32 f
 		}
 		else if(runtime->left_remaining || runtime->right_remaining)
 		{
-			r32 speed = (Sign(runtime->left_distance) != Sign(runtime->right_distance)) ? 0.60 : 0.25;
+			b32 is_turn = Sign(runtime->left_distance) != Sign(runtime->right_distance);
+			r32 speed = is_turn ? 0.80 : (robot->current_auto_slot == 3 ? 0.60 : 0.30);
 
-			r32 left_distance = robot->left_encoder.Get() / 1173.0;
+			r32 left_distance = robot->left_encoder.Get() / DRIVE_ENCODER_COEFF;
+			r32 right_distance = robot->right_encoder.Get() / DRIVE_ENCODER_COEFF;
+
+#ifdef COMP_BOT
+			left_distance *= -1;
+			right_distance *= -1;
+#endif
+
 			b32 prev_left_remaining = runtime->left_remaining;
 			runtime->left_remaining = (runtime->left_distance > 0) ? ((left_distance + runtime->left_distance) > 0.01) : ((left_distance + runtime->left_distance) < -0.01);
 			b32 left_moving = Absolute(robot->left_encoder.GetRate()) > 1;
 			b32 left_drove_half = Absolute(left_distance) > (Absolute(runtime->left_distance) / 2);
 
-			r32 right_distance = robot->right_encoder.Get() / 1173.0;
 			b32 prev_right_remaining = runtime->right_remaining;
-			runtime->right_remaining = (runtime->right_distance > 0) ? ((left_distance + runtime->right_distance) > 0.01) : ((left_distance + runtime->right_distance) < -0.01);
+			runtime->right_remaining = (runtime->right_distance > 0) ? ((right_distance + runtime->right_distance) > 0.01) : ((right_distance + runtime->right_distance) < -0.01);
 			b32 right_moving = Absolute(robot->right_encoder.GetRate()) > 1;
 			b32 right_drove_half = Absolute(right_distance) > (Absolute(runtime->right_distance) / 2);
 
@@ -273,6 +314,9 @@ void ExecuteBlocklangRuntime(blocklang_runtime *runtime, TestRobot *robot, b32 f
 
 			r32 left_speed = (prev_left_remaining && !runtime->left_remaining) ? 0 : (runtime->left_distance > 0 ? speed : -speed);
 			r32 right_speed = (prev_right_remaining && !runtime->right_remaining) ? 0 : (runtime->right_distance > 0 ? speed : -speed);
+
+			SmartDashboard::PutNumber("Left Remaining", (runtime->left_distance > 0) ? (left_distance + runtime->left_distance) : (left_distance + runtime->left_distance));
+			SmartDashboard::PutNumber("Right Remaining", (runtime->right_distance > 0) ? (right_distance + runtime->right_distance) : (right_distance + runtime->right_distance));
 
 			TankDrive(robot, left_speed, right_speed);
 		}

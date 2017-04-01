@@ -25,40 +25,19 @@ typedef uint32_t b32;
 #include "packet_definitions.h"
 #include "WPILib.h"
 
+//#define COMP_BOT
+
+#ifdef COMP_BOT
+	#define DRIVE_ENCODER_COEFF 1173.0 //586.5
+#else
+	#define DRIVE_ENCODER_COEFF 1173.0
+#endif
+
 using namespace frc;
 
-struct ErrorFunction
+r32 Absolute(r32 a)
 {
-	int avg_span;
-	float coeff;
-	float dcoeff;
-
-	float target;
-	float acc;
-	int inc;
-	float avg;
-	float speed;
-};
-
-ErrorFunction EFunction(int avg_span, float coeff, float dcoeff)
-{
-	ErrorFunction result = {};
-
-	result.avg_span = avg_span;
-	result.coeff = coeff;
-	result.dcoeff = dcoeff;
-
-	return result;
-}
-
-float Square(float x)
-{
-	return x * x;
-}
-
-float Absolute(float x)
-{
-	return (x < 0.0f) ? -x : x;
+	return (a < 0) ? -a : a;
 }
 
 float Sign(float x)
@@ -79,26 +58,6 @@ float Clamp(float min, float value, float max)
 	return result;
 }
 
-void Update(ErrorFunction *function, float rate)
-{
-	function->inc++;
-	function->acc += rate;
-
-	if(function->inc >= function->avg_span)
-	{
-		function->avg = function->acc / (float)function->inc;
-
-		float diff = (function->target - function->avg);
-		float c = function->coeff * Square(function->dcoeff * diff);
-
-		function->speed += c * diff;
-		function->speed = Clamp(-1, function->speed, 1);
-
-		function->acc = 0.0f;
-		function->inc = 0;
-	}
-}
-
 struct RobotHardware
 {
 	RobotHardwareType type;
@@ -106,7 +65,7 @@ struct RobotHardware
 	{
 		struct
 		{
-			ErrorFunction error_function;
+			PIDController *pid;
 			Encoder *encoder;
 			Victor *motor;
 		} encoder_motor;
@@ -131,11 +90,6 @@ struct RobotHardware
 	RobotHardwareSample last_sample;
 };
 
-b32 HitTarget(ErrorFunction efunction, r32 threshold)
-{
-	return Absolute(efunction.avg - efunction.target) < threshold;
-}
-
 #define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
 
 struct ButtonState
@@ -150,6 +104,18 @@ struct network_state
 	struct sockaddr_in client_info;
 	socklen_t client_info_size;
 };
+
+#define HW_TURNTABLE 0
+#define HW_SHOOTER 1
+#define HW_INTAKE 2
+#define HW_INDEXER 3
+#define HW_CLIMBER 4
+#define HW_SHOOTER_SWIVEL 5
+#define HW_BALL_SHIFTER 6
+#define HW_PUNCH 7
+#define HW_GEAR_HOLDER 8
+#define HW_POT 9
+#define HW_HOPPER_FLAP 10
 
 class TestRobot : public SampleRobot
 {
@@ -176,6 +142,8 @@ public:
 	FunctionBlock *auto_program[4] = {NULL, NULL, NULL, NULL};
 	
 	network_state net_state = {};
+
+	AnalogInput punch_plate { 1 };
 
 	void RobotInit();
 	void Disabled();
@@ -242,7 +210,12 @@ void SendWelcomePacket(network_state *net_state, RobotHardware *hardware, u32 ha
 	welcome_header->header.type = PACKET_TYPE_WELCOME;
 	welcome_header->hardware_count = hardware_count;
 	welcome_header->drive_encoder = false; //TODO: change this to true when we get drive encoders working
+
+#ifdef COMP_BOT
+	strcpy(welcome_header->name, "VanADIum");
+#else
 	strcpy(welcome_header->name, "ToasterOven");
+#endif
 
 	robot_hardware *send_hardware = (robot_hardware *)(welcome_header + 1);
 
@@ -423,8 +396,22 @@ void SendSamples(network_state *net_state, TestRobot *robot, b32 force_send = fa
 
 			case Hardware_EncoderMotor:
 			{
+
 				sample.multiplier = hardware->multiplier;
-				sample.motor = hardware->encoder_motor.encoder->GetRate();
+#ifdef COMP_BOT
+				/*
+				if(i == HW_SHOOTER)
+				{
+					sample.motor = hardware->encoder_motor.encoder->GetRate();
+				}
+				else
+				*/
+				{
+					sample.motor = -hardware->encoder_motor.encoder->GetRate();
+				}
+#else
+				sample.motor = hardware->encoder_motor.encoder->GetRate() * 60;
+#endif
 
 				send_sample = (Absolute(sample.motor - hardware->last_sample.motor) > 0.01f) ||
 							  (Absolute(sample.multiplier - hardware->last_sample.multiplier) > 0.01f);
@@ -477,53 +464,12 @@ void SendSamples(network_state *net_state, TestRobot *robot, b32 force_send = fa
 	}
 }
 
-void UpdateErrorFunction(TestRobot *robot)
-{
-	for(u32 i = 0;
-		i < ArrayCount(robot->hardware);
-		i++)
-	{
-		if(robot->hardware[i].type == Hardware_EncoderMotor)
-		{
-			r32 rate = robot->hardware[i].encoder_motor.encoder->GetRate();
-
-			Update(&robot->hardware[i].encoder_motor.error_function, rate);
-
-			SmartDashboard::PutNumber("Rate " + std::string(robot->hardware[i].name), rate);
-			SmartDashboard::PutNumber("Speed " + std::string(robot->hardware[i].name), robot->hardware[i].encoder_motor.error_function.speed);
-			SmartDashboard::PutNumber("Target " + std::string(robot->hardware[i].name), robot->hardware[i].encoder_motor.error_function.target);
-			SmartDashboard::PutNumber("Average " + std::string(robot->hardware[i].name), robot->hardware[i].encoder_motor.error_function.avg);
-
-			robot->hardware[i].encoder_motor.error_function.speed = Clamp(-0.83, robot->hardware[i].encoder_motor.error_function.speed, 0);
-
-			if(Absolute(robot->hardware[i].encoder_motor.error_function.target) < 0.1)
-			{
-				robot->hardware[i].encoder_motor.motor->Set(0);
-			}
-			else
-			{
-				robot->hardware[i].encoder_motor.motor->Set(robot->hardware[i].encoder_motor.error_function.speed);
-			}
-		}
-	}
-}
-
-#define HW_TURNTABLE 0
-#define HW_SHOOTER 1
-#define HW_INTAKE 2
-#define HW_INDEXER 3
-#define HW_CLIMBER 4
-#define HW_SHOOTER_SWIVEL 5
-#define HW_BALL_SHIFTER 6
-#define HW_PUNCH 7
-#define HW_GEAR_HOLDER 8
-#define HW_POT 9
-#define HW_HOPPER_FLAP 10
-
 void TestRobot::RobotInit()
 {
 	hardware[HW_TURNTABLE] = HWMotor_Victor(4, (char *)"Turntable");
-	hardware[HW_SHOOTER] = HWMotor_EncoderVictor(5, 4, 5, EFunction(10, 0.001, 0.0000088), (char *)"Shooter");
+	hardware[HW_SHOOTER] = HWMotor_EncoderVictor(5, 4, 5,
+												 0.00095, 0.0018, 0.001,
+												 110, 1.0 / 1024.0, (char *)"Shooter");
 	hardware[HW_INTAKE] = HWMotor_Victor(6, (char *)"Intake");
 	hardware[HW_INDEXER] = HWMotor_Victor(7, (char *)"Indexer");
 	hardware[HW_CLIMBER] = HWMotor_Victor(8, (char *)"Climber");
@@ -604,7 +550,7 @@ void TestRobot::Autonomous()
 	b32 auto_rt_setup = (auto_program[current_auto_slot] != NULL);
 	blocklang_runtime auto_rt = SetupRuntime(auto_program[current_auto_slot], auto_length[current_auto_slot]);
 
-	b32 flip_turns = (DriverStation::GetInstance().GetAlliance() != DriverStation::Alliance::kRed);
+	b32 flip_turns = (DriverStation::GetInstance().GetAlliance() == DriverStation::Alliance::kRed);
 
 	SendDebugMessagePacket(&net_state, auto_rt_setup ? "Start Auto" : "No Auto Run", true);
 
@@ -614,6 +560,12 @@ void TestRobot::Autonomous()
  		{
  			ExecuteBlocklangRuntime(&auto_rt, this, flip_turns);
 
+ 			FunctionBlock gear_punch = {};
+ 			gear_punch.type = FunctionBlock_SetBool;
+ 			gear_punch.set_bool.op = (punch_plate.GetValue() > 1000) ? BooleanOp_True : BooleanOp_False;
+ 			gear_punch.set_bool.hardware_index = HW_PUNCH;
+ 			ExecuteBlocklangFunction(gear_punch, this);
+
  			SmartDashboard::PutNumber("Auto RT Wait Time", auto_rt.wait_time);
  			SmartDashboard::PutNumber("Auto RT Timer", auto_rt.timer);
  			SmartDashboard::PutNumber("Auto IPointer", auto_rt.curr_function);
@@ -621,7 +573,6 @@ void TestRobot::Autonomous()
 
  		HandlePackets(&net_state, this);
  		SendSamples(&net_state, this);
- 		UpdateErrorFunction(this);
 
  		Wait(0.05f);
  	}
@@ -688,8 +639,8 @@ void TestRobot::Autonomous()
 
 	while(IsAutonomous() && IsEnabled())
 	{
-		r32 left_distance = left_encoder.Get() / 1173.0;
-		r32 right_distance = right_encoder.Get() / 1173.0;
+		r32 left_distance = left_encoder.Get() / DRIVE_ENCODER_COEFF;
+		r32 right_distance = right_encoder.Get() / DRIVE_ENCODER_COEFF;
 
 		b32 left_remaining = (left_distance + 6.2) > 0.01;
 		b32 right_remaining = (right_distance + 6.2) > 0.01;
@@ -796,9 +747,11 @@ void TestRobot::OperatorControl()
 
 	b32 shooter_ready = false;
 
-	hardware[HW_SHOOTER].encoder_motor.error_function.speed = -0.65;
-
 	SendDebugMessagePacket(&net_state, "Start Teleop", false);
+
+	hardware[HW_SHOOTER].encoder_motor.pid->SetAbsoluteTolerance(4);
+	hardware[HW_SHOOTER].encoder_motor.pid->SetToleranceBuffer(10);
+	hardware[HW_SHOOTER].encoder_motor.pid->SetInputRange(-5500, 5500);
 
 	while(IsOperatorControl() && IsEnabled())
 	{
@@ -830,6 +783,14 @@ void TestRobot::OperatorControl()
 		intake.set_float_const.hardware_index = HW_INTAKE;
 		ExecuteBlocklangFunction(intake, this);
 
+#ifdef COMP_BOT
+		FunctionBlock climber_flip = {};
+		climber_flip.type = FunctionBlock_SetMultiplier;
+		climber_flip.set_multiplier.value = -1;
+		climber_flip.set_multiplier.hardware_index = HW_CLIMBER;
+		ExecuteBlocklangFunction(climber_flip, this);
+#endif
+
 		FunctionBlock climber = {};
 		climber.type = FunctionBlock_SetFloatController;
 		climber.set_float_controller.axis_index = 1;
@@ -845,7 +806,7 @@ void TestRobot::OperatorControl()
 
 		FunctionBlock gear_punch = {};
 		gear_punch.type = FunctionBlock_SetBool;
-		gear_punch.set_bool.op = driver_buttons[D_BUTTON_Y].down ? BooleanOp_True : BooleanOp_False;
+		gear_punch.set_bool.op = (driver_buttons[D_BUTTON_Y].down || (punch_plate.GetValue() > 1000)) ? BooleanOp_True : BooleanOp_False;
 		gear_punch.set_bool.hardware_index = HW_PUNCH;
 		ExecuteBlocklangFunction(gear_punch, this);
 
@@ -858,8 +819,13 @@ void TestRobot::OperatorControl()
 			ExecuteBlocklangFunction(gear_holder, this);
 		}
 
-		r32 spot1 = -59414;
-		r32 spot2 = -67000;
+		r32 spot1 = -3400;
+		r32 spot2 = -3325;
+
+		SmartDashboard::PutNumber("Shooter Speed", hardware[HW_SHOOTER].encoder_motor.encoder->GetRate() * 60);
+		SmartDashboard::PutBoolean("Shooter On Target", hardware[HW_SHOOTER].encoder_motor.pid->OnTarget());
+		SmartDashboard::PutNumber("Shooter Setpoint", hardware[HW_SHOOTER].encoder_motor.pid->GetSetpoint() * 60);
+		SmartDashboard::PutNumber("Shooter Power", hardware[HW_SHOOTER].encoder_motor.pid->Get());
 
 		SmartDashboard::PutNumber("Spot 1", spot1);
 		SmartDashboard::PutNumber("Spot 2", spot2);
@@ -870,17 +836,19 @@ void TestRobot::OperatorControl()
 		shooter.set_float_const.hardware_index = HW_SHOOTER;
 		ExecuteBlocklangFunction(shooter, this);
 
-		b32 new_shooter_ready = HitTarget(hardware[HW_SHOOTER].encoder_motor.error_function, 6000) && op_buttons[OP_BUTTON_TRIGGER].down;
+		b32 new_shooter_ready = hardware[HW_SHOOTER].encoder_motor.pid->OnTarget() && (hardware[HW_SHOOTER].encoder_motor.pid->GetSetpoint() != 0);
 		b32 shooter_became_ready = new_shooter_ready && !shooter_ready;
 		b32 shooter_became_unready = !new_shooter_ready && shooter_ready;
 		shooter_ready = new_shooter_ready;
 
-		/*
+		SmartDashboard::PutBoolean("Shooter Ready", new_shooter_ready);
+
+#if 1
 		if(shooter_became_ready)
 		{
 			FunctionBlock indexer = {};
 			indexer.type = FunctionBlock_SetFloatConst;
-			indexer.set_float_const.value = -0.65;
+			indexer.set_float_const.value = -0.50;
 			indexer.set_float_const.hardware_index = HW_INDEXER;
 			ExecuteBlocklangFunction(indexer, this);
 
@@ -905,7 +873,7 @@ void TestRobot::OperatorControl()
 			turntable.set_float_const.hardware_index = HW_TURNTABLE;
 			ExecuteBlocklangFunction(turntable, this);
 		}
-		 */
+#endif
 
 		if(op_buttons[OP_BUTTON_7].up)
 		{
@@ -918,10 +886,16 @@ void TestRobot::OperatorControl()
 
 		HandlePackets(&net_state, this);
 		SendSamples(&net_state, this);
-		UpdateErrorFunction(this);
 
-		SmartDashboard::PutNumber("Left Distance", left_encoder.Get() / 1173.0);
-		SmartDashboard::PutNumber("Right Distance", right_encoder.Get() / 1173.0);
+		SmartDashboard::PutNumber("Punch Plate", punch_plate.GetValue());
+
+#ifdef COMP_BOT
+		SmartDashboard::PutNumber("Left Distance", -left_encoder.Get() / DRIVE_ENCODER_COEFF);
+#else
+		SmartDashboard::PutNumber("Left Distance", left_encoder.Get() / DRIVE_ENCODER_COEFF);
+#endif
+
+		SmartDashboard::PutNumber("Right Distance", right_encoder.Get() / DRIVE_ENCODER_COEFF);
 
 		Wait(0.05f);
 	}
