@@ -280,7 +280,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    dashstate.vision.brightness = 20;
    dashstate.vision.top_reference = RectMinSize(V2(290, 236), V2(63, 16));
    dashstate.vision.bottom_reference = RectMinSize(V2(285, 200), V2(66, 27));
-   dashstate.vision.shooter_threshold = 13000;
+   dashstate.vision.shooter_threshold = 600;
+   dashstate.vision.shooter_target = -3400;
    
    dashstate.vision.grabbed_frame = new cv::Mat(dashstate.vision.camera->get(CV_CAP_PROP_FRAME_WIDTH),
 												dashstate.vision.camera->get(CV_CAP_PROP_FRAME_HEIGHT),

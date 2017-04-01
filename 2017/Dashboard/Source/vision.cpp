@@ -142,7 +142,7 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 			if(dashstate->vision.turret_speed == 0)
 			{
 				r32 motor_reading = GetLatestSample(dashstate->robot.hardware + 1)->motor;
-				b32 speed_hit = (Abs(motor_reading - (-59414)) < dashstate->vision.shooter_threshold);
+				b32 speed_hit = (Abs(motor_reading - dashstate->vision.shooter_target) < dashstate->vision.shooter_threshold);
 			
 				SendSetFloat(dashstate->net_state, 3, speed_hit ? -0.65 : 0);
 				SendSetFloat(dashstate->net_state, 0, speed_hit ? 1 : 0);
@@ -253,6 +253,16 @@ void DrawVision(layout *vision_ui, UIContext *context, DashboardState *dashstate
 	TextBox(&vision_config_list, &dashstate->vision.right_limit, V2(GetSize(vision_config_list.bounds).x, 20), V2(0, 0), V2(0, 0));
 	NextLine(&vision_config_list);
 	
+	Text(&vision_config_list, Concat(Literal("Shooter Target: "), ToString(dashstate->vision.shooter_target, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
+	NextLine(&vision_config_list);
+	TextBox(&vision_config_list, &dashstate->vision.shooter_target, V2(GetSize(vision_config_list.bounds).x, 20), V2(0, 0), V2(0, 0));
+	NextLine(&vision_config_list);
+	
+	Text(&vision_config_list, Concat(Literal("Shooter Threshold: "), ToString(dashstate->vision.shooter_threshold, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
+	NextLine(&vision_config_list);
+	TextBox(&vision_config_list, &dashstate->vision.shooter_threshold, V2(GetSize(vision_config_list.bounds).x, 20), V2(0, 0), V2(0, 0));
+	NextLine(&vision_config_list);
+	
 	if(Button(&vision_config_list, NULL, Literal("Camera Reconnect"), V2(120, 40), V2(0, 0), V2(5, 5)).state)
 	{
 		delete dashstate->vision.camera;
@@ -301,7 +311,7 @@ void DrawVision(layout *vision_ui, UIContext *context, DashboardState *dashstate
 		Text(&vision_info_page, Concat(Literal("Shooter Motor: "), ToString(motor_reading, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
 		NextLine(&vision_info_page);
 		
-		r32 speed_diff = Abs(motor_reading - (-59414));
+		r32 speed_diff = Abs(motor_reading - dashstate->vision.shooter_target);
 		b32 speed_hit = (speed_diff < dashstate->vision.shooter_threshold);
 		
 		Text(&vision_info_page, Concat(speed_hit ? Literal("Speed Hit") : Literal("Speed Not Hit: "), ToString(speed_diff, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));

@@ -218,6 +218,7 @@ struct DashboardState
 		r32 movement;
 		
 		r32 shooter_threshold;
+		r32 shooter_target;
 	} vision;
 };
 
