@@ -117,11 +117,11 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 			
 			if(Abs(dashstate->vision.movement) > 170)
 			{
-				dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * 0.25;
+				dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * dashstate->vision.swivel_high_speed;
 			}
 			else if((170 > Abs(dashstate->vision.movement)) && (Abs(dashstate->vision.movement) > 20))
 			{
-				dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * 0.165;
+				dashstate->vision.turret_speed = (dashstate->vision.movement / Abs(dashstate->vision.movement)) * dashstate->vision.swivel_low_speed;
 			}
 			else if(20 > Abs(dashstate->vision.movement))
 			{
@@ -266,6 +266,16 @@ void DrawVision(layout *vision_ui, UIContext *context, DashboardState *dashstate
 	
 	Text(&vision_config_list, Literal("Swivel"), 20, V2(0, 0), V2(0, 5));
 	ToggleSlider(&vision_config_list, &dashstate->vision.swivel_enabled, Literal("Enabled"), Literal("Disabled"), V2(120, 20), V2(0, 0), V2(0, 5));
+	NextLine(&vision_config_list);
+	
+	Text(&vision_config_list, Concat(Literal("Swivel High Speed: "), ToString(dashstate->vision.swivel_high_speed, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
+	NextLine(&vision_config_list);
+	TextBox(&vision_config_list, &dashstate->vision.swivel_high_speed, V2(GetSize(vision_config_list.bounds).x, 20), V2(0, 0), V2(0, 0));
+	NextLine(&vision_config_list);
+	
+	Text(&vision_config_list, Concat(Literal("Swivel Low Speed: "), ToString(dashstate->vision.swivel_low_speed, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
+	NextLine(&vision_config_list);
+	TextBox(&vision_config_list, &dashstate->vision.swivel_low_speed, V2(GetSize(vision_config_list.bounds).x, 20), V2(0, 0), V2(0, 0));
 	NextLine(&vision_config_list);
 	
 	if(Button(&vision_config_list, NULL, Literal("Camera Reconnect"), V2(120, 40), V2(0, 0), V2(5, 5)).state)

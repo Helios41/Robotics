@@ -283,6 +283,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
    dashstate.vision.shooter_threshold = 600;
    dashstate.vision.shooter_target = -3400;
    
+   dashstate.vision.swivel_low_speed = 0.2;
+   dashstate.vision.swivel_high_speed = -0.25;
+   
    dashstate.vision.grabbed_frame = new cv::Mat(dashstate.vision.camera->get(CV_CAP_PROP_FRAME_WIDTH),
 												dashstate.vision.camera->get(CV_CAP_PROP_FRAME_HEIGHT),
 												CV_32F);

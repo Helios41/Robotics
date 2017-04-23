@@ -221,6 +221,9 @@ struct DashboardState
 		r32 shooter_target;
 		
 		b32 swivel_enabled;
+		
+		r32 swivel_low_speed;
+		r32 swivel_high_speed;
 	} vision;
 };
 
