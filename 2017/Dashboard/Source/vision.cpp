@@ -155,6 +155,11 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 				dashstate->vision.sweep_speed = 0.2;
 			}
 			
+			if(dashstate->vision.sweep_speed == 0)
+			{
+				dashstate->vision.sweep_speed = -0.2;
+			}
+			
 			SendSetFloat(dashstate->net_state, 5, dashstate->vision.swivel_enabled ? dashstate->vision.sweep_speed : 0);
 		}
 	}
