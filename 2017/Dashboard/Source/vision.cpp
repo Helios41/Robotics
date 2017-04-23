@@ -148,7 +148,7 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 				SendSetFloat(dashstate->net_state, 0, speed_hit ? 1 : 0);
 			}
 		}
-		else if(dashstate->vision.swivel_enabled)
+		else 
 		{
 			if(dashstate->vision.left_limit > potentiometer_reading)
 			{
@@ -159,11 +159,7 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 				dashstate->vision.sweep_speed = 0.2;
 			}
 			
-			SendSetFloat(dashstate->net_state, 5, dashstate->vision.sweep_speed);
-		}
-		else
-		{
-			//SendSetFloat(dashstate->net_state, 5, 0);
+			SendSetFloat(dashstate->net_state, 5, dashstate->vision.swivel_enabled ? dashstate->vision.sweep_speed : 0);
 		}
 	}
 }
