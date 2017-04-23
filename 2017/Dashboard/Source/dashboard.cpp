@@ -219,6 +219,8 @@ struct DashboardState
 		
 		r32 shooter_threshold;
 		r32 shooter_target;
+		
+		b32 swivel_enabled;
 	} vision;
 };
 

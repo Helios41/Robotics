@@ -148,7 +148,7 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 				SendSetFloat(dashstate->net_state, 0, speed_hit ? 1 : 0);
 			}
 		}
-		else
+		else if(dashstate->vision.swivel_enabled)
 		{
 			if(dashstate->vision.left_limit > potentiometer_reading)
 			{
@@ -160,6 +160,10 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 			}
 			
 			SendSetFloat(dashstate->net_state, 5, dashstate->vision.sweep_speed);
+		}
+		else
+		{
+			SendSetFloat(dashstate->net_state, 5, 0);
 		}
 	}
 }
@@ -261,6 +265,10 @@ void DrawVision(layout *vision_ui, UIContext *context, DashboardState *dashstate
 	Text(&vision_config_list, Concat(Literal("Shooter Threshold: "), ToString(dashstate->vision.shooter_threshold, &temp_memory), &temp_memory), 20, V2(0, 0), V2(0, 5));
 	NextLine(&vision_config_list);
 	TextBox(&vision_config_list, &dashstate->vision.shooter_threshold, V2(GetSize(vision_config_list.bounds).x, 20), V2(0, 0), V2(0, 0));
+	NextLine(&vision_config_list);
+	
+	Text(&vision_config_list, Literal("Swivel: "), 20, V2(0, 0), V2(0, 5));
+	ToggleSlider(&vision_config_list, &dashstate->vision.swivel_enabled, Literal("Enabled"), Literal("Disabled"), V2(120, 20), V2(0, 0), V2(0, 5));
 	NextLine(&vision_config_list);
 	
 	if(Button(&vision_config_list, NULL, Literal("Camera Reconnect"), V2(120, 40), V2(0, 0), V2(5, 5)).state)
