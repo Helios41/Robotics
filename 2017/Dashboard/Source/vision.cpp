@@ -163,7 +163,7 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 		}
 		else
 		{
-			SendSetFloat(dashstate->net_state, 5, 0);
+			//SendSetFloat(dashstate->net_state, 5, 0);
 		}
 	}
 }
@@ -267,7 +267,7 @@ void DrawVision(layout *vision_ui, UIContext *context, DashboardState *dashstate
 	TextBox(&vision_config_list, &dashstate->vision.shooter_threshold, V2(GetSize(vision_config_list.bounds).x, 20), V2(0, 0), V2(0, 0));
 	NextLine(&vision_config_list);
 	
-	Text(&vision_config_list, Literal("Swivel: "), 20, V2(0, 0), V2(0, 5));
+	Text(&vision_config_list, Literal("Swivel"), 20, V2(0, 0), V2(0, 5));
 	ToggleSlider(&vision_config_list, &dashstate->vision.swivel_enabled, Literal("Enabled"), Literal("Disabled"), V2(120, 20), V2(0, 0), V2(0, 5));
 	NextLine(&vision_config_list);
 	
