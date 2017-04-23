@@ -128,17 +128,13 @@ void RunVision(UIContext *context, DashboardState *dashstate)
 				dashstate->vision.turret_speed = 0.0f;
 			}
 			
-			b32 moving_right = (dashstate->vision.turret_speed > 0) && (dashstate->vision.right_limit > potentiometer_reading);
-			b32 moving_left = (dashstate->vision.turret_speed < 0) && (dashstate->vision.left_limit < potentiometer_reading);
-			b32 stopping = (dashstate->vision.turret_speed == 0);
-			
-			SendSetFloat(dashstate->net_state, 5, dashstate->vision.turret_speed);
-			
 			dashstate->vision.last_track_time = context->curr_time;
 		}
 		
 		if(dashstate->vision.target_hit)
 		{
+			SendSetFloat(dashstate->net_state, 5, dashstate->vision.turret_speed);
+			
 			if(dashstate->vision.turret_speed == 0)
 			{
 				r32 motor_reading = GetLatestSample(dashstate->robot.hardware + 1)->motor;
